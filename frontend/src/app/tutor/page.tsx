@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo } from "lucide-react";
 import KnowledgeTree from "../components/KnowledgeTree";
+
 
 interface NodeItem {
   id: string;
@@ -498,7 +500,7 @@ export default function StudentTutorPage() {
                 : "text-slate-500 hover:bg-white/40"
             }`}
           >
-            <span>📋</span>
+            <ListTodo size={14} className={activeTab === "path" ? "text-indigo-600" : "text-slate-400"} />
             Lộ trình học
           </button>
           <button
@@ -509,7 +511,7 @@ export default function StudentTutorPage() {
                 : "text-slate-500 hover:bg-white/40"
             }`}
           >
-            <span>📖</span>
+            <History size={14} className={activeTab === "logs" ? "text-indigo-600" : "text-slate-400"} />
             Lịch sử
           </button>
         </div>
@@ -721,7 +723,8 @@ export default function StudentTutorPage() {
                     : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
                 }`}
               >
-                🌐 Sơ đồ Cây
+                <Map size={14} className={activeMainTab === "graph" ? "text-indigo-600" : "text-slate-500"} />
+                Sơ đồ Cây
               </button>
               <button
                 onClick={() => {
@@ -737,7 +740,8 @@ export default function StudentTutorPage() {
                     : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
                 }`}
               >
-                ⚡ Không gian Học tập
+                <Sparkles size={14} className={activeMainTab === "workspace" ? "text-indigo-600" : "text-slate-500"} />
+                Không gian Học tập
               </button>
               {selectedNode && (
                 <span className="text-[10px] text-slate-400 font-extrabold px-3 border-l border-slate-200 max-w-[160px] truncate animate-[fadeIn_0.2s_ease-out]">
@@ -792,8 +796,9 @@ export default function StudentTutorPage() {
               <div className="w-[45%] bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm">
                 <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
                   <div className="space-y-0.5">
-                    <span className="text-[9px] bg-indigo-50 text-indigo-700 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
-                      {selectedNode.isRoot ? "📌 Nút Gốc môn học" : "📖 Chủ đề học tập"}
+                    <span className="text-[9px] bg-indigo-50 text-indigo-700 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono flex items-center gap-1.5 w-fit">
+                      {selectedNode.isRoot ? <Compass size={10} /> : <BookOpen size={10} />}
+                      {selectedNode.isRoot ? "Nút Gốc môn học" : "Chủ đề học tập"}
                     </span>
                     <h2 className="text-base font-black text-slate-900 leading-tight truncate max-w-[280px]">
                       {selectedNode.name}
@@ -801,9 +806,9 @@ export default function StudentTutorPage() {
                   </div>
                   <button
                     onClick={() => setActiveMainTab("graph")}
-                    className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50/50 active:scale-95 transition-all shadow-sm cursor-pointer"
+                    className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50/50 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1"
                   >
-                    👈 Bản đồ cây
+                    <ArrowLeft size={10} /> Bản đồ cây
                   </button>
                 </div>
 
@@ -818,7 +823,7 @@ export default function StudentTutorPage() {
                 {/* Socratic RAG Chatbot */}
                 <div className="flex-1 border-t border-slate-100 pt-4 flex flex-col overflow-hidden">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs">💬</span>
+                    <MessageSquare size={13} className="text-indigo-600" />
                     <h4 className="text-xs font-black text-slate-800">Trợ lý Socratic giải thích (RAG Chat)</h4>
                   </div>
 
@@ -858,7 +863,7 @@ export default function StudentTutorPage() {
                       disabled={chatLoading}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
                     >
-                      ➔
+                      <Send size={12} />
                     </button>
                   </form>
                 </div>
@@ -1039,7 +1044,7 @@ export default function StudentTutorPage() {
                             disabled={hintLoading || submitting}
                             className="bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-50 font-black text-xs px-4.5 py-3.5 rounded-2xl transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5 duration-200"
                           >
-                            <span>✨</span>
+                            <Sparkles size={13} className="text-indigo-600" />
                             {hintPressCount === 0 ? "Xem gợi ý" : hintPressCount === 1 ? "Gợi ý 2" : hintPressCount === 2 ? "Gợi ý 3" : "Hết gợi ý"}
                           </button>
 
@@ -1130,7 +1135,7 @@ export default function StudentTutorPage() {
                         {/* 3. Inline Socratic Question RAG Chatbot Helper */}
                         <div className="pt-6 border-t border-slate-200 space-y-3 bg-indigo-50/20 p-4 rounded-[24px] border border-indigo-100/60 shadow-inner mt-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs">💬</span>
+                            <MessageSquare size={13} className="text-indigo-650" />
                             <h4 className="text-xs font-black text-slate-850">Cần trợ giúp? Trò chuyện Socratic về câu hỏi này</h4>
                           </div>
 
@@ -1177,7 +1182,7 @@ export default function StudentTutorPage() {
                               disabled={questionChatLoading || !questionChatInput.trim()}
                               className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
                             >
-                              ➔
+                              <Send size={12} />
                             </button>
                           </form>
                         </div>
@@ -1186,7 +1191,7 @@ export default function StudentTutorPage() {
                   })()
                 ) : (
                   <div className="text-center py-16 text-slate-400 text-xs font-bold border border-dashed border-slate-200 rounded-2xl flex flex-col items-center gap-2">
-                    <span className="text-2xl select-none mb-1">📝</span>
+                    <HelpCircle size={24} className="text-indigo-400" />
                     Chưa có câu hỏi trắc nghiệm nào cho bài học này.
                   </div>
                 )}
@@ -1194,7 +1199,7 @@ export default function StudentTutorPage() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-3 p-10 bg-white border border-slate-200 rounded-3xl shadow-sm">
-              <span className="text-4xl select-none animate-pulse mb-1">💡</span>
+              <Compass size={40} className="text-indigo-500 animate-pulse mb-1" />
               <p className="text-sm font-bold text-slate-700">Chưa có bài học nào được chọn</p>
               <p className="text-xs text-slate-400 max-w-sm text-center leading-relaxed">
                 Em hãy quay lại tab <strong>🌐 Sơ đồ Cây</strong> và bấm chọn một chủ đề học tập để bắt đầu không gian học tập Socratic nhé!
