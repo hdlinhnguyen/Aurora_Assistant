@@ -1221,14 +1221,23 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 	}
 
 	var req struct {
-		Approve bool   `json:"approve"`
-		Note    string `json:"note"`
+		Approve     bool                   `json:"approve"`
+		Note        string                 `json:"note"`
+		CustomPaths map[string]interface{} `json:"custom_paths"`
 	}
 	if err := c.Bind().JSON(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu yêu cầu không hợp lệ"})
 	}
 
-	jsonBytes, err := json.Marshal(req)
+	// We still notify FastAPI server of approval to update the thread status
+	reqToFastAPI := struct {
+		Approve bool   `json:"approve"`
+		Note    string `json:"note"`
+	}{
+		Approve: req.Approve,
+		Note:    req.Note,
+	}
+	jsonBytes, err := json.Marshal(reqToFastAPI)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
 	}
@@ -1261,7 +1270,12 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 
 	classID := "class-demo"
 
-	for studentIDStr, pathData := range result.Paths {
+	pathsToSave := result.Paths
+	if len(req.CustomPaths) > 0 {
+		pathsToSave = req.CustomPaths
+	}
+
+	for studentIDStr, pathData := range pathsToSave {
 		studentID, err := uuid.Parse(studentIDStr)
 		if err != nil {
 			continue

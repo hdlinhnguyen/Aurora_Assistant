@@ -1041,9 +1041,15 @@ export default function KnowledgeTree({
                     >
                       <div
                         onMouseDown={(e) => handleNodeDragStart(e, node.id, node.posX, node.posY)}
-                        onClick={() => selectable && handleNodeClick(node)}
+                        onClick={() => {
+                          if (selectable) {
+                            handleNodeClick(node);
+                          } else {
+                            alert(`🔒 Chủ đề "${node.name}" đang bị khóa. Em hãy học và hoàn thành các bài học tiên quyết trước nhé!`);
+                          }
+                        }}
                         className={`h-full w-full rounded-2xl border-2 p-3 text-center flex flex-col justify-center items-center shadow-sm select-none transition-all duration-200 relative ${colorClass} ${
-                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-not-allowed"
+                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-not-allowed hover:opacity-80"
                         } ${isActiveNode
                             ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] scale-[1.06] shadow-lg shadow-[var(--purple)]/25 z-10"
                             : isHighlighted
@@ -1103,8 +1109,8 @@ export default function KnowledgeTree({
                                 </span>
                               )}
                               {(!studentNodeStatus[node.id] || studentNodeStatus[node.id] === "locked") && (
-                                <span className="text-[7px] bg-muted text-muted-foreground border border-border px-1 py-0.5 rounded font-black uppercase tracking-wider opacity-60">
-                                  Khóa
+                                <span className="text-[7px] bg-slate-100 text-slate-400 border border-slate-200 px-1 py-0.5 rounded font-black uppercase tracking-wider opacity-85">
+                                  🔒 Khóa
                                 </span>
                               )}
                             </div>

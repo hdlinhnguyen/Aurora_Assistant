@@ -331,6 +331,7 @@ export default function TeacherDashboard() {
         body: JSON.stringify({
           approve: true,
           note: "Phê duyệt bởi giáo viên",
+          custom_paths: draftPaths,
         }),
       });
       alert("Đã phê duyệt và kích hoạt lộ trình học tập cho học sinh!");
@@ -343,6 +344,53 @@ export default function TeacherDashboard() {
       setApprovingPath(false);
     }
   };
+
+  const handleMoveStep = (studentId: string, stepIndex: number, direction: "up" | "down") => {
+    if (!draftPaths) return;
+    const studentPath = { ...draftPaths[studentId] };
+    const steps = [...(studentPath.ordered_steps || [])];
+    
+    if (direction === "up" && stepIndex > 0) {
+      const temp = steps[stepIndex];
+      steps[stepIndex] = steps[stepIndex - 1];
+      steps[stepIndex - 1] = temp;
+    } else if (direction === "down" && stepIndex < steps.length - 1) {
+      const temp = steps[stepIndex];
+      steps[stepIndex] = steps[stepIndex + 1];
+      steps[stepIndex + 1] = temp;
+    } else {
+      return;
+    }
+
+    steps.forEach((s, idx) => {
+      s.order = idx + 1;
+    });
+
+    studentPath.ordered_steps = steps;
+    setDraftPaths({
+      ...draftPaths,
+      [studentId]: studentPath
+    });
+  };
+
+  const handleDeleteStep = (studentId: string, stepIndex: number) => {
+    if (!draftPaths) return;
+    const studentPath = { ...draftPaths[studentId] };
+    const steps = [...(studentPath.ordered_steps || [])];
+    
+    steps.splice(stepIndex, 1);
+    
+    steps.forEach((s, idx) => {
+      s.order = idx + 1;
+    });
+
+    studentPath.ordered_steps = steps;
+    setDraftPaths({
+      ...draftPaths,
+      [studentId]: studentPath
+    });
+  };
+
   const loadStudentDetailProgress = async (studentId: string) => {
     try {
       const data = (await apiFetch(
@@ -1671,19 +1719,46 @@ export default function TeacherDashboard() {
                                 </div>
                                 
                                 <div className="space-y-2">
-                                  {studentPath.ordered_steps && studentPath.ordered_steps.map((step: any) => {
+                                  {studentPath.ordered_steps && studentPath.ordered_steps.map((step: any, idx: number) => {
                                     const stepNode = nodes.find(n => n.id === step.topic_id);
                                     const topicName = stepNode ? stepNode.name : step.topic_id;
                                     return (
-                                      <div key={step.topic_id} className="p-2.5 bg-white border border-border rounded-xl text-[10px] space-y-1">
+                                      <div key={step.topic_id} className="p-2.5 bg-white border border-border rounded-xl text-[10px] space-y-1 shadow-sm animate-[fadeIn_0.2s_ease-out]">
                                         <div className="flex justify-between font-bold text-foreground">
-                                          <span>{step.order}. {topicName}</span>
-                                          <span className="text-muted-foreground font-mono">{(step.current_mastery * 100).toFixed(0)}% → {(step.target_mastery * 100).toFixed(0)}%</span>
+                                          <span className="flex items-center gap-1 font-bold text-slate-800">
+                                            <span>{step.order}. {topicName}</span>
+                                          </span>
+                                          <div className="flex items-center gap-1.5 select-none">
+                                            <button
+                                              onClick={() => handleMoveStep(sid, idx, "up")}
+                                              disabled={idx === 0}
+                                              className="text-[9px] hover:scale-115 active:scale-95 disabled:opacity-30 cursor-pointer"
+                                              title="Di chuyển lên"
+                                            >
+                                              ⬆️
+                                            </button>
+                                            <button
+                                              onClick={() => handleMoveStep(sid, idx, "down")}
+                                              disabled={idx === studentPath.ordered_steps.length - 1}
+                                              className="text-[9px] hover:scale-115 active:scale-95 disabled:opacity-30 cursor-pointer"
+                                              title="Di chuyển xuống"
+                                            >
+                                              ⬇️
+                                            </button>
+                                            <button
+                                              onClick={() => handleDeleteStep(sid, idx)}
+                                              className="text-[9px] hover:scale-115 active:scale-95 text-rose-500 cursor-pointer ml-1"
+                                              title="Xóa bước"
+                                            >
+                                              ❌
+                                            </button>
+                                          </div>
                                         </div>
-                                        <p className="text-[9px] text-muted-foreground leading-relaxed">{step.inclusion_reason}</p>
-                                        <div className="flex gap-2 text-[8px] text-slate-400 font-bold">
+                                        <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold font-mono">
+                                          <span>Tiến trình: {(step.current_mastery * 100).toFixed(0)}% &rarr; {(step.target_mastery * 100).toFixed(0)}%</span>
                                           <span>⏱️ {step.estimated_minutes}m</span>
                                         </div>
+                                        <p className="text-[9px] text-slate-500 leading-relaxed pt-1.5 border-t border-slate-100">{step.inclusion_reason}</p>
                                       </div>
                                     );
                                   })}

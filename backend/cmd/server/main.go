@@ -147,12 +147,16 @@ func main() {
 
 		// Save questions for mathNode11ID (Cộng cùng mẫu)
 		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode11ID, Content: "Tính phép tính sau: 1/5 + 2/5 = ?", OptionsJSON: `["3/5", "3/10", "1/5", "2/5"]`, CorrectOption: 0, Difficulty: "easy", CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode11ID, Content: "Tính phép tính sau: 2/7 + 3/7 = ?", OptionsJSON: `["5/7", "5/14", "6/7", "1/7"]`, CorrectOption: 0, Difficulty: "easy", CreatedAt: time.Now(), UpdatedAt: time.Now()})
 		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode11ID, Content: "Tính phép tính sau và rút gọn: 3/8 + 1/8 = ?", OptionsJSON: `["4/8", "1/2", "4/16", "1/4"]`, CorrectOption: 1, Difficulty: "medium", CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode11ID, Content: "Tính phép tính sau và rút gọn: 5/12 + 1/12 = ?", OptionsJSON: `["6/12", "1/2", "1/4", "5/12"]`, CorrectOption: 1, Difficulty: "medium", CreatedAt: time.Now(), UpdatedAt: time.Now()})
 		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode11ID, Content: "Một bình nước có 2/9 lít nước, người ta đổ thêm vào 4/9 lít nước nữa. Hỏi trong bình có bao nhiêu lít nước? (Rút gọn kết quả)", OptionsJSON: `["6/18 lít", "2/3 lít", "1/3 lít", "8/9 lít"]`, CorrectOption: 1, Difficulty: "hard", CreatedAt: time.Now(), UpdatedAt: time.Now()})
 
 		// Save questions for mathNode12ID (Cộng khác mẫu)
 		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode12ID, Content: "Hãy quy đồng mẫu số và cộng: 1/2 + 1/4 = ?", OptionsJSON: `["2/6", "3/4", "1/2", "3/8"]`, CorrectOption: 1, Difficulty: "easy", CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode12ID, Content: "Quy đồng và tính: 1/3 + 1/6 = ?", OptionsJSON: `["2/9", "1/2", "3/6", "2/6"]`, CorrectOption: 1, Difficulty: "easy", CreatedAt: time.Now(), UpdatedAt: time.Now()})
 		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode12ID, Content: "Tìm kết quả đúng: 1/3 + 2/5 = ?", OptionsJSON: `["3/8", "11/15", "7/15", "3/15"]`, CorrectOption: 1, Difficulty: "medium", CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode12ID, Content: "Tính kết quả sau: 2/3 + 1/4 = ?", OptionsJSON: `["3/7", "11/12", "3/12", "7/12"]`, CorrectOption: 1, Difficulty: "medium", CreatedAt: time.Now(), UpdatedAt: time.Now()})
 		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode12ID, Content: "Mẹ mua 1/2 kg táo và 3/5 kg cam. Hỏi tổng số kg hoa quả mẹ đã mua là bao nhiêu?", OptionsJSON: `["4/7 kg", "11/10 kg", "9/10 kg", "4/10 kg"]`, CorrectOption: 1, Difficulty: "hard", CreatedAt: time.Now(), UpdatedAt: time.Now()})
 
 		// Save questions for mathNode2ID (Nhân số thập phân)
