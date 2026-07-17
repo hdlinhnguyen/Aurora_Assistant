@@ -52,6 +52,34 @@ export default function StudentTutorPage() {
   const [userName, setUserName] = useState("Học sinh");
   const [subjects, setSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("");
+
+  const formatMarkdown = (text: string): string => {
+    if (!text) return "";
+    let html = text;
+
+    // Escape HTML tags to prevent basic XSS
+    html = html
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // Format bold-italic (***text***)
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
+    // Format bold (**text**)
+    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    // Format italic (*text*)
+    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+    // Format inline code/math ($P(n)$ or $n$)
+    html = html.replace(/\$(.*?)\$/g, (match, p1) => {
+      return `<code class="font-mono bg-indigo-50/50 text-indigo-700 px-1.5 py-0.5 rounded text-[11px] font-bold border border-indigo-100/50 mx-0.5">${p1}</code>`;
+    });
+
+    // Replace newlines with <br />
+    html = html.replace(/\n/g, "<br />");
+
+    return html;
+  };
   
   // Tree Data
   const [nodes, setNodes] = useState<NodeItem[]>([]);
@@ -1112,13 +1140,14 @@ export default function StudentTutorPage() {
                   <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/30 space-y-3 mb-4 text-sm font-medium">
                     {theoryChat.map((msg, idx) => (
                       <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border transition-all ${
-                          msg.sender === "student"
-                            ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
-                            : "bg-white border-slate-200 text-slate-800 rounded-bl-none"
-                        }`}>
-                          {msg.content}
-                        </div>
+                        <div 
+                          className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border transition-all text-xs md:text-sm leading-relaxed ${
+                            msg.sender === "student"
+                              ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
+                              : "bg-white border-slate-200 text-slate-800 rounded-bl-none font-bold"
+                          }`}
+                          dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                        />
                       </div>
                     ))}
                     {chatLoading && (
@@ -1169,21 +1198,27 @@ export default function StudentTutorPage() {
                 
                 {/* 1. Conditional Progress Header: Gauge for Practice, Test Card for Diagnostic */}
                 {quizMode === "diagnostic" ? (
-                  <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-5 text-white shadow-md flex items-center justify-between mb-6 animate-[fadeIn_0.2s_ease-out]">
-                    <div className="space-y-1.5">
-                      <span className="text-[9px] bg-white/20 text-white font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full font-mono">
+                  <div className="bg-gradient-to-r from-indigo-700 via-indigo-800 to-violet-900 rounded-[24px] p-6 text-white shadow-lg border border-indigo-600/30 flex items-center justify-between mb-6 animate-[fadeIn_0.2s_ease-out] relative overflow-hidden">
+                    {/* Glowing background circles for visual depth */}
+                    <div className="absolute -right-10 -top-10 w-36 h-36 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+                    <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+                    
+                    <div className="space-y-2 flex-1 pr-4 relative z-10">
+                      <span className="inline-flex items-center gap-1.5 text-[9px] bg-white/15 text-indigo-100 font-black uppercase tracking-widest px-3 py-1 rounded-full font-mono border border-white/10">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
                         Chế độ Chẩn đoán Năng lực
                       </span>
-                      <h3 className="text-sm font-black uppercase tracking-tight">
+                      <h3 className="text-base font-black uppercase tracking-tight leading-tight">
                         Bài đánh giá năng lực thích ứng
                       </h3>
-                      <p className="text-[10px] text-blue-100/90 font-medium">
-                        Làm bài hết sức mình. Hệ thống sẽ tự động đo đạc, phân tích lỗ hổng và xếp lớp chính xác cho em.
+                      <p className="text-[11px] text-indigo-100/90 font-medium leading-relaxed max-w-md">
+                        Làm bài hết sức mình. Hệ thống sẽ tự động đo đạc, phân tích lỗ hổng kiến thức và xếp lớp chính xác nhất cho em.
                       </p>
                     </div>
-                    <div className="text-right shrink-0 bg-white/10 px-4 py-2 rounded-2xl border border-white/25">
-                      <span className="text-2xl font-black leading-none block">{currentQIndex + 1}</span>
-                      <span className="text-[9px] text-blue-200 font-extrabold uppercase tracking-wide">Câu hỏi</span>
+                    
+                    <div className="h-16 w-16 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex flex-col items-center justify-center shadow-inner shrink-0 relative z-10 hover:scale-105 transition-transform duration-200">
+                      <span className="text-xl font-black leading-none text-white font-mono">{currentQIndex + 1}</span>
+                      <span className="text-[8px] text-indigo-200 font-black uppercase tracking-widest mt-0.5 font-mono">Câu hỏi</span>
                     </div>
                   </div>
                 ) : (
@@ -1318,9 +1353,10 @@ export default function StudentTutorPage() {
                         </div>
 
                         {/* Question Box */}
-                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 font-black text-xs text-slate-800 leading-relaxed shadow-inner">
-                          {currentQ.content}
-                        </div>
+                        <div 
+                          className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 text-sm text-slate-800 leading-relaxed shadow-inner font-extrabold"
+                          dangerouslySetInnerHTML={{ __html: formatMarkdown(currentQ.content) }}
+                        />
 
                         {/* Options Buttons */}
                         <div className="grid grid-cols-1 gap-2.5">
@@ -1370,7 +1406,10 @@ export default function StudentTutorPage() {
                               </span>
                               <span className="text-[9px] text-slate-400 font-semibold font-mono">(Trọng số BKT đã giảm)</span>
                             </div>
-                            <p className="text-xs text-slate-750 leading-relaxed font-extrabold">{activeHint}</p>
+                            <p 
+                              className="text-xs text-slate-750 leading-relaxed font-extrabold"
+                              dangerouslySetInnerHTML={{ __html: formatMarkdown(activeHint) }}
+                            />
                           </div>
                         )}
 
@@ -1379,8 +1418,9 @@ export default function StudentTutorPage() {
                           <button
                             onClick={handleSubmitAnswer}
                             disabled={selectedOption === null || submitting}
-                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-650 hover:from-indigo-700 hover:to-purple-700 text-white disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed font-extrabold text-xs py-3.5 rounded-2xl shadow-md shadow-indigo-100 disabled:shadow-none hover:shadow-lg hover:shadow-indigo-250 transition-all duration-200 active:scale-[0.98] cursor-pointer text-center"
+                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-slate-100 disabled:text-slate-400 font-extrabold text-xs py-4 rounded-2xl shadow-md active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 border border-indigo-700 disabled:border-slate-200"
                           >
+                            <Check size={14} className={selectedOption === null ? "text-slate-400" : "text-white"} />
                             {submitting ? "Đang gửi..." : "Gửi đáp án"}
                           </button>
 
@@ -1388,9 +1428,9 @@ export default function StudentTutorPage() {
                             <button
                               onClick={handleRequestHint}
                               disabled={hintLoading || submitting}
-                              className="bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-50 font-black text-xs px-4.5 py-3.5 rounded-2xl transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5 duration-200"
+                              className="bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-50 font-black text-xs px-5 py-4 rounded-2xl transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5 duration-200"
                             >
-                              <Sparkles size={13} className="text-indigo-600" />
+                              <Sparkles size={13} className="text-indigo-650" />
                               {hintPressCount === 0 ? "Xem gợi ý" : hintPressCount === 1 ? "Gợi ý 2" : hintPressCount === 2 ? "Gợi ý 3" : "Hết gợi ý"}
                             </button>
                           )}
@@ -1398,7 +1438,7 @@ export default function StudentTutorPage() {
                           <button
                             onClick={handleCantDo}
                             disabled={submitting}
-                            className="bg-white border border-slate-200 hover:border-rose-300 hover:text-rose-600 text-slate-500 disabled:opacity-50 font-bold text-xs px-5 py-3.5 rounded-2xl transition-all hover:shadow-sm cursor-pointer duration-200"
+                            className="bg-white border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-slate-600 disabled:opacity-50 font-extrabold text-xs px-6 py-4 rounded-2xl transition-all hover:shadow-sm cursor-pointer duration-200 active:scale-95 shadow-sm"
                           >
                             Bỏ qua
                           </button>
@@ -1496,13 +1536,14 @@ export default function StudentTutorPage() {
                               ) : (
                                 qChat.map((msg, idx) => (
                                   <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                                    <div className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm transition-all ${
-                                      msg.sender === "student"
-                                        ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
-                                        : "bg-indigo-50/70 border-indigo-100 text-indigo-950 rounded-bl-none"
-                                    }`}>
-                                      {msg.content}
-                                    </div>
+                                    <div 
+                                      className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm transition-all text-[11px] leading-relaxed ${
+                                        msg.sender === "student"
+                                          ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
+                                          : "bg-indigo-50/70 border-indigo-100 text-indigo-950 rounded-bl-none font-bold"
+                                      }`}
+                                      dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                                    />
                                   </div>
                                 ))
                               )}
