@@ -684,11 +684,13 @@ func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
 	}
 	role, _ := claims["role"].(string)
-	if role != "teacher" {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem chi tiết tiến trình"})
-	}
-
 	studentIdStr := c.Params("studentId")
+	if role != "teacher" {
+		userIDStr, _ := c.Locals("userID").(string)
+		if userIDStr != studentIdStr {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem chi tiết tiến trình"})
+		}
+	}
 	studentID, err := uuid.Parse(studentIdStr)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
