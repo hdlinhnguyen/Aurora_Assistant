@@ -1,0 +1,56 @@
+[
+  {
+    "tienQuyet": "l4-khai-niem-phan-so",
+    "node": "l4-so-sanh-phan-so",
+    "canCu": "Yêu cầu cần đạt của 'l4-khai-niem-phan-so': \"Nhận biết được khái niệm ban đầu về phân số, tử số, mẫu số.\" và của 'l4-so-sanh-phan-so': \"So sánh và sắp xếp được thứ tự các phân số trong những trường hợp sau: các phân số có cùng mẫu số\".",
+    "lyDo": "Để so sánh hai phân số có cùng mẫu số, học sinh phải hiểu khái niệm tử số và mẫu số để có thể so sánh hai tử số trong khi giữ nguyên mẫu số. Đây là trường hợp so sánh cơ bản nhất."
+  },
+  {
+    "tienQuyet": "l4-khai-niem-phan-so",
+    "node": "l4-phep-tinh-phan-so",
+    "canCu": "Yêu cầu cần đạt của 'l4-khai-niem-phan-so': \"Nhận biết được khái niệm ban đầu về phân số, tử số, mẫu số.\" và của 'l4-phep-tinh-phan-so': \"Thực hiện được phép cộng, phép trừ phân số trong những trường hợp sau: các phân số có cùng mẫu số\".",
+    "lyDo": "Để thực hiện phép cộng hoặc trừ hai phân số có cùng mẫu số, học sinh phải vận dụng khái niệm tử số và mẫu số để thực hiện phép tính trên các tử số và giữ nguyên mẫu số chung."
+  },
+  {
+    "tienQuyet": "l6-phep-tinh-so-nguyen",
+    "node": "l7-phep-tinh-so-huu-ti",
+    "canCu": "Yêu cầu cần đạt của 'l6-phep-tinh-so-nguyen': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia (chia hết) trong tập hợp các số nguyên.\" và của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\"",
+    "lyDo": "Các quy tắc thực hiện phép tính với số hữu tỉ (dưới dạng phân số a/b) được xây dựng trực tiếp từ các phép tính trên tử số và mẫu số, vốn là các số nguyên. Nắm vững phép tính số nguyên là điều kiện cần để thực hiện đúng các phép tính với số hữu tỉ."
+  },
+  {
+    "tienQuyet": "l5-phep-tinh-so-thap-phan",
+    "node": "l7-phep-tinh-so-huu-ti",
+    "canCu": "Yêu cầu cần đạt của 'l5-phep-tinh-so-thap-phan': \"Thực hiện được phép cộng, phép trừ hai số thập phân. · Thực hiện được phép nhân... · Thực hiện được phép chia...\" và của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\"",
+    "lyDo": "Số thập phân là một dạng biểu diễn của số hữu tỉ. Việc thực hiện thành thạo các phép tính với số thập phân là kĩ năng cần có để thực hiện các phép tính trong tập hợp số hữu tỉ, vốn bao gồm cả số thập phân và phân số."
+  },
+  {
+    "tienQuyet": "l6-phep-tinh-phan-so",
+    "node": "l8-phuong-trinh-bac-nhat",
+    "canCu": "Yêu cầu cần đạt của 'l6-phep-tinh-phan-so': \"Thực hiện được các phép tính cộng, trừ, nhân, chia với phân số.\" và của 'l8-phuong-trinh-bac-nhat': \"Hiểu được khái niệm phương trình bậc nhất một ẩn và cách giải.\"",
+    "lyDo": "Quá trình giải phương trình bậc nhất một ẩn (ví dụ: ax + b = c) thường xuyên sử dụng các phép biến đổi tương đương như nhân, chia, cộng, trừ các hệ số là phân số, và kết quả (nghiệm) của phương trình cũng thường là phân số."
+  },
+  {
+    "tienQuyet": "l7-phep-tinh-so-huu-ti",
+    "node": "l8-ham-so-bac-nhat",
+    "canCu": "Yêu cầu cần đạt của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\" và của 'l8-ham-so-bac-nhat': \"Thiết lập được bảng giá trị của hàm số bậc nhất y = ax + b (a ≠ 0).\"",
+    "lyDo": "Để lập bảng giá trị của hàm số bậc nhất, học sinh cần thay các giá trị x (thường là số hữu tỉ) vào biểu thức y = ax + b và tính giá trị y tương ứng. Việc này đòi hỏi phải thực hiện thành thạo các phép tính với số hữu tỉ."
+  },
+  {
+    "tienQuyet": "l8-ham-so-bac-nhat",
+    "node": "l9-he-phuong-trinh",
+    "canCu": "Yêu cầu cần đạt của 'l8-ham-so-bac-nhat': \"Vẽ được đồ thị của hàm số bậc nhất y = ax + b (a ≠ 0).\" và của 'l9-he-phuong-trinh': \"Nhận biết được khái niệm nghiệm của hệ hai phương trình bậc nhất hai ẩn.\"",
+    "lyDo": "Hiểu và vẽ được đồ thị của hàm số bậc nhất giúp học sinh trực quan hóa và hiểu được ý nghĩa hình học của nghiệm của hệ hai phương trình bậc nhất hai ẩn chính là tọa độ giao điểm của hai đường thẳng."
+  },
+  {
+    "tienQuyet": "l7-phep-tinh-so-huu-ti",
+    "node": "l9-phuong-trinh-bac-hai",
+    "canCu": "Yêu cầu cần đạt của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\" và của 'l9-phuong-trinh-bac-hai': \"Giải được phương trình bậc hai một ẩn.\"",
+    "lyDo": "Việc giải phương trình bậc hai, đặc biệt là sử dụng công thức nghiệm, đòi hỏi phải thực hiện các phép tính cộng, trừ, nhân, chia với các hệ số a, b, c, vốn là các số hữu tỉ. Kỹ năng tính toán với số hữu tỉ là nền tảng để tìm nghiệm chính xác."
+  },
+  {
+    "tienQuyet": "l8-ham-so-bac-nhat",
+    "node": "l10-ham-so-bac-hai",
+    "canCu": "Yêu cầu cần đạt của 'l8-ham-so-bac-nhat': \"Thiết lập được bảng giá trị của hàm số bậc nhất... · Vẽ được đồ thị của hàm số bậc nhất...\" và của 'l10-ham-so-bac-hai': \"Thiết lập được bảng giá trị của hàm số bậc hai. · Vẽ được Parabola...\"",
+    "lyDo": "Các kỹ năng cơ bản về hàm số như lập bảng giá trị và vẽ đồ thị được giới thiệu và thực hành với hàm số bậc nhất. Đây là nền tảng để học sinh tiếp cận và thực hiện các kỹ năng tương tự đối với hàm số bậc hai phức tạp hơn."
+  }
+]

@@ -1,0 +1,222 @@
+"use client";
+
+import React from "react";
+import { Upload, Pencil, Trash } from "lucide-react";
+
+import { NodeItem, Question } from "../page";
+
+interface QuestionBankTabProps {
+  selectedSubject: string;
+  nodes: NodeItem[];
+  subjectQuestions: Question[];
+  qbSearchText: string;
+  setQbSearchText: (v: string) => void;
+  qbFilterNodeId: string;
+  setQbFilterNodeId: (v: string) => void;
+  qbFilterDifficulty: string;
+  setQbFilterDifficulty: (v: string) => void;
+  handleStartAddQuestion: () => void;
+  handleDownloadTemplate: () => void;
+  handleExcelImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleStartEditQuestion: (q: Question) => void;
+  handleDeleteQuestion: (qId: string) => void;
+  setEditingNode: (node: NodeItem | null) => void;
+  formatDate: (dateStr?: string) => string;
+}
+
+export default function QuestionBankTab({
+  selectedSubject,
+  nodes,
+  subjectQuestions,
+  qbSearchText,
+  setQbSearchText,
+  qbFilterNodeId,
+  setQbFilterNodeId,
+  qbFilterDifficulty,
+  setQbFilterDifficulty,
+  handleStartAddQuestion,
+  handleDownloadTemplate,
+  handleExcelImport,
+  handleStartEditQuestion,
+  handleDeleteQuestion,
+  setEditingNode,
+  formatDate,
+}: QuestionBankTabProps) {
+  const filtered = subjectQuestions.filter(q => {
+    const matchSearch = qbSearchText ? q.content.toLowerCase().includes(qbSearchText.toLowerCase()) : true;
+    const matchNode = qbFilterNodeId ? q.nodeId === qbFilterNodeId : true;
+    const matchDiff = qbFilterDifficulty ? q.difficulty.toLowerCase() === qbFilterDifficulty.toLowerCase() : true;
+    return matchSearch && matchNode && matchDiff;
+  });
+
+  return (
+    <div className="flex-1 flex flex-col gap-5 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+      {/* Search & Filters & Import excel row */}
+      <div className="bg-card border border-border rounded-3xl p-5 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex flex-wrap gap-3 items-center flex-1">
+          <input
+            type="text"
+            placeholder="Tìm kiếm câu hỏi..."
+            value={qbSearchText}
+            onChange={(e) => setQbSearchText(e.target.value)}
+            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] w-full max-w-[240px] font-semibold bg-white"
+          />
+          
+          <select
+            value={qbFilterNodeId}
+            onChange={(e) => setQbFilterNodeId(e.target.value)}
+            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+          >
+            <option value="">Tất cả chủ đề</option>
+            {nodes.map(n => (
+              <option key={n.id} value={n.id}>{n.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={qbFilterDifficulty}
+            onChange={(e) => setQbFilterDifficulty(e.target.value)}
+            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+          >
+            <option value="">Tất cả độ khó</option>
+            <option value="easy">Nhận biết</option>
+            <option value="medium">Thông hiểu</option>
+            <option value="hard">Vận dụng</option>
+            <option value="very_hard">Vận dụng cao</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleStartAddQuestion}
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+          >
+            ➕ Thêm câu hỏi
+          </button>
+
+          <button
+            onClick={handleDownloadTemplate}
+            className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+          >
+            Tải file mẫu Excel
+          </button>
+          
+          <label className="px-4 py-2 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground rounded-xl text-xs font-black transition-all shadow-[var(--shadow-card)] flex items-center gap-1.5 cursor-pointer">
+            <Upload size={14} /> Nhập từ Excel
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleExcelImport}
+              className="hidden"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Question List Area */}
+      <div className="flex-1 bg-card border border-border rounded-3xl p-6 shadow-sm overflow-y-auto space-y-4">
+        {filtered.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground font-semibold">
+            Không tìm thấy câu hỏi nào phù hợp với bộ lọc.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map(q => {
+              const matchedNode = nodes.find(n => n.id === q.nodeId);
+              let opts = ["", "", "", ""];
+              try {
+                opts = JSON.parse(q.optionsJson);
+              } catch (e) {}
+
+              return (
+                <div key={q.id} className="p-4 border border-border rounded-2xl bg-white hover:shadow-md transition-shadow flex flex-col justify-between gap-3 shadow-sm">
+                  <div className="space-y-2.5">
+                    {/* Row 1: Badges & metadata */}
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-100 text-[9px] text-slate-500 font-extrabold">
+                          {selectedSubject}
+                        </span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[9px] text-slate-600 font-black uppercase select-text" title={matchedNode ? matchedNode.name : "Chủ đề ẩn"}>
+                          {matchedNode ? matchedNode.name : "Chủ đề ẩn"}
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase border shrink-0 ${
+                        q.difficulty === "easy"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                          : q.difficulty === "medium"
+                          ? "bg-amber-50 text-amber-600 border-amber-100"
+                          : q.difficulty === "hard"
+                          ? "bg-orange-50 text-orange-600 border-orange-100"
+                          : "bg-rose-50 text-rose-600 border-rose-100"
+                      }`}>
+                        {q.difficulty === "easy"
+                          ? "Nhận biết"
+                          : q.difficulty === "medium"
+                          ? "Thông hiểu"
+                          : q.difficulty === "hard"
+                          ? "Vận dụng"
+                          : "Vận dụng cao"}
+                      </span>
+                    </div>
+
+                    {/* Content */}
+                    <p className="text-xs font-bold text-slate-800 leading-relaxed line-clamp-3" title={q.content}>
+                      {q.content}
+                    </p>
+
+                    {/* Options */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {opts.map((opt, oIdx) => (
+                        <div
+                          key={oIdx}
+                          className={`p-2 rounded-xl text-[10px] font-semibold border truncate ${oIdx === q.correctOption
+                              ? "bg-emerald-50/50 border-emerald-200 text-emerald-800 font-bold"
+                              : "bg-slate-50 border-slate-100 text-slate-600"
+                            }`}
+                          title={opt}
+                        >
+                          <span className="font-extrabold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Bottom meta & actions */}
+                  <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                    <span className="text-[8px] text-slate-400 font-bold">
+                      Cập nhật: {formatDate((q as any).updatedAt || (q as any).createdAt)}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingNode(matchedNode || null);
+                          handleStartEditQuestion(q);
+                        }}
+                        className="p-1.5 rounded-lg border border-border hover:bg-muted text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
+                        title="Chỉnh sửa câu hỏi"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingNode(matchedNode || null);
+                          handleDeleteQuestion(q.id);
+                        }}
+                        className="p-1.5 rounded-lg border border-rose-100 hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-all cursor-pointer"
+                        title="Xóa câu hỏi"
+                      >
+                        <Trash size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
