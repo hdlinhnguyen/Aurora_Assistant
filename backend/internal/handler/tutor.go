@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -677,17 +678,22 @@ func (h *TutorHandler) GetStudentsProgress(c fiber.Ctx) error {
 func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	token, ok := c.Locals("user").(*jwt.Token)
 	if !ok {
+		log.Println("[DEBUG] GetStudentSubjectProgress: Token not found in locals")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
 	}
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
+		log.Println("[DEBUG] GetStudentSubjectProgress: Claims cast failed")
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
 	}
 	role, _ := claims["role"].(string)
 	studentIdStr := c.Params("studentId")
+	log.Printf("[DEBUG] GetStudentSubjectProgress: role=%s, param studentId=%s", role, studentIdStr)
 	if role != "teacher" {
 		userIDStr, _ := c.Locals("userID").(string)
+		log.Printf("[DEBUG] GetStudentSubjectProgress: student role, local userIDStr=%s vs param studentId=%s", userIDStr, studentIdStr)
 		if !strings.EqualFold(userIDStr, studentIdStr) {
+			log.Println("[DEBUG] GetStudentSubjectProgress: IDs do not match (Forbidden)")
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem chi tiết tiến trình"})
 		}
 	}
@@ -1303,14 +1309,17 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 
 func (h *TutorHandler) GetStudentLearningPath(c fiber.Ctx) error {
 	userIDStr := c.Locals("userID").(string)
+	log.Printf("[DEBUG] GetStudentLearningPath: hit with userIDStr=%s", userIDStr)
 	studentID, err := uuid.Parse(userIDStr)
 	if err != nil {
+		log.Printf("[DEBUG] GetStudentLearningPath: UUID parsing failed for %s", userIDStr)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
 	}
 
 	var path model.LearningPath
 	err = config.DB.Where("student_id = ? AND status = 'Approved'", studentID).Order("created_at desc").First(&path).Error
 	if err != nil {
+		log.Printf("[DEBUG] GetStudentLearningPath: no learning path found for student %s", studentID)
 		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
 	}
 

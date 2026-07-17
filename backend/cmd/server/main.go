@@ -249,8 +249,12 @@ func main() {
 		port = "8081"
 	}
 
-	// Clean up port prefix
 	port = strings.TrimPrefix(port, ":")
+
+	// Print all registered routes for debugging
+	for _, r := range app.GetRoutes() {
+		log.Printf("[DEBUG-ROUTE] %s %s", r.Method, r.Path)
+	}
 
 	log.Printf("Aurora Assistant Server starting on port %s", port)
 	log.Fatal(app.Listen(":" + port))
