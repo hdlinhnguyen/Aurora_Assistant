@@ -101,6 +101,7 @@ type StudentState struct {
 	Subject            string    `gorm:"type:varchar(255);not null;index" json:"subject"`
 	InitialLevelNodeID uuid.UUID `gorm:"type:uuid" json:"initialLevelNodeId"`
 	CurrentLevelNodeID uuid.UUID `gorm:"type:uuid" json:"currentLevelNodeId"`
+	NeedsDiagnostic    bool      `gorm:"default:false" json:"needsDiagnostic"`
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
 }

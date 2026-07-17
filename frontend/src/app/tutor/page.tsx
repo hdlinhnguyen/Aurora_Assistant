@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo } from "lucide-react";
+import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle } from "lucide-react";
 import KnowledgeTree from "../components/KnowledgeTree";
 
 
@@ -36,6 +36,7 @@ interface Question {
 interface StudentState {
   initialLevelNodeId: string;
   currentLevelNodeId: string;
+  needsDiagnostic: boolean;
 }
 
 interface LogItem {
@@ -94,6 +95,9 @@ export default function StudentTutorPage() {
   const [hintLoading, setHintLoading] = useState<boolean>(false);
 
   // New Promax Socratic Workspace States
+  const [quizMode, setQuizMode] = useState<"diagnostic" | "practice" | null>(null);
+  const [showPurposeModal, setShowPurposeModal] = useState(false);
+  const [nodeForPurpose, setNodeForPurpose] = useState<NodeItem | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<"graph" | "workspace">("graph");
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
   const [navHistory, setNavHistory] = useState<NodeItem[]>([]);
@@ -314,11 +318,37 @@ export default function StudentTutorPage() {
       return;
     }
 
-    if (activeMainTab === "workspace") {
-      handleShowContent(node);
+    setNodeForPurpose(node);
+    setShowPurposeModal(true);
+  };
+
+  const handleStartNodeMode = (node: NodeItem, selectedMode: "theory" | "practice" | "diagnostic") => {
+    setShowPurposeModal(false);
+    setSelectedNode(node);
+    handlePivotCenter(node.id);
+    setActiveMainTab("workspace");
+
+    if (selectedMode === "theory") {
+      setDrawerTab("theory");
+      setTheoryChat([
+        {
+          sender: "ai",
+          content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${node.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu hiểu bản chất!`,
+        },
+      ]);
     } else {
-      setSelectedNode(node);
-      handlePivotCenter(node.id);
+      setDrawerTab("practice");
+      setQuizMode(selectedMode === "diagnostic" ? "diagnostic" : "practice");
+      // Reset practice states
+      setQuestions([]);
+      setCurrentQIndex(0);
+      setSelectedOption(null);
+      setAnswerFeedback(null);
+      setCantDoOptions(null);
+      setDifficultyFilter(null);
+      setHintPressCount(0);
+      setActiveHint(null);
+      loadQuestions(node.id);
     }
   };
 
@@ -411,6 +441,28 @@ export default function StudentTutorPage() {
     }
   };
 
+  const handleAdaptiveDowngrade = async (nodeId: string) => {
+    try {
+      const res = await apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
+        method: "POST"
+      });
+      if (res.hasParent) {
+        alert(`⚠️ NHẬN DIỆN HỔNG KIẾN THỨC NỀN: Phần này có vẻ hơi khó với em. Hãy cùng ôn tập bài học nền tảng "${res.parentName}" trước nhé!`);
+        const parentNode = nodes.find(n => n.id === res.parentId);
+        if (parentNode) {
+          handleStartNodeMode(parentNode, "practice");
+        }
+      } else {
+        alert("⚠️ HỔNG KIẾN THỨC: Em đã dùng hết gợi ý nhưng chưa vượt qua được thử thách này. Hãy đọc lại lý thuyết nhé!");
+        setDrawerTab("theory");
+      }
+      loadStudentState();
+      loadTreeData();
+    } catch (err: any) {
+      console.error("Lỗi hạ cấp thích ứng:", err);
+    }
+  };
+
   // Submit Answer trắc nghiệm
   const handleSubmitAnswer = async () => {
     if (selectedOption === null || !selectedNode || submitting) return;
@@ -432,7 +484,6 @@ export default function StudentTutorPage() {
 
       if (res.isCorrect) {
         setAnswerFeedback({ isCorrect: true, message: "🎉 Tuyệt vời! Câu trả lời của em hoàn toàn chính xác." });
-        // Update states
         loadStudentState();
         loadTreeData();
         loadLearningPath();
@@ -459,6 +510,13 @@ export default function StudentTutorPage() {
         setAnswerFeedback({ isCorrect: false, message: "❌ Rất tiếc, câu trả lời chưa chính xác. Em thử lại nhé!" });
         setShake(true);
         setTimeout(() => setShake(false), 500);
+
+        // If they have pressed hints 3 times or more and failed, trigger downgrade!
+        if (hintPressCount >= 3) {
+          setTimeout(() => {
+            handleAdaptiveDowngrade(selectedNode.id);
+          }, 1200);
+        }
       }
     } catch (err: any) {
       alert("Lỗi khi nộp bài: " + err.message);
@@ -470,8 +528,13 @@ export default function StudentTutorPage() {
   // "Không làm được" button logic
   const handleCantDo = async () => {
     if (!selectedNode || submitting) return;
-    setSubmitting(true);
 
+    if (hintPressCount >= 3) {
+      await handleAdaptiveDowngrade(selectedNode.id);
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const res = await apiFetch(`/nodes/${selectedNode.id}/cant-do`, {
         method: "POST",
@@ -756,6 +819,108 @@ export default function StudentTutorPage() {
           </div>
         )}
 
+        {/* U1 Socratic Purpose Selection Modal */}
+        {showPurposeModal && nodeForPurpose && (
+          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
+            <div className="bg-white p-7 rounded-3xl shadow-2xl max-w-lg w-full border border-slate-100 flex flex-col space-y-5 animate-[scaleUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <span className="text-[9px] bg-indigo-50 text-indigo-600 font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full font-mono">
+                    Không gian học tập
+                  </span>
+                  <h3 className="text-sm font-black text-slate-900 leading-snug uppercase pt-1">
+                    {nodeForPurpose.name}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowPurposeModal(false)}
+                  className="h-7 w-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {studentState?.needsDiagnostic && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2 text-rose-700 animate-pulse">
+                  <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                  <div className="text-[11px] font-semibold leading-relaxed">
+                    <span className="font-extrabold uppercase block mb-0.5">Yêu cầu chẩn đoán bắt buộc</span>
+                    Thầy/cô giáo đã gửi yêu cầu đánh giá chẩn đoán năng lực. Em vui lòng thực hiện bài kiểm tra chẩn đoán dưới đây để xác định trình độ thực tế trên cây.
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3">
+                {/* Mode 1: Theory Socratic Chat */}
+                <button
+                  onClick={() => handleStartNodeMode(nodeForPurpose, "theory")}
+                  disabled={studentState?.needsDiagnostic}
+                  className={`flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all ${
+                    studentState?.needsDiagnostic
+                      ? "bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed"
+                      : "bg-white border-slate-200/80 hover:border-indigo-400 hover:bg-indigo-50/10 cursor-pointer hover:scale-[1.01]"
+                  }`}
+                >
+                  <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
+                    <BookOpen size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900">📖 Học lý thuyết & Thảo luận</h4>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-normal font-semibold">
+                      Tìm hiểu sâu lý thuyết và trao đổi trực tiếp với Trợ lý Socratic để tự thấu suốt kiến thức nền tảng.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Mode 2: Practice Free Mode */}
+                <button
+                  onClick={() => handleStartNodeMode(nodeForPurpose, "practice")}
+                  disabled={studentState?.needsDiagnostic}
+                  className={`flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all ${
+                    studentState?.needsDiagnostic
+                      ? "bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed"
+                      : "bg-white border-slate-200/80 hover:border-orange-400 hover:bg-orange-50/10 cursor-pointer hover:scale-[1.01]"
+                  }`}
+                >
+                  <div className="p-2.5 bg-orange-50 text-orange-650 rounded-xl shrink-0">
+                    <PlayCircle size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900">📝 Luyện tập tự do</h4>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-normal font-semibold">
+                      Thực hành làm các bài toán trắc nghiệm chia theo từng cấp bậc nhận thức tại node hiện tại.
+                    </p>
+                  </div>
+                </button>
+
+                {/* Mode 3: Diagnostic Assessment */}
+                <button
+                  onClick={() => handleStartNodeMode(nodeForPurpose, "diagnostic")}
+                  className={`flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all ${
+                    studentState?.needsDiagnostic
+                      ? "bg-rose-50/20 border-rose-400/80 hover:bg-rose-50/40 hover:scale-[1.01]"
+                      : "bg-white border-slate-200/80 hover:border-blue-400 hover:bg-blue-50/10 hover:scale-[1.01]"
+                  } cursor-pointer`}
+                >
+                  <div className={`p-2.5 rounded-xl shrink-0 ${
+                    studentState?.needsDiagnostic ? "bg-rose-100/50 text-rose-600" : "bg-blue-50 text-blue-600"
+                  }`}>
+                    <Compass size={16} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-900">
+                      🔍 Đánh giá năng lực chẩn đoán {studentState?.needsDiagnostic && "(Bắt buộc)"}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-normal font-semibold">
+                      Kiểm tra thực tế trình độ. Trả lời sai/dùng hết gợi ý sẽ tự động hạ mức để tìm ra chính xác lỗ hổng gốc rễ.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div>
@@ -845,7 +1010,7 @@ export default function StudentTutorPage() {
                 currentNodeId={studentState?.currentLevelNodeId}
                 focusedNodeId={focusedNodeId}
                 onFocusedNodeChange={handlePivotCenter}
-                onShowContentClick={handleShowContent}
+                onShowContentClick={handleNodeClick}
                 onNodeClick={handleNodeClick}
                 onRefresh={() => {
                   loadTreeData();

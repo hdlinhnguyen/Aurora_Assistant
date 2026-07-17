@@ -27,7 +27,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ListTodo,
-  Check
+  Check,
+  RefreshCw
 } from "lucide-react";
 
 interface NodeItem {
@@ -430,6 +431,22 @@ export default function TeacherDashboard() {
     setSelectedStudent(null);
     setStudentDetail(null);
     loadStudentsProgress();
+  };
+
+  const handleReDiagnostic = async () => {
+    if (!selectedStudent) return;
+    if (confirm(`Bạn có chắc chắn muốn yêu cầu học sinh "${selectedStudent.studentName}" thực hiện chẩn đoán lại năng lực cho môn "${selectedStudent.subject}"?\n\nHành động này sẽ xóa nhật ký làm bài trước đó của học sinh đối với môn này để đánh giá lại từ đầu.`)) {
+      try {
+        await apiFetch(`/teacher/students/${selectedStudent.studentId}/re-diagnostic`, {
+          method: "POST",
+          body: JSON.stringify({ subject: selectedStudent.subject })
+        });
+        alert("Đã gửi yêu cầu chẩn đoán lại năng lực thành công!");
+        loadStudentDetailProgress(selectedStudent.studentId);
+      } catch (err: any) {
+        alert("Lỗi khi yêu cầu chẩn đoán lại: " + err.message);
+      }
+    }
   };
 
   const handleNodeClick = (node: NodeItem) => {
@@ -1014,9 +1031,16 @@ export default function TeacherDashboard() {
                 )}
                 <button
                   onClick={handleBackToStudents}
-                  className="p-2 bg-card border border-border rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+                  className="p-2 bg-card border border-border rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5 text-xs font-bold font-mono"
                 >
                   <ArrowLeft size={16} /> Quay lại
+                </button>
+                <button
+                  onClick={handleReDiagnostic}
+                  className="p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-black shadow-sm transition-all hover:bg-rose-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="Yêu cầu học sinh làm lại chẩn đoán năng lực"
+                >
+                  <RefreshCw size={12} /> Yêu cầu chẩn đoán lại
                 </button>
                 <div>
                   <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground">

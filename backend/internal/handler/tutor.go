@@ -691,11 +691,7 @@ func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	log.Printf("[DEBUG] GetStudentSubjectProgress: role=%s, param studentId=%s", role, studentIdStr)
 	if role != "teacher" {
 		userIDStr, _ := c.Locals("userID").(string)
-		log.Printf("[DEBUG] GetStudentSubjectProgress: student role, local userIDStr=%s vs param studentId=%s", userIDStr, studentIdStr)
-		if !strings.EqualFold(userIDStr, studentIdStr) {
-			log.Println("[DEBUG] GetStudentSubjectProgress: IDs do not match (Forbidden)")
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem chi tiết tiến trình"})
-		}
+		studentIdStr = userIDStr
 	}
 	studentID, err := uuid.Parse(studentIdStr)
 	if err != nil {
@@ -1401,6 +1397,43 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 	}
 
 	return c.JSON(hintResult)
+}
+
+func (h *TutorHandler) RequestReDiagnostic(c fiber.Ctx) error {
+	studentIdStr := c.Params("studentId")
+	studentID, err := uuid.Parse(studentIdStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+	var req struct {
+		Subject string `json:"subject"`
+	}
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu yêu cầu không hợp lệ"})
+	}
+	if err := h.svc.RequestReDiagnostic(studentID, req.Subject); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"status": "success", "message": "Yêu cầu chẩn đoán lại thành công"})
+}
+
+func (h *TutorHandler) AdaptiveDowngrade(c fiber.Ctx) error {
+	userIDStr := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID người dùng không hợp lệ"})
+	}
+	nodeIdStr := c.Params("nodeId")
+	nodeID, err := uuid.Parse(nodeIdStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
+	}
+
+	res, err := h.svc.AdaptiveDowngrade(studentID, nodeID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(res)
 }
 
 

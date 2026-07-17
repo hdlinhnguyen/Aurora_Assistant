@@ -234,6 +234,7 @@ func main() {
 	api.Post("/subjects/:subject/start", tutorHandler.StartSubjectNode)
 	api.Post("/nodes/:nodeId/answer", tutorHandler.SubmitAnswer)
 	api.Post("/nodes/:nodeId/cant-do", tutorHandler.SubmitCantDo)
+	api.Post("/nodes/:nodeId/adaptive-downgrade", tutorHandler.AdaptiveDowngrade)
 
 	// Personalized Learning Path & Hint Routes
 	api.Post("/teacher/learning-path", tutorHandler.CreateLearningPath)
@@ -243,6 +244,7 @@ func main() {
 
 	api.Get("/teacher/students-progress", tutorHandler.GetStudentsProgress)
 	api.Get("/teacher/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)
+	api.Post("/teacher/students/:studentId/re-diagnostic", tutorHandler.RequestReDiagnostic)
 
 	port := os.Getenv("PORT")
 	if port == "" {

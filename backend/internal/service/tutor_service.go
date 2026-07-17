@@ -50,6 +50,8 @@ type TutorService interface {
 	SubmitAnswer(studentID uuid.UUID, nodeID uuid.UUID, questionID uuid.UUID, selectedOption int) (bool, *model.Question, error)
 	SubmitCantDo(studentID uuid.UUID, nodeID uuid.UUID) (map[string]interface{}, error)
 	LogActivity(studentID uuid.UUID, subject string, nodeID uuid.UUID, action string, detail string) error
+	RequestReDiagnostic(studentID uuid.UUID, subject string) error
+	AdaptiveDowngrade(studentID uuid.UUID, nodeID uuid.UUID) (map[string]interface{}, error)
 
 	// Teacher Dashboard Progress
 	GetStudentsProgress() ([]map[string]interface{}, error)
@@ -439,6 +441,81 @@ func (s *tutorService) LogActivity(studentID uuid.UUID, subject string, nodeID u
 		CreatedAt: time.Now(),
 	}
 	return s.db.Create(log).Error
+}
+
+func (s *tutorService) RequestReDiagnostic(studentID uuid.UUID, subject string) error {
+	var state model.StudentState
+	err := s.db.Where("student_id = ? AND subject = ?", studentID, subject).First(&state).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			state = model.StudentState{
+				ID:                 uuid.New(),
+				StudentID:          studentID,
+				Subject:            subject,
+				NeedsDiagnostic:    true,
+				CreatedAt:          time.Now(),
+				UpdatedAt:          time.Now(),
+			}
+			return s.db.Create(&state).Error
+		}
+		return err
+	}
+	state.NeedsDiagnostic = true
+	state.InitialLevelNodeID = uuid.Nil
+	state.CurrentLevelNodeID = uuid.Nil
+	state.UpdatedAt = time.Now()
+	
+	// Delete previous activity logs to reset progress
+	s.db.Where("student_id = ? AND subject = ?", studentID, subject).Delete(&model.ActivityLog{})
+	
+	return s.db.Save(&state).Error
+}
+
+func (s *tutorService) AdaptiveDowngrade(studentID uuid.UUID, nodeID uuid.UUID) (map[string]interface{}, error) {
+	var node model.Node
+	if err := s.db.Where("id = ?", nodeID).First(&node).Error; err != nil {
+		return nil, err
+	}
+
+	// 1. Log high-severity Warning Gap for teacher alerting
+	warningDetail := fmt.Sprintf("CẢNH BÁO: Học sinh hổng kiến thức nghiêm trọng tại node '%s'. Đã dùng hết gợi ý nhưng không vượt qua được thử thách.", node.Name)
+	s.LogActivity(studentID, node.Subject, nodeID, "warning_gap", warningDetail)
+
+	// 2. Find parent/prerequisite nodes to downgrade to
+	var parentNodes []model.Node
+	err := s.db.Table("nodes").
+		Select("nodes.*").
+		Joins("join edges on nodes.id = edges.source_id").
+		Where("edges.target_id = ?", nodeID).
+		Find(&parentNodes).Error
+
+	var targetNode model.Node
+	hasParent := false
+	if err == nil && len(parentNodes) > 0 {
+		targetNode = parentNodes[0]
+		hasParent = true
+	}
+
+	// 3. Update Student State current level
+	var state model.StudentState
+	err = s.db.Where("student_id = ? AND subject = ?", studentID, node.Subject).First(&state).Error
+	if err == nil {
+		if hasParent {
+			state.CurrentLevelNodeID = targetNode.ID
+		}
+		state.NeedsDiagnostic = false
+		state.UpdatedAt = time.Now()
+		s.db.Save(&state)
+	}
+
+	res := map[string]interface{}{
+		"hasParent": hasParent,
+	}
+	if hasParent {
+		res["parentId"] = targetNode.ID.String()
+		res["parentName"] = targetNode.Name
+	}
+	return res, nil
 }
 
 func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {

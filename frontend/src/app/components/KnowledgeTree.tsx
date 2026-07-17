@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, MouseEvent } from "react";
 import { apiFetch } from "@/lib/api";
-import { Plus, Trash, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo, Redo, RefreshCw, Layers, LayoutGrid } from "lucide-react";
+import { Plus, Trash, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo, Redo, RefreshCw, Layers, LayoutGrid, CheckCircle2, AlertCircle, PlayCircle, Lock, Compass } from "lucide-react";
 
 
 interface NodeItem {
@@ -379,13 +379,9 @@ export default function KnowledgeTree({
       return;
     }
 
-    if (isFocusedView) {
-      setSelectedNodeId(node.id);
-      if (onFocusedNodeChange) {
-        onFocusedNodeChange(node.id);
-      }
-    } else {
-      setSelectedNodeId(node.id);
+    setSelectedNodeId(node.id);
+    if (onFocusedNodeChange) {
+      onFocusedNodeChange(node.id);
     }
   };
 
@@ -508,21 +504,21 @@ export default function KnowledgeTree({
 
   const getNodeColorClass = (node: NodeItem) => {
     if (mode === "teacher") {
-      return "border-border bg-card text-foreground hover:border-[var(--mint)]/50 shadow-sm";
+      return "border-slate-200 bg-white text-slate-800 hover:border-[var(--mint)]/60 shadow-sm";
     }
 
     const status = studentNodeStatus[node.id] || "locked";
     switch (status) {
       case "mastered":
-        return "border-emerald-500 bg-emerald-50 text-emerald-900 shadow-emerald-100 font-semibold";
+        return "border-emerald-400/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30 text-emerald-950 shadow-md shadow-emerald-100/40 hover:shadow-emerald-200/50 font-bold";
       case "struggle":
-        return "border-rose-500 bg-rose-50 text-rose-900 shadow-rose-100 animate-pulse";
+        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-50/30 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold";
       case "learning":
-        return "border-orange-500 bg-orange-50 text-orange-900 shadow-orange-100 ring-2 ring-orange-400";
+        return "border-orange-400/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/30 text-orange-950 shadow-md shadow-orange-100/40 hover:shadow-orange-200/50 ring-2 ring-orange-300/60 font-bold";
       case "initial":
-        return "border-blue-500 bg-blue-50 text-blue-900 shadow-blue-100 ring-2 ring-blue-500 font-bold";
+        return "border-blue-400/80 bg-gradient-to-br from-blue-50 via-white to-blue-50/30 text-blue-950 shadow-md shadow-blue-100/40 hover:shadow-blue-200/50 ring-2 ring-blue-300/60 font-bold";
       default:
-        return "border-border bg-muted text-muted-foreground opacity-60 cursor-not-allowed";
+        return "border-slate-200/70 bg-slate-50/90 text-slate-400/80 opacity-60 cursor-not-allowed";
     }
   };
 
@@ -718,8 +714,8 @@ export default function KnowledgeTree({
     const tgtNode = displayNodes.find((n) => n.id === edge.targetId);
     if (!srcNode || !tgtNode) return null;
 
-    const nodeWidth = 200;
-    const nodeHeight = 70;
+    const nodeWidth = 230;
+    const nodeHeight = 85;
     const startX = srcNode.posX + nodeWidth / 2;
     const startY = srcNode.posY + nodeHeight;
     const endX = tgtNode.posX + nodeWidth / 2;
@@ -730,7 +726,7 @@ export default function KnowledgeTree({
     const pathD = `M ${startX} ${startY} C ${startX} ${controlPointY}, ${endX} ${controlPointY}, ${endX} ${endY}`;
 
     const isHighlighted = highlightedEdges.has(edge.id);
-    const opacity = isFocusedView ? (isHighlighted ? 1 : 0.15) : 1;
+    const opacity = isFocusedView ? (isHighlighted ? 1 : 0.45) : 1;
 
     return (
       <g key={edge.id} className="group/edge" style={{ opacity, transition: "opacity 0.2s" }}>
@@ -999,9 +995,9 @@ export default function KnowledgeTree({
                         height={22}
                         className="overflow-visible"
                       >
-                        <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-foreground bg-card border border-border px-2.5 py-1.5 rounded-xl shadow-sm select-none">
+                        <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-foreground bg-card/95 border border-border px-2.5 py-1.5 rounded-xl shadow-sm select-none whitespace-nowrap truncate max-w-full">
                           <Folder size={11} className="text-[var(--mint)]" />
-                          <span>{box.name}</span>
+                          <span className="truncate">{box.name}</span>
                         </div>
                       </foreignObject>
                     );
@@ -1015,16 +1011,18 @@ export default function KnowledgeTree({
               {displayNodes.map((node) => {
                 const selectable = isNodeSelectable(node);
                 const colorClass = getNodeColorClass(node);
-                const nodeWidth = 200;
-                const nodeHeight = 70;
+                const nodeWidth = 230;
+                const nodeHeight = 85;
 
                 const isHighlighted = highlightedNodes.has(node.id);
                 const isActiveNode = node.id === activeSelectedNodeId;
-                const opacity = isFocusedView ? (isHighlighted ? 1 : 0.2) : 1;
+                const opacity = isFocusedView ? (isHighlighted ? 1 : 0.6) : 1;
 
                 const isCollapsed = collapsedNodes[node.id];
                 const childrenEdges = edges.filter(e => e.sourceId === node.id);
                 const hasChildren = childrenEdges.length > 0;
+
+                const status = studentNodeStatus[node.id] || "locked";
 
                 return (
                   <g 
@@ -1049,73 +1047,64 @@ export default function KnowledgeTree({
                             alert(`🔒 Chủ đề "${node.name}" đang bị khóa. Em hãy học và hoàn thành các bài học tiên quyết trước nhé!`);
                           }
                         }}
-                        className={`h-full w-full rounded-2xl border-2 p-3 text-center flex flex-col justify-center items-center shadow-sm select-none transition-all duration-200 relative ${colorClass} ${
-                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-not-allowed hover:opacity-80"
+                        className={`h-full w-full rounded-2xl border-2 p-3 flex flex-col justify-between items-start shadow-sm select-none transition-all duration-200 relative ${colorClass} ${
+                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-not-allowed hover:opacity-85"
                         } ${isActiveNode
-                            ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] scale-[1.06] shadow-lg shadow-[var(--purple)]/25 z-10"
+                            ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] scale-[1.06] shadow-lg shadow-[var(--purple)]/20 z-10"
                             : isHighlighted
-                              ? "ring-1 ring-[var(--purple)]/50 border-[var(--purple)]/50 scale-[1.01] shadow-sm shadow-[var(--purple)]/5"
+                              ? "ring-1 ring-[var(--purple)]/40 border-[var(--purple)]/40 scale-[1.01]"
                               : ""
                         }`}
                       >
-                        {/* Floating details icon button in the corner */}
-                        {selectable && (
-                          <button
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onShowContentClick) {
-                                onShowContentClick(node);
-                              } else if (onNodeClick) {
-                                onNodeClick(node);
-                              }
-                            }}
-                            className="absolute top-1 right-1 h-5.5 w-5.5 rounded-lg bg-card/60 backdrop-blur-sm hover:bg-card text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-sm border border-border/80 z-20 hover:scale-105 active:scale-95"
-                            title="Xem lý thuyết và làm bài tập"
-                          >
-                            <BookOpen size={10} />
-                          </button>
-                        )}
+                        {/* Top Metadata Row: Status label and Action details button */}
+                        <div className="w-full flex justify-between items-center border-b border-slate-100/60 pb-1">
+                          <div className="flex items-center gap-1">
+                            {node.isRoot ? (
+                              <Compass size={11} className="text-[var(--mint)] animate-spin-slow" />
+                            ) : status === "mastered" ? (
+                              <CheckCircle2 size={11} className="text-emerald-500" />
+                            ) : status === "struggle" ? (
+                              <AlertCircle size={11} className="text-rose-500 animate-pulse" />
+                            ) : status === "learning" ? (
+                              <PlayCircle size={11} className="text-orange-500 animate-pulse" />
+                            ) : status === "initial" ? (
+                              <Compass size={11} className="text-blue-500" />
+                            ) : (
+                              <Lock size={11} className="text-slate-400" />
+                            )}
+                            <span className="text-[8px] font-black uppercase tracking-wider">
+                              {node.isRoot ? "ĐIỂM GỐC" : {
+                                mastered: "ĐÃ XONG",
+                                struggle: "CẦN LƯU Ý",
+                                learning: "ĐANG HỌC",
+                                initial: "ĐẦU VÀO",
+                                locked: "ĐANG KHÓA"
+                              }[status]}
+                            </span>
+                          </div>
 
-                        <div className="text-[10px] font-black max-w-full leading-snug uppercase tracking-tight line-clamp-3 overflow-hidden text-ellipsis pr-3">
-                          {node.name}
+                          {selectable && (
+                            <button
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onShowContentClick) {
+                                  onShowContentClick(node);
+                                } else if (onNodeClick) {
+                                  onNodeClick(node);
+                                }
+                              }}
+                              className="h-5 w-5 rounded-md bg-slate-100 hover:bg-slate-200/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-sm border border-slate-255 z-20 hover:scale-105 active:scale-95"
+                              title="Xem lý thuyết và làm bài tập"
+                            >
+                              <BookOpen size={10} />
+                            </button>
+                          )}
                         </div>
 
-                        <div className="flex gap-1.5 mt-1">
-                          {node.isRoot && (
-                            <span className="text-[8px] bg-[var(--mint)]/25 text-[var(--mint)] font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                              Gốc
-                            </span>
-                          )}
-                          {!node.isRoot && mode !== "teacher" && (
-                            <div className="flex gap-1">
-                              {studentNodeStatus[node.id] === "mastered" && (
-                                <span className="text-[7px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-1 py-0.5 rounded font-black uppercase tracking-wider">
-                                  Xong
-                                </span>
-                              )}
-                              {studentNodeStatus[node.id] === "struggle" && (
-                                <span className="text-[7px] bg-rose-500/10 text-rose-600 border border-rose-500/20 px-1 py-0.5 rounded font-black uppercase tracking-wider animate-pulse">
-                                  Lỗi
-                                </span>
-                              )}
-                              {studentNodeStatus[node.id] === "learning" && (
-                                <span className="text-[7px] bg-orange-500/10 text-orange-600 border border-orange-500/20 px-1 py-0.5 rounded font-black uppercase tracking-wider">
-                                  Học
-                                </span>
-                              )}
-                              {studentNodeStatus[node.id] === "initial" && (
-                                <span className="text-[7px] bg-blue-500/10 text-blue-600 border border-blue-500/20 px-1 py-0.5 rounded font-black uppercase tracking-wider">
-                                  Đầu
-                                </span>
-                              )}
-                              {(!studentNodeStatus[node.id] || studentNodeStatus[node.id] === "locked") && (
-                                <span className="text-[7px] bg-slate-100 text-slate-400 border border-slate-200 px-1 py-0.5 rounded font-black uppercase tracking-wider opacity-85">
-                                  🔒 Khóa
-                                </span>
-                              )}
-                            </div>
-                          )}
+                        {/* Title text */}
+                        <div className="text-[10px] font-black w-full text-left leading-snug uppercase tracking-tight line-clamp-2 overflow-hidden text-ellipsis flex-1 flex items-center pt-1.5">
+                          {node.name}
                         </div>
 
                         {/* Expand / Collapse Sub-tree trigger (hidden in focused view) */}
