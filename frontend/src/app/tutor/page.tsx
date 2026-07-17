@@ -95,6 +95,9 @@ export default function StudentTutorPage() {
 
   // New Promax Socratic Workspace States
   const [activeMainTab, setActiveMainTab] = useState<"graph" | "workspace">("graph");
+  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
+  const [navHistory, setNavHistory] = useState<NodeItem[]>([]);
+  const [leftWidth, setLeftWidth] = useState<number>(45);
   const [questionChat, setQuestionChat] = useState<Record<string, Array<{sender: "student" | "ai", content: string}>>>({});
   const [questionChatInput, setQuestionChatInput] = useState("");
   const [questionChatLoading, setQuestionChatLoading] = useState(false);
@@ -234,6 +237,57 @@ export default function StudentTutorPage() {
     }
   };
 
+  const handlePivotCenter = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    setFocusedNodeId(nodeId);
+    setNavHistory(prev => {
+      const idx = prev.findIndex(item => item.id === nodeId);
+      if (idx !== -1) {
+        return prev.slice(0, idx + 1);
+      } else {
+        return [...prev, node];
+      }
+    });
+  };
+
+  const handleShowContent = (node: NodeItem) => {
+    setSelectedNode(node);
+    handlePivotCenter(node.id);
+    setActiveMainTab("workspace");
+    setDrawerTab("theory");
+    setTheoryChat([
+      {
+        sender: "ai",
+        content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${node.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu hiểu bản chất!`,
+      },
+    ]);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const container = e.currentTarget.parentElement;
+      if (!container) return;
+      const containerWidth = container.getBoundingClientRect().width;
+      const deltaX = moveEvent.clientX - startX;
+      const deltaPercent = (deltaX / containerWidth) * 100;
+      const newWidth = Math.max(25, Math.min(75, startWidth + deltaPercent));
+      setLeftWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
   const handleNodeClick = (node: NodeItem) => {
     // If student state is nil and node is not root, they must click root or select first
     if (!studentState && !node.isRoot) {
@@ -249,16 +303,9 @@ export default function StudentTutorPage() {
       return;
     }
 
-    // Load drawer for selected node and switch workspace
     setSelectedNode(node);
-    setActiveMainTab("workspace");
-    setDrawerTab("theory");
-    setTheoryChat([
-      {
-        sender: "ai",
-        content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${node.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu hiểu bản chất!`,
-      },
-    ]);
+    handlePivotCenter(node.id);
+  };
     
     // Reset practice states
     setQuestions([]);
@@ -743,11 +790,6 @@ export default function StudentTutorPage() {
                 <Sparkles size={14} className={activeMainTab === "workspace" ? "text-indigo-600" : "text-slate-500"} />
                 Không gian Học tập
               </button>
-              {selectedNode && (
-                <span className="text-[10px] text-slate-400 font-extrabold px-3 border-l border-slate-200 max-w-[160px] truncate animate-[fadeIn_0.2s_ease-out]">
-                  📍 {selectedNode.name}
-                </span>
-              )}
             </div>
           </div>
 
