@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Aurora · Bàn soạn đề</title>
+  <style>
+    :root{--ink:#17263c;--sheet:#f7f9fc;--rule:#d8e0ea;--marker:#1b74e4;--check:#18856b;--correction:#d45252;--muted:#64748b}
+    *{box-sizing:border-box} body{margin:0;background:#e9eef5;color:var(--ink);font-family:"Segoe UI",sans-serif}
+    button,input,select,textarea{font:inherit} button{cursor:pointer}
+    .topbar{height:70px;padding:0 24px;background:var(--ink);color:white;display:flex;align-items:center;justify-content:space-between}
+    .brand{font:700 22px "Aptos Display","Segoe UI";letter-spacing:-.02em}.brand small{display:block;font:11px Consolas;opacity:.65;letter-spacing:.12em;text-transform:uppercase}
+    .status{display:flex;gap:10px;align-items:center}.badge{padding:7px 10px;border:1px solid #ffffff44;border-radius:4px;font:12px Consolas}
+    .workspace{display:grid;grid-template-columns:280px minmax(420px,1fr) 330px;gap:14px;padding:14px;height:calc(100vh - 70px)}
+    .panel,.paper{background:white;border:1px solid var(--rule);min-height:0;overflow:auto}
+    .panel{padding:16px}.panel h2{font-size:15px;margin:0 0 14px}.panel h2 span{font:11px Consolas;color:var(--muted);display:block;margin-bottom:4px}
+    .field{margin:0 0 12px}.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;color:#526174}
+    input,select,textarea{width:100%;border:1px solid var(--rule);border-radius:3px;padding:9px;background:var(--sheet);color:var(--ink)}
+    input:focus,select:focus,textarea:focus,button:focus-visible{outline:3px solid #1b74e433;outline-offset:1px;border-color:var(--marker)}
+    textarea{min-height:76px;resize:vertical}.actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{border:1px solid var(--ink);background:white;color:var(--ink);padding:9px 12px;border-radius:3px;font-weight:650}
+    .btn.primary{background:var(--marker);border-color:var(--marker);color:white}.btn.success{background:var(--check);border-color:var(--check);color:white}.btn:disabled{opacity:.45;cursor:not-allowed}
+    .bank-item{padding:12px 0;border-top:1px solid var(--rule)}.bank-item p{font-size:13px;line-height:1.4;margin:4px 0 9px}.meta{font:10px Consolas;color:var(--muted)}
+    .paper{position:relative;padding:28px 48px 60px}.paper-head{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:18px;text-align:center}.paper-head h1{font:700 24px "Aptos Display","Segoe UI";margin:0}.paper-head p{margin:6px 0 0;font-size:12px}
+    .score-ledger{position:sticky;top:0;z-index:2;margin:-28px -48px 18px;padding:8px 18px;background:#f0f5fb;border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;font:12px Consolas}
+    .meter{height:5px;width:160px;background:#d9e2ed}.meter i{display:block;height:100%;background:var(--marker);transition:width .2s}
+    .question-card{position:relative;border:1px solid var(--rule);border-left:4px solid var(--marker);padding:15px;margin:10px 0;background:white;box-shadow:0 2px 6px #17263c0b}
+    .question-card.dragging{opacity:.4}.question-card.selected{box-shadow:0 0 0 2px #1b74e455}.drag{position:absolute;right:10px;top:8px;color:#8794a6;cursor:grab;font:18px Consolas}.question-card h3{font-size:14px;margin:0 28px 8px 0}.question-card p{font-size:13px;margin:0;line-height:1.45}.tags{margin-top:10px}.tag{display:inline-block;background:#e8f1ff;color:#1459a8;padding:3px 6px;margin:0 4px 3px 0;border-radius:2px;font:10px Consolas}
+    .empty{border:1px dashed #aab6c5;text-align:center;padding:48px 18px;color:var(--muted)}.error-box{display:none;margin:12px 0;padding:10px;border-left:3px solid var(--correction);background:#fff1f1;font-size:12px}.error-box.show{display:block}
+    .rubric-row{border:1px solid var(--rule);padding:8px;margin:6px 0;font-size:12px}.utility{border-top:1px solid var(--rule);margin-top:18px;padding-top:14px}
+    @media(max-width:1000px){.workspace{grid-template-columns:240px 1fr}.inspector{grid-column:1/-1;height:auto}.workspace{height:auto}.panel,.paper{overflow:visible}}
+    @media(max-width:680px){.workspace{display:block;padding:8px}.panel,.paper{margin-bottom:8px}.paper{padding:20px}.score-ledger{margin:-20px -20px 15px}.topbar{padding:0 14px}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Aurora · Bàn soạn đề<small>Teacher assessment composer</small></div>
+    <div class="status"><span class="badge" id="status-badge">Chưa có đề</span><span class="badge" id="version-badge">v—</span></div>
+  </header>
+  <main class="workspace">
+    <aside class="panel">
+      <h2><span>NGUỒN CÂU</span>Ngân hàng câu hỏi</h2>
+      <div class="field"><input id="bank-search" placeholder="Tìm nội dung câu…"></div>
+      <div class="field"><select id="bank-type"><option value="">Tất cả loại</option><option value="single_choice">Trắc nghiệm</option><option value="essay">Tự luận</option></select></div>
+      <div class="field"><select id="bank-topic"><option value="">Tất cả topic</option></select></div>
+      <div id="bank-list"></div>
+    </aside>
+    <section class="paper">
+      <div class="score-ledger">
+        <span id="score-copy">0.00 / 10.00 điểm</span>
+        <div class="meter"><i id="score-meter" style="width:0"></i></div>
+        <span id="validation-copy">Đang soạn</span>
+      </div>
+      <div class="paper-head"><h1 id="exam-title">Đề kiểm tra mới</h1><p id="exam-meta">Toán · Khối 8 · 15 phút</p></div>
+      <div id="exam-canvas"><div class="empty">Chọn câu từ ngân hàng hoặc thêm câu thủ công.</div></div>
+    </section>
+    <aside class="panel inspector">
+      <h2><span>THIẾT LẬP</span>Thông tin đề</h2>
+      <div class="field"><label>Đề đã lưu</label><select id="exam-picker"><option value="">Đề mới</option></select></div>
+      <button class="btn" type="button" id="new-exam">Tạo đề khác</button>
+      <form id="exam-form">
+        <div class="field"><label>Tên đề</label><input id="title" value="Kiểm tra 15 phút"></div>
+        <div class="field"><label>Thời lượng</label><input id="duration" type="number" value="15"></div>
+        <div class="field"><label>Thang điểm</label><input id="total" type="number" step=".25" value="10"></div>
+        <div class="field"><label>Hướng dẫn</label><textarea id="instructions" placeholder="Ví dụ: Không sử dụng tài liệu"></textarea></div>
+        <button class="btn primary" type="submit" id="create-exam">Tạo đề mới</button>
+      </form>
+      <div class="utility">
+        <h2><span>CÂU RIÊNG</span>Thêm câu thủ công</h2>
+        <form id="manual-question-form">
+          <div class="field"><label>Loại câu</label><select id="manual-type"><option value="essay">Tự luận</option><option value="single_choice">Trắc nghiệm</option></select></div>
+          <div class="field"><label>Nội dung</label><textarea id="manual-content" placeholder="Nhập nội dung câu hỏi"></textarea></div>
+          <div class="field"><label>Điểm</label><input id="manual-points" type="number" step=".25" value="2"></div>
+          <div class="field"><label>Topic</label><select id="manual-topic"></select></div>
+          <div id="manual-choices" hidden>
+            <div class="field"><label>Lựa chọn A</label><input id="manual-choice-a" value="Đáp án A"></div>
+            <div class="field"><label>Lựa chọn B</label><input id="manual-choice-b" value="Đáp án B"></div>
+            <div class="field"><label>Đáp án đúng</label><select id="manual-correct"><option value="a">A</option><option value="b">B</option></select></div>
+          </div>
+          <button class="btn" type="submit">Thêm vào đề</button>
+        </form>
+      </div>
+      <div class="utility">
+        <h2><span>INSPECTOR</span>Sửa câu đang chọn</h2>
+        <form id="question-editor-form">
+          <div class="field"><label>Câu hỏi</label><select id="editor-question"></select></div>
+          <div class="field"><label>Nội dung</label><textarea id="editor-content"></textarea></div>
+          <div class="field"><label>Điểm</label><input id="editor-points" type="number" step=".25"></div>
+          <div class="field"><label>Topic</label><select id="editor-topic"></select></div>
+          <div id="editor-choices" hidden>
+            <div class="field"><label>Lựa chọn A</label><input id="editor-choice-a"></div>
+            <div class="field"><label>Lựa chọn B</label><input id="editor-choice-b"></div>
+            <div class="field"><label>Đáp án đúng</label><select id="editor-correct"><option value="a">A</option><option value="b">B</option></select></div>
+          </div>
+          <div class="actions">
+            <button class="btn" type="submit" id="save-question">Lưu câu</button>
+            <button class="btn" type="button" id="delete-question">Xóa câu</button>
+          </div>
+        </form>
+      </div>
+      <div class="utility">
+        <h2><span>BAREM TỰ LUẬN</span>Thêm ý chấm</h2>
+        <form id="rubric-form">
+          <div class="field"><label>Câu tự luận</label><select id="rubric-question"></select></div>
+          <div class="field"><label>Ý chấm</label><input id="rubric-description" placeholder="Ví dụ: Lập luận đúng"></div>
+          <div class="field"><label>Điểm</label><input id="rubric-points" type="number" step=".25" value="1"></div>
+          <div class="field"><label>Topic</label><select id="rubric-topic"></select></div>
+          <button class="btn" type="submit">Thêm ý barem</button>
+        </form>
+      </div>
+      <div id="error-box" class="error-box"></div>
+      <div class="utility">
+        <h2><span>TÀI LIỆU</span>Tùy chọn DOCX</h2>
+        <div class="field"><label>Kiểu trình bày</label><select id="export-style"><option value="standard">Tiêu chuẩn</option><option value="compact">Gọn</option></select></div>
+        <label><input id="include-answer" type="checkbox" checked style="width:auto"> Kèm đáp án</label><br>
+        <label><input id="include-rubric" type="checkbox" checked style="width:auto"> Kèm barem</label>
+      </div>
+      <div class="utility actions">
+        <button class="btn" id="validate-exam">Kiểm tra đề</button>
+        <button class="btn success" id="prepare-exam">Chuẩn bị phát đề</button>
+        <button class="btn" id="return-draft">Đưa về bản nháp</button>
+        <button class="btn primary" id="export-docx">Tải DOCX</button>
+      </div>
+      <div class="utility" id="demo-tools">
+        <h2><span>MÔ PHỎNG MODULE CHẤM</span>Vòng đời sau phát đề</h2>
+        <div class="actions">
+          <button class="btn" id="simulate-submission">Nhận bài đầu tiên</button>
+          <button class="btn success" id="simulate-completion">Chấm xong toàn bộ</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const H = {
+      "X-Teacher-Id": "teacher-demo",
+      "X-Role": "teacher",
+      "Content-Type": "application/json",
+    };
+    let exam = null;
+    let bank = [];
+    let topics = [];
+    let dragId = null;
+    let selectedQuestionId = null;
+    let demoConfig = {demo_mode: false, teacher_id: null};
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value ?? "").replace(
+      /[&<>"']/g,
+      character => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      })[character],
+    );
+
+    async function api(url, options = {}) {
+      const response = await fetch(url, {
+        ...options,
+        headers: {...H, ...(options.headers || {})},
+      });
+      const contentType = response.headers.get("content-type") || "";
+      const data = contentType.includes("json")
+        ? await response.json()
+        : await response.blob();
+      if (!response.ok) {
+        if (data.error?.code === "version_conflict" && exam) {
+          const latest = await fetch(`/api/exams/${exam.exam_id}`, {headers: H});
+          if (latest.ok) {
+            exam = await latest.json();
+            renderExam();
+          }
+        }
+        showError(
+          data.error?.message || data.detail || "Không thể thực hiện",
+          data.error?.code || "request_error",
+        );
+        throw new Error(data.error?.code || "request_error");
+      }
+      return data;
+    }
+
+    function showError(message, code = "error") {
+      $("error-box").className = "error-box show";
+      $("error-box").textContent = `${code}: ${message}`;
+    }
+
+    function clearError() {
+      $("error-box").className = "error-box";
+    }
+
+    function points(value) {
+      return Number(value).toFixed(2);
+    }
+
+    function topicOptions(includeAll = false) {
+      const all = includeAll ? '<option value="">Tất cả topic</option>' : "";
+      return all + topics.map(
+        topic => `<option value="${esc(topic.topic_id)}">${esc(topic.name)}</option>`,
+      ).join("");
+    }
+
+    async function loadReference() {
+      [bank, topics, demoConfig] = await Promise.all([
+        api("/api/question-bank/questions?subject_id=math&grade_level=8"),
+        api("/api/topics?subject_id=math&grade_level=8"),
+        api("/api/demo-config"),
+      ]);
+      $("demo-tools").hidden = !demoConfig.demo_mode;
+      $("bank-topic").innerHTML = topicOptions(true);
+      for (const id of ["manual-topic", "rubric-topic", "editor-topic"]) {
+        $(id).innerHTML = topicOptions();
+      }
+      renderBank();
+      await loadExamList();
+      if (!exam) $("new-exam").click();
+    }
+
+    async function loadExamList() {
+      const exams = await api("/api/exams");
+      const currentId = exam?.exam_id || "";
+      $("exam-picker").innerHTML = '<option value="">Đề mới</option>' + exams.map(
+        item => `<option value="${esc(item.exam_id)}">${esc(item.title)} · ${
+          esc(item.status)
+        }</option>`,
+      ).join("");
+      $("exam-picker").value = currentId;
+    }
+
+    function isLocked() {
+      return Boolean(
+        exam && (exam.first_submission_received_at || exam.status === "done"),
+      );
+    }
+
+    function renderBank() {
+      const query = $("bank-search").value.toLowerCase();
+      const type = $("bank-type").value;
+      const topic = $("bank-topic").value;
+      const locked = isLocked();
+      $("bank-list").innerHTML = bank.filter(question =>
+        (!query || question.content.toLowerCase().includes(query))
+        && (!type || question.question_type === type)
+        && (!topic || question.topic_ids.includes(topic))
+      ).map(question => `
+        <article class="bank-item">
+          <span class="meta">${
+            question.question_type === "essay" ? "TỰ LUẬN" : "TRẮC NGHIỆM"
+          } · ${esc(question.default_points)} Đ</span>
+          <p>${esc(question.content)}</p>
+          <button class="btn bank-add" data-id="${esc(question.question_id)}"
+            ${locked ? "disabled" : ""}>Thêm câu</button>
+        </article>
+      `).join("");
+      document.querySelectorAll(".bank-add").forEach(button => {
+        button.onclick = () => addBank(button.dataset.id);
+      });
+    }
+
+    function populateEditor() {
+      const question = exam?.questions.find(
+        item => item.exam_question_id === selectedQuestionId,
+      );
+      const hasQuestion = Boolean(question);
+      $("question-editor-form").querySelectorAll("input,select,textarea,button")
+        .forEach(control => { control.disabled = !hasQuestion || isLocked(); });
+      if (!question) {
+        $("editor-content").value = "";
+        $("editor-points").value = "";
+        $("editor-choices").hidden = true;
+        return;
+      }
+      $("editor-question").disabled = false;
+      $("editor-question").value = question.exam_question_id;
+      $("editor-content").value = question.content;
+      $("editor-points").value = question.points;
+      $("editor-topic").value = question.topic_ids[0] || "";
+      $("editor-topic").disabled = isLocked() || question.source_type === "question_bank";
+      const singleChoice = question.question_type === "single_choice";
+      $("editor-choices").hidden = !singleChoice;
+      if (singleChoice) {
+        $("editor-choice-a").value = question.choices[0]?.content || "";
+        $("editor-choice-b").value = question.choices[1]?.content || "";
+        $("editor-correct").value = question.correct_choice_id || "a";
+      }
+    }
+
+    function updateDisabledState() {
+      const locked = isLocked();
+      for (const formId of ["exam-form", "manual-question-form", "rubric-form"]) {
+        $(formId).querySelectorAll("input,select,textarea,button").forEach(
+          control => { control.disabled = locked; },
+        );
+      }
+      $("validate-exam").disabled = !exam;
+      $("export-docx").disabled = !exam;
+      $("prepare-exam").disabled = locked || !exam;
+      $("return-draft").disabled = !exam
+        || exam.status !== "preparing_exam"
+        || locked;
+      $("simulate-submission").disabled = !exam
+        || exam.status !== "preparing_exam"
+        || locked;
+      $("simulate-completion").disabled = !exam
+        || !exam.first_submission_received_at
+        || exam.status === "done";
+      populateEditor();
+      renderBank();
+    }
+
+    function renderExam() {
+      if (!exam) return;
+      if (
+        !selectedQuestionId
+        || !exam.questions.some(
+          question => question.exam_question_id === selectedQuestionId,
+        )
+      ) {
+        selectedQuestionId = exam.questions[0]?.exam_question_id || null;
+      }
+      $("title").value = exam.title;
+      $("duration").value = exam.duration_minutes;
+      $("total").value = exam.total_points;
+      $("instructions").value = exam.instructions;
+      $("exam-picker").value = exam.exam_id;
+      $("create-exam").textContent = "Lưu thông tin";
+      $("exam-title").textContent = exam.title;
+      $("exam-meta").textContent = `${exam.subject_id} · Khối ${
+        exam.grade_level
+      } · ${exam.duration_minutes} phút`;
+      $("status-badge").textContent = exam.status;
+      $("version-badge").textContent = `v${exam.version}`;
+      const total = Number(exam.total_points);
+      const current = exam.questions.reduce(
+        (sum, question) => sum + Number(question.points),
+        0,
+      );
+      $("score-copy").textContent = `${points(current)} / ${points(total)} điểm`;
+      $("score-meter").style.width = `${
+        Math.min(100, total ? current / total * 100 : 0)
+      }%`;
+      const essayOptions = exam.questions.filter(
+        question => question.question_type === "essay",
+      ).map(
+        question => `<option value="${esc(question.exam_question_id)}">Câu ${
+          question.position
+        }</option>`,
+      ).join("");
+      $("rubric-question").innerHTML = essayOptions;
+      $("editor-question").innerHTML = exam.questions.map(
+        question => `<option value="${esc(question.exam_question_id)}">Câu ${
+          question.position
+        }</option>`,
+      ).join("");
+      $("exam-canvas").innerHTML = exam.questions.length
+        ? exam.questions.map(question => `
+          <article class="question-card ${
+            question.exam_question_id === selectedQuestionId ? "selected" : ""
+          }" draggable="${isLocked() ? "false" : "true"}"
+            data-id="${esc(question.exam_question_id)}">
+            <span class="drag">⠿</span>
+            <h3>Câu ${question.position} · ${esc(question.points)} điểm</h3>
+            <p>${esc(question.content)}</p>
+            <div class="tags">${question.topic_ids.map(
+              topic => `<span class="tag">${esc(topic)}</span>`,
+            ).join("")}</div>
+            ${question.rubric_items.map(
+              item => `<div class="rubric-row">${esc(item.description)} · ${
+                esc(item.points)
+              } điểm</div>`,
+            ).join("")}
+          </article>
+        `).join("")
+        : '<div class="empty">Chọn câu từ ngân hàng hoặc thêm câu thủ công.</div>';
+      wireCards();
+      updateDisabledState();
+    }
+
+    function wireCards() {
+      document.querySelectorAll(".question-card").forEach(card => {
+        card.onclick = () => {
+          selectedQuestionId = card.dataset.id;
+          renderExam();
+        };
+        if (isLocked()) return;
+        card.ondragstart = () => {
+          dragId = card.dataset.id;
+          card.classList.add("dragging");
+        };
+        card.ondragend = () => card.classList.remove("dragging");
+        card.ondragover = event => event.preventDefault();
+        card.ondrop = async event => {
+          event.preventDefault();
+          const targetId = card.dataset.id;
+          if (targetId === dragId) return;
+          const ids = exam.questions.map(
+            question => question.exam_question_id,
+          );
+          const from = ids.indexOf(dragId);
+          const to = ids.indexOf(targetId);
+          ids.splice(to, 0, ids.splice(from, 1)[0]);
+          exam = await api(`/api/exams/${exam.exam_id}/questions/reorder`, {
+            method: "PUT",
+            body: JSON.stringify({
+              exam_question_ids: ids,
+              expected_version: exam.version,
+            }),
+          });
+          renderExam();
+        };
+      });
+    }
+
+    async function refreshExam() {
+      exam = await api(`/api/exams/${exam.exam_id}`);
+      renderExam();
+    }
+
+    async function addBank(questionId) {
+      if (!exam) return showError("Hãy tạo đề trước");
+      clearError();
+      const question = bank.find(item => item.question_id === questionId);
+      await api(`/api/exams/${exam.exam_id}/questions/from-bank`, {
+        method: "POST",
+        body: JSON.stringify({
+          question_id: questionId,
+          points: question.default_points,
+          expected_version: exam.version,
+        }),
+      });
+      await refreshExam();
+    }
+
+    $("exam-form").onsubmit = async event => {
+      event.preventDefault();
+      clearError();
+      if (!exam) {
+        exam = await api("/api/exams", {
+          method: "POST",
+          body: JSON.stringify({
+            title: $("title").value,
+            subject_id: "math",
+            grade_level: 8,
+            duration_minutes: Number($("duration").value),
+            total_points: points($("total").value),
+            instructions: $("instructions").value,
+          }),
+        });
+      } else {
+        exam = await api(`/api/exams/${exam.exam_id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            title: $("title").value,
+            duration_minutes: Number($("duration").value),
+            total_points: points($("total").value),
+            instructions: $("instructions").value,
+            expected_version: exam.version,
+          }),
+        });
+      }
+      renderExam();
+      await loadExamList();
+    };
+
+    $("exam-picker").onchange = async () => {
+      const examId = $("exam-picker").value;
+      if (!examId) {
+        $("new-exam").click();
+        return;
+      }
+      exam = await api(`/api/exams/${examId}`);
+      selectedQuestionId = null;
+      clearError();
+      renderExam();
+    };
+
+    $("new-exam").onclick = () => {
+      exam = null;
+      selectedQuestionId = null;
+      $("exam-picker").value = "";
+      $("exam-form").reset();
+      $("title").value = "Kiểm tra 15 phút";
+      $("duration").value = "15";
+      $("total").value = "10";
+      $("create-exam").textContent = "Tạo đề mới";
+      $("exam-title").textContent = "Đề kiểm tra mới";
+      $("exam-meta").textContent = "Toán · Khối 8 · 15 phút";
+      $("status-badge").textContent = "Chưa có đề";
+      $("version-badge").textContent = "v—";
+      $("score-copy").textContent = "0.00 / 10.00 điểm";
+      $("score-meter").style.width = "0";
+      $("exam-canvas").innerHTML =
+        '<div class="empty">Chọn câu từ ngân hàng hoặc thêm câu thủ công.</div>';
+      for (const formId of ["exam-form", "manual-question-form", "rubric-form"]) {
+        $(formId).querySelectorAll("input,select,textarea,button").forEach(
+          control => { control.disabled = formId !== "exam-form"; },
+        );
+      }
+      populateEditor();
+      renderBank();
+      $("validate-exam").disabled = true;
+      $("prepare-exam").disabled = true;
+      $("return-draft").disabled = true;
+      $("export-docx").disabled = true;
+      $("simulate-submission").disabled = true;
+      $("simulate-completion").disabled = true;
+    };
+
+    $("manual-type").onchange = () => {
+      $("manual-choices").hidden = $("manual-type").value !== "single_choice";
+    };
+
+    $("manual-question-form").onsubmit = async event => {
+      event.preventDefault();
+      if (!exam) return showError("Hãy tạo đề trước");
+      const type = $("manual-type").value;
+      const payload = {
+        question_type: type,
+        content: $("manual-content").value,
+        points: points($("manual-points").value),
+        topic_ids: [$("manual-topic").value],
+        choices: [],
+        correct_choice_id: null,
+        expected_version: exam.version,
+      };
+      if (type === "single_choice") {
+        payload.choices = [
+          {choice_id: "a", content: $("manual-choice-a").value},
+          {choice_id: "b", content: $("manual-choice-b").value},
+        ];
+        payload.correct_choice_id = $("manual-correct").value;
+      }
+      const created = await api(
+        `/api/exams/${exam.exam_id}/questions/manual`,
+        {method: "POST", body: JSON.stringify(payload)},
+      );
+      selectedQuestionId = created.exam_question_id;
+      await refreshExam();
+    };
+
+    $("editor-question").onchange = () => {
+      selectedQuestionId = $("editor-question").value;
+      renderExam();
+    };
+
+    $("question-editor-form").onsubmit = async event => {
+      event.preventDefault();
+      const question = exam.questions.find(
+        item => item.exam_question_id === selectedQuestionId,
+      );
+      if (!question) return;
+      const payload = {
+        content: $("editor-content").value,
+        points: points($("editor-points").value),
+        expected_version: exam.version,
+      };
+      if (question.source_type === "manual") {
+        payload.topic_ids = [$("editor-topic").value];
+      }
+      if (question.question_type === "single_choice") {
+        payload.choices = [
+          {choice_id: "a", content: $("editor-choice-a").value},
+          {choice_id: "b", content: $("editor-choice-b").value},
+        ];
+        payload.correct_choice_id = $("editor-correct").value;
+      }
+      await api(
+        `/api/exams/${exam.exam_id}/questions/${selectedQuestionId}`,
+        {method: "PATCH", body: JSON.stringify(payload)},
+      );
+      await refreshExam();
+    };
+
+    $("delete-question").onclick = async () => {
+      if (!selectedQuestionId) return;
+      await api(
+        `/api/exams/${exam.exam_id}/questions/${selectedQuestionId}?expected_version=${
+          exam.version
+        }`,
+        {method: "DELETE"},
+      );
+      selectedQuestionId = null;
+      await refreshExam();
+    };
+
+    $("rubric-form").onsubmit = async event => {
+      event.preventDefault();
+      if (!exam) return showError("Hãy tạo đề trước");
+      const questionId = $("rubric-question").value;
+      if (!questionId) return showError("Đề chưa có câu tự luận");
+      await api(
+        `/api/exams/${exam.exam_id}/questions/${questionId}/rubric-items`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            description: $("rubric-description").value,
+            points: points($("rubric-points").value),
+            topic_ids: [$("rubric-topic").value],
+            expected_version: exam.version,
+          }),
+        },
+      );
+      selectedQuestionId = questionId;
+      await refreshExam();
+    };
+
+    $("validate-exam").onclick = async () => {
+      if (!exam) return;
+      clearError();
+      const result = await api(
+        `/api/exams/${exam.exam_id}/validate`,
+        {method: "POST"},
+      );
+      $("validation-copy").textContent = result.valid
+        ? "Đề hợp lệ"
+        : `${result.errors.length} lỗi cần sửa`;
+      if (!result.valid) {
+        showError(
+          result.errors.map(error => error.message).join(" · "),
+          "validation",
+        );
+      }
+    };
+
+    $("prepare-exam").onclick = async () => {
+      if (!exam) return;
+      exam = await api(`/api/exams/${exam.exam_id}/prepare`, {
+        method: "POST",
+        body: JSON.stringify({expected_version: exam.version}),
+      });
+      renderExam();
+    };
+
+    $("return-draft").onclick = async () => {
+      if (!exam) return;
+      exam = await api(`/api/exams/${exam.exam_id}/return-to-draft`, {
+        method: "POST",
+        body: JSON.stringify({expected_version: exam.version}),
+      });
+      renderExam();
+    };
+
+    $("export-docx").onclick = async () => {
+      if (!exam) return;
+      const metadata = await api(
+        `/api/exams/${exam.exam_id}/exports/docx`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            style: $("export-style").value,
+            include_answer_key: $("include-answer").checked,
+            include_rubric: $("include-rubric").checked,
+            expected_version: exam.version,
+          }),
+        },
+      );
+      const blob = await api(
+        `/api/exams/${exam.exam_id}/exports/${metadata.export_id}/download`,
+      );
+      const anchor = document.createElement("a");
+      anchor.href = URL.createObjectURL(blob);
+      anchor.download = metadata.file_name;
+      anchor.click();
+      URL.revokeObjectURL(anchor.href);
+    };
+
+    $("simulate-submission").onclick = async () => {
+      if (!exam) return;
+      await api(`/demo/exams/${exam.exam_id}/simulate-first-submission`, {
+        method: "POST",
+      });
+      await refreshExam();
+      $("validation-copy").textContent = "Đã khóa đề";
+    };
+
+    $("simulate-completion").onclick = async () => {
+      if (!exam) return;
+      await api(`/demo/exams/${exam.exam_id}/simulate-grading-completed`, {
+        method: "POST",
+      });
+      await refreshExam();
+      $("validation-copy").textContent = "Đã chấm xong";
+    };
+
+    $("bank-search").oninput = renderBank;
+    $("bank-type").onchange = renderBank;
+    $("bank-topic").onchange = renderBank;
+    loadReference().catch(error => showError(error.message));
+  </script>
+</body>
+</html>
