@@ -1,84 +1,61 @@
-# Thiet ke module lo trinh hoc tap ca nhan hoa
+# Thiết kế module lộ trình học tập cá nhân hóa
 
-## 1. Muc tieu
+## 1. Mục tiêu
 
-Module tao lo trinh hoc tap ca nhan hoa cho hoc sinh dang hoc trong lop do giao vien quan ly. He thong khong chi danh dau dung/sai tai topic hien tai ma phai truy nguoc Knowledge Graph de tim khoang trong kien thuc goc, ke ca topic thuoc khoi lop thap hon, sau do tao chuoi topic can hoc voi muc tieu thanh thao va dieu kien chuyen tiep ro rang.
+Module tạo lộ trình học tập cá nhân hóa cho học sinh trong lớp do giáo viên quản lý. Hệ thống truy ngược Knowledge Graph để tìm khoảng trống kiến thức gốc, kể cả topic thuộc khối lớp thấp hơn, thay vì chỉ đánh dấu đúng hoặc sai tại topic hiện tại.
 
-Giao vien la nguoi dat muc tieu, rang buoc va phe duyet chinh sach hoc tap. He thong phu trach tong hop evidence, uoc luong nang luc, chan doan gap, de xuat lo trinh, gom nhom hoc sinh va uu tien ho tro o cap lop.
+Đầu ra là chuỗi topic có thứ tự. Mỗi bước gồm mức thành thạo hiện tại, mức cần đạt, lý do được chọn, thời lượng dự kiến và điều kiện hoàn thành. Giáo viên đặt mục tiêu và ràng buộc; hệ thống chẩn đoán, đề xuất lộ trình, gom nhóm học sinh và ưu tiên hỗ trợ.
 
-## 2. Pham vi
+## 2. Phạm vi
 
-### 2.1. Trong pham vi
+Module phụ trách:
 
-- Tiep nhan mastery evidence tu bai thi giay da OCR/cham theo rubric va quiz tren he thong.
-- Chuan hoa va hieu chinh do tin cay cua evidence.
-- Uoc luong mastery theo tung cap `student-topic` bang Bayesian Knowledge Tracing (BKT).
-- Tinh `confidence_score` rieng voi `mastery_probability`.
-- Truy nguoc prerequisite graph de tim root-cause gap.
-- Yeu cau quiz chan doan khi evidence chua du chac chan.
-- Tao lo trinh gom topic, mastery hien tai, mastery muc tieu va dieu kien hoan thanh.
-- Toi uu lo trinh theo deadline, thoi luong va rang buoc cua giao vien.
-- Tu dong gom nhom hoc sinh theo nhu cau.
-- Phat hien gap chung cua lop va de xuat hoc sinh can ho tro truoc.
-- Luu version, lich su thay doi va ly do cua moi de xuat.
+- Tiếp nhận mastery evidence từ bài kiểm tra giấy và quiz trên hệ thống.
+- Chuẩn hóa độ tin cậy của evidence.
+- Ước lượng mastery theo từng cặp `student-topic` bằng Bayesian Knowledge Tracing (BKT).
+- Tính `confidence_score` độc lập với `mastery_probability`.
+- Chẩn đoán root-cause gap trên prerequisite graph.
+- Tạo và tối ưu lộ trình theo ràng buộc của giáo viên.
+- Gom nhóm học sinh, phát hiện gap toàn lớp và xếp hạng học sinh cần hỗ trợ.
+- Lưu phiên bản lộ trình và giải thích mọi thay đổi.
 
-### 2.2. Ngoai pham vi
+Module không phụ trách OCR, chấm điểm, quản lý ngân hàng câu hỏi, gắn topic hoặc tự động sửa Knowledge Graph.
 
-- OCR bai lam viet tay.
-- Mapping bai lam voi rubric.
-- Cham diem cau hoi hoac quiz.
-- Quan ly ngan hang cau hoi.
-- Gan topic cho cau hoi va rubric.
-- Tu dong sua Knowledge Graph.
-- Bat giao vien dieu chinh truc tiep cac tham so BKT.
-
-## 3. Cac he thong lien quan
+## 3. Nguồn dữ liệu
 
 ### 3.1. Knowledge Graph
 
-Knowledge Graph da ton tai va luu topic cung quan he prerequisite dang co huong:
+Graph lưu quan hệ có hướng:
 
 ```text
 prerequisite_topic -> dependent_topic
 ```
 
-Vi du:
+Ví dụ:
 
 ```text
-Phep cong -> Phep nhan
-Quy dong mau so -> Cong phan so -> Bieu thuc so huu ti
+Phép cộng -> Phép nhân
+Quy đồng mẫu số -> Cộng phân số -> Biểu thức số hữu tỉ
 ```
 
-Graph hien chi co canh phu thuoc, chua co trong so, loai phu thuoc hoac nguong mastery tren canh. Module phai hoat dong duoc voi du lieu nay; trong so canh duoc tinh dong neu can.
+Graph hiện chỉ có cạnh phụ thuộc, chưa có trọng số. Các trọng số dùng để xếp hạng được tính động và không làm thay đổi graph gốc.
 
-### 3.2. Nguon evidence tu bai thi giay
-
-Luong hien co:
+### 3.2. Evidence từ bài kiểm tra giấy
 
 ```text
 Approved Assessment Template
--> OCR bai lam
+-> OCR bài làm
 -> Answer-Rubric Mapping
 -> Teacher Final Review
 -> Approved Rubric Evaluation
 -> Paper Mastery Evidence
 ```
 
-Evidence co the chua:
+Evidence gồm Student ID, assessment/question/rubric item ID, topic tag, điểm đạt được, điểm tối đa, trạng thái rubric, xác nhận của giáo viên và timestamp.
 
-- Student ID.
-- Assessment, question va rubric item ID.
-- Topic tu question tag va rubric tag.
-- Diem dat duoc va diem toi da.
-- Trang thai dat, dat mot phan, chua dat, khong lam hoac khong doc duoc.
-- Xac nhan cua giao vien.
-- Timestamp.
+Chỉ evidence đã được giáo viên xác nhận mới cập nhật mastery chính thức. Evidence chưa xác nhận được lưu ở trạng thái `provisional`.
 
-Chi evidence da duoc giao vien xac nhan moi cap nhat mastery chinh thuc. Evidence chua xac nhan duoc luu o trang thai `provisional`.
-
-### 3.3. Nguon evidence tu quiz tren he thong
-
-Luong hien co:
+### 3.3. Evidence từ quiz trên hệ thống
 
 ```text
 Question Bank
@@ -87,61 +64,47 @@ Question Bank
 -> Quiz Mastery Evidence
 ```
 
-Evidence co the chua:
+Evidence gồm Student ID, session/question ID, topic ID, kết quả, điểm, độ khó, thời gian trả lời, số lần thử, gợi ý đã dùng, phương pháp chấm và timestamp.
 
-- Student ID, quiz session ID va question ID.
-- Topic ID.
-- Ket qua va diem dat duoc.
-- Do kho.
-- Thoi gian tra loi.
-- So lan thu.
-- Goi y da su dung.
-- Phuong phap cham.
-- Timestamp.
-
-## 4. Kien truc logic
-
-He thong duoc chia thanh cac thanh phan sau.
+## 4. Kiến trúc logic
 
 ### 4.1. Evidence Ingestion and Calibration
 
-Tiep nhan hai nguon evidence, kiem tra schema, chong trung lap va chuyen ve cung mot hop dong du lieu. Thanh phan nay khong cham lai bai lam.
-
-Nhiem vu:
-
-- Xac thuc `student_id`, `topic_id` va lineage cua evidence.
-- Bao dam xu ly idempotent theo `evidence_id`.
-- Tranh double-count question tag va rubric tag cua cung mot ket qua.
-- Tinh `observation_value` va `evidence_weight`.
-- Luu nguon goc de co the giai thich va tinh lai.
+- Kiểm tra schema và lineage.
+- Chống trùng lặp theo `evidence_id`.
+- Tránh double-count question tag và rubric tag của cùng một kết quả.
+- Tính `observation_value` và `evidence_weight`.
+- Bảo đảm xử lý idempotent.
 
 ### 4.2. Core Mastery Module
 
-Dung weighted BKT de cap nhat `mastery_probability` theo tung cap `student-topic`. Day la noi duy nhat so huu trang thai mastery chinh thuc.
+Dùng weighted BKT để cập nhật `mastery_probability` theo từng cặp `student-topic`. Đây là thành phần duy nhất sở hữu trạng thái mastery chính thức.
 
 ### 4.3. Gap Diagnosis Engine
 
-Nhan topic muc tieu, truy nguoc Knowledge Graph, phan loai cac prerequisite thanh `mastered`, `learning`, `uncertain` hoac `confirmed_gap`, sau do xep hang gap co kha nang la nguyen nhan goc.
+Nhận topic mục tiêu, truy ngược Knowledge Graph và phân loại prerequisite:
+
+```text
+unknown | uncertain | learning | confirmed_gap | mastered
+```
 
 ### 4.4. Diagnostic Assessment Planner
 
-Chon cac cau hoi ngan cho topic `uncertain`. Muc tieu la thu them evidence co gia tri phan biet cao, khong bat hoc sinh lam lai toan bo bai kiem tra.
+Chọn câu hỏi chẩn đoán ngắn cho topic `uncertain`. Mục tiêu là thu thêm evidence có giá trị phân biệt cao mà không bắt học sinh làm lại toàn bộ bài kiểm tra.
 
 ### 4.5. Root-Cause Ranker
 
-Tinh muc do nghiem trong va anh huong cua gap, loai bo nhung loi chi la he qua cua gap phia truoc, va tra ve root-cause gap kem giai thich.
+Xếp hạng gap theo mức thiếu hụt, confidence, khoảng cách tới topic mục tiêu và ảnh hưởng tới các topic phía sau.
 
 ### 4.6. Personalized Path Planner
 
-Tao remediation subgraph, loai topic da thanh thao, toi uu danh sach topic theo rang buoc cua giao vien va sap thu tu bang topological sort.
+Tạo remediation subgraph, loại topic đã thành thạo, tối ưu theo ràng buộc và sắp thứ tự bằng topological sort.
 
 ### 4.7. Teacher Control and Class Insight
 
-Cho phep giao vien dat rang buoc, phe duyet hoac override lo trinh. Thanh phan nay cung tong hop gap toan lop, tao nhom can thiep va xep hang hoc sinh can ho tro.
+Cho phép giáo viên cấu hình, phê duyệt hoặc override lộ trình; đồng thời tổng hợp gap toàn lớp, tạo nhóm can thiệp và xếp hạng học sinh cần hỗ trợ.
 
-## 5. Chuan hoa evidence
-
-Hop dong evidence noi bo:
+## 5. Chuẩn hóa evidence
 
 ```text
 CalibratedMasteryEvidence
@@ -160,9 +123,7 @@ CalibratedMasteryEvidence
 - status
 ```
 
-`observation_value` nam trong khoang `0..1`. Voi rubric, gia tri co the tinh tu ti le diem cua tung rubric item. Voi quiz, gia tri duoc tao tu ket qua dung/sai hoac diem mot phan.
-
-Trong so evidence:
+`observation_value` nằm trong khoảng `0..1`. Với rubric, giá trị được tính từ tỷ lệ điểm của rubric item. Với quiz, giá trị được tính từ kết quả đúng, sai hoặc đúng một phần.
 
 ```text
 evidence_weight =
@@ -174,71 +135,69 @@ evidence_weight =
   * recency_factor
 ```
 
-Gia tri khoi tao minh hoa:
+Giá trị khởi tạo minh họa:
 
 ```text
-Bai giay da giao vien xac nhan: 1.00
-Quiz cham tu dong:              0.85
-Da dung goi y:                  x 0.70
-Lan thu thu hai:                x 0.80
+Bài giấy đã được giáo viên xác nhận: 1.00
+Quiz chấm tự động:                    0.85
+Đã dùng gợi ý:                        x 0.70
+Lần thử thứ hai:                      x 0.80
 ```
 
-Day la tham so cau hinh ban dau, khong phai gia tri nghiep vu co dinh. Chung phai duoc hieu chinh bang du lieu thuc te.
+Các hệ số này phải được hiệu chỉnh bằng dữ liệu thực tế.
 
 ## 6. Bayesian Knowledge Tracing
 
-BKT uoc luong:
+BKT ước lượng:
 
 ```text
-P(L_t) = xac suat hoc sinh da thanh thao topic tai thoi diem t
+P(L_t) = xác suất học sinh đã thành thạo topic tại thời điểm t
 ```
 
-Moi topic co cac tham so:
+Mỗi topic có bốn tham số:
 
-- `P(L0)`: xac suat da biet truoc khi co evidence.
-- `P(T)`: xac suat hoc duoc sau mot co hoi luyen tap.
-- `P(S)`: xac suat lam sai du da biet.
-- `P(G)`: xac suat lam dung du chua biet.
+- `P(L0)`: xác suất đã biết trước khi có evidence.
+- `P(T)`: xác suất học được sau một cơ hội luyện tập.
+- `P(S)`: xác suất trả lời sai dù đã biết.
+- `P(G)`: xác suất trả lời đúng dù chưa biết.
 
-Phien ban dau co the dung tham so mac dinh theo mon, khoi va loai cau hoi. Khi co du du lieu, tham so duoc hieu chinh tu lich su toan he thong.
+Phiên bản đầu dùng tham số mặc định theo môn, khối và loại câu hỏi. Khi đủ dữ liệu, tham số được hiệu chỉnh từ lịch sử hệ thống.
 
-Vi evidence co diem mot phan va trong so, he thong dung weighted/soft-evidence BKT thay vi ep moi quan sat thanh dung hoac sai tuyet doi. Viec nay can duoc kiem dinh de bao dam mastery khong tang qua nhanh sau mot evidence yeu.
+Vì evidence có điểm một phần và trọng số, hệ thống dùng weighted hoặc soft-evidence BKT thay vì ép mọi quan sát thành đúng hoặc sai tuyệt đối.
+
+BKT chỉ ước lượng mastery, không trực tiếp tạo lộ trình.
 
 ## 7. Confidence score
 
-`mastery_probability` tra loi hoc sinh co kha nang da thanh thao den dau. `confidence_score` tra loi he thong tin tuong den dau vao uoc luong do.
+`mastery_probability` biểu thị khả năng học sinh đã thành thạo. `confidence_score` biểu thị mức hệ thống tin tưởng vào ước lượng đó.
 
-Khong dat ten la `confidence_probability`, vi day la chi so tong hop chuan hoa, khong phai xac suat Bayesian thuan tuy.
-
-### 7.1. Luong evidence hieu dung
+### 7.1. Lượng evidence hiệu dụng
 
 ```text
 effective_evidence = sum(evidence_weight_i)
-
 evidence_sufficiency = 1 - exp(-effective_evidence / k)
 ```
 
-`k` la so evidence hieu dung can de dat do tin cay tuong doi cao, vi du gia tri khoi tao `k = 5`.
+`k` là số evidence hiệu dụng cần để đạt độ tin cậy tương đối cao, khởi tạo với `k = 5`.
 
-### 7.2. Do chac chan cua posterior
+### 7.2. Độ chắc chắn của posterior
 
 ```text
 H(p) = -p*log(p) - (1-p)*log(1-p)
-
 posterior_certainty = 1 - H(P_mastery) / log(2)
 ```
 
-Mastery gan `0.5` tao certainty thap; mastery gan `0` hoac `1` tao certainty cao.
+Mastery gần `0.5` tạo certainty thấp; mastery gần `0` hoặc `1` tạo certainty cao.
 
-### 7.3. Tinh nhat quan
+### 7.3. Tính nhất quán
 
 ```text
 consistency = 1 - weighted_prediction_error
 ```
 
-Sai so duoc tinh tren cac observation gan day va phai ton trong thu tu thoi gian de khong phat hoc sinh chi vi cac em dang tien bo.
+Sai số được tính trên observation gần đây và phải tôn trọng thứ tự thời gian để không phạt học sinh vì các em đang tiến bộ.
 
-### 7.4. Cong thuc tong hop
+### 7.4. Công thức tổng hợp
 
 ```text
 confidence_score =
@@ -246,20 +205,18 @@ confidence_score =
   * (0.7 * posterior_certainty + 0.3 * consistency)
 ```
 
-Vi `evidence_sufficiency` la cong, mot cau tra loi dung khong the tao confidence cao ngay ca khi BKT tam thoi tra mastery cao.
-
-Nguong khoi tao:
+Ngưỡng khởi tạo:
 
 ```text
-mastery >= 0.80 va confidence >= 0.70 -> mastered
-mastery <  0.60 va confidence >= 0.70 -> confirmed_gap
+mastery >= 0.80 và confidence >= 0.70 -> mastered
+mastery <  0.60 và confidence >= 0.70 -> confirmed_gap
 confidence < 0.70                     -> uncertain
-con lai                                -> learning
+còn lại                               -> learning
 ```
 
-Nguong phai cau hinh duoc theo mon va khoi.
+Các ngưỡng phải cấu hình được theo môn và khối.
 
-## 8. Hop dong du lieu voi Path Planner
+## 8. Hợp đồng dữ liệu
 
 ### 8.1. Student Topic Knowledge State
 
@@ -278,7 +235,7 @@ StudentTopicKnowledgeState
 - version
 ```
 
-### 8.2. Yeu cau cua giao vien
+### 8.2. Yêu cầu của giáo viên
 
 ```text
 LearningPathRequest
@@ -295,7 +252,7 @@ LearningPathRequest
 - teacher_id
 ```
 
-### 8.3. Du lieu Knowledge Graph
+### 8.3. Knowledge Graph
 
 ```text
 Topic
@@ -310,23 +267,15 @@ PrerequisiteEdge
 - dependent_topic_id
 ```
 
-## 9. Thuat toan chan doan root-cause gap
+## 9. Chẩn đoán root-cause gap
 
-### 9.1. Tao relevant subgraph
-
-Tu topic muc tieu, chay reverse BFS/DFS de lay tat ca prerequisite xuyen khoi lop:
+Từ topic mục tiêu, chạy reverse BFS hoặc DFS:
 
 ```text
 RelevantSubgraph = ancestors(target_topics) + target_topics
 ```
 
-Graph con phai la DAG. Neu co cycle, Path Planner khong duoc tao lo trinh moi tren vung graph loi.
-
-### 9.2. Phan loai topic
-
-Moi topic trong relevant subgraph duoc gan trang thai theo mastery va confidence. Topic `unknown` hoac `uncertain` khong bi mac dinh la gap.
-
-### 9.3. Xep hang gap
+Graph con phải là DAG. Topic `unknown` hoặc `uncertain` không được mặc định là gap.
 
 ```text
 gap_score =
@@ -337,39 +286,21 @@ gap_score =
   * recency_factor
 ```
 
-Trong do:
+Trong đó:
 
 ```text
 mastery_deficit   = 1 - mastery_probability
 target_relevance  = 1 / (1 + distance_to_target)
-downstream_impact = so topic chua vung phu thuoc vao topic nay
+downstream_impact = số topic chưa vững phụ thuộc vào topic này
 ```
 
-### 9.4. Xac dinh root cause
+Một root-cause candidate phải chưa thành thạo với confidence đủ cao, nằm trên đường tới topic mục tiêu, là điểm đứt sớm nhất có bằng chứng trong một nhánh prerequisite và có khả năng mở khóa topic phía sau.
 
-Mot root-cause candidate phai:
+Nếu confidence thấp, hệ thống yêu cầu chẩn đoán thêm thay vì kết luận.
 
-- Chua thanh thao voi confidence du cao.
-- Nam tren duong prerequisite toi topic muc tieu.
-- La diem dut som nhat co bang chung trong mot nhanh prerequisite.
-- Co kha nang mo khoa mot hoac nhieu topic phia sau khi duoc cai thien.
+## 10. Tạo lộ trình
 
-Neu gap co confidence thap, he thong phai yeu cau chan doan them thay vi ket luan.
-
-## 10. Thuat toan tao lo trinh
-
-### 10.1. Remediation subgraph
-
-Bao gom:
-
-- Root-cause gaps.
-- Topic trung gian chua thanh thao.
-- Topic muc tieu.
-- Topic bat buoc do giao vien dat.
-
-Topic da mastered duoc giu trong dependency graph de giai thich, nhung khong tro thanh buoc hoc.
-
-### 10.2. Toi uu theo ngan sach
+Remediation subgraph gồm root-cause gap, topic trung gian chưa thành thạo, topic mục tiêu và topic bắt buộc do giáo viên đặt. Topic đã mastered được giữ trong dependency graph để giải thích nhưng không trở thành bước học.
 
 ```text
 learning_cost = estimated_minutes
@@ -380,29 +311,20 @@ learning_value =
   * downstream_impact
 ```
 
-Neu du thoi gian, he thong lay toan bo remediation subgraph. Neu thieu thoi gian, dung constrained knapsack heuristic de chon tap topic co gia tri cao, nhung van bao toan prerequisite bat buoc.
+Nếu đủ thời gian, hệ thống lấy toàn bộ remediation subgraph. Nếu thiếu thời gian, dùng constrained knapsack heuristic nhưng vẫn bảo toàn prerequisite bắt buộc.
 
-Khong dung shortest path don thuan vi mot topic co the can nhieu prerequisite dong thoi. Khi quy mo va nhu cau toi uu tang, co the thay heuristic bang Integer Linear Programming.
+Không dùng shortest path đơn thuần vì một topic có thể cần nhiều prerequisite đồng thời. Khi cần tối ưu chính xác hơn, có thể thay heuristic bằng Integer Linear Programming.
 
-### 10.3. Sap thu tu
+Thứ tự được tạo bằng topological sort. Khi nhiều topic cùng sẵn sàng, ưu tiên gap score cao hơn, mở khóa nhiều topic hơn, chi phí thấp hơn và gần deadline hơn.
 
-Dung topological sort. Neu nhieu topic cung san sang:
-
-1. Gap score cao hon.
-2. Mo khoa nhieu topic hon.
-3. Chi phi hoc thap hon.
-4. Gan deadline hon.
-
-### 10.4. Dieu kien hoan thanh
+Điều kiện hoàn thành một bước:
 
 ```text
 mastery_probability >= target_mastery
 AND confidence_score >= minimum_confidence
 ```
 
-Xem bai hoac lam du so cau khong tu dong dong nghia voi thanh thao.
-
-## 11. Dau ra Personalized Learning Path
+## 11. Đầu ra lộ trình
 
 ```text
 PersonalizedLearningPath
@@ -420,8 +342,6 @@ PersonalizedLearningPath
 - version
 ```
 
-Moi buoc:
-
 ```text
 PathStep
 - topic_id
@@ -438,48 +358,25 @@ PathStep
 - teacher_locked
 ```
 
-Trang thai lo trinh:
-
 ```text
 Draft -> Approved -> Active -> Paused -> Completed
                          |
                          -> Superseded
 ```
 
-## 12. Quyen kiem soat cua giao vien
+## 12. Quyền kiểm soát của giáo viên
 
-### 12.1. Cap lop
+Giáo viên được đặt topic mục tiêu, deadline, thời lượng, ngưỡng mastery, topic bắt buộc, topic bị loại và thời điểm tái đánh giá.
 
-Giao vien duoc dat:
+Giáo viên có thể phê duyệt hàng loạt, thêm hoặc xóa topic, đổi thứ tự, khóa bước, tạo lại lộ trình, tạm dừng hoặc giao cùng hoạt động cho một nhóm.
 
-- Topic dang day va topic muc tieu.
-- Deadline va thoi luong luyen tap.
-- Nguong mastery muc tieu.
-- Topic bat buoc hoac bi loai.
-- Thoi diem tai danh gia.
+Mỗi override lưu `teacher_id`, timestamp, phạm vi và lý do. Hệ thống không được âm thầm đảo ngược override của giáo viên.
 
-### 12.2. Cap lo trinh
+Giáo viên điều chỉnh chính sách học tập, không điều chỉnh trực tiếp các tham số `slip`, `guess` hoặc `transition` của BKT.
 
-Giao vien co the:
+## 13. Gom nhóm và ưu tiên cấp lớp
 
-- Phe duyet hang loat.
-- Them, xoa hoac doi thu tu topic.
-- Khoa mot buoc.
-- Tao lai hoac tam dung lo trinh.
-- Giao cung hoat dong cho mot nhom.
-- Chap nhan hoac tu choi thay doi do he thong de xuat.
-
-Moi override luu `teacher_id`, timestamp, pham vi va ly do. Override khong duoc am tham bi he thong dao nguoc.
-
-### 12.3. Tham so mo hinh
-
-Giao vien dieu chinh chinh sach hoc tap, khong dieu chinh truc tiep `slip`, `guess`, `transition` hoac tham so noi bo khac cua BKT.
-
-## 13. Gom nhom va uu tien o cap lop
-
-### 13.1. Gom nhom
-
-Nhom theo root-cause gap va hinh thuc can thiep, khong theo tong diem:
+Học sinh được nhóm theo root-cause gap và hình thức can thiệp, không theo tổng điểm:
 
 ```text
 group_key =
@@ -489,16 +386,9 @@ group_key =
   + recommended_intervention
 ```
 
-Vi du:
+Một học sinh có thể có nhiều nhu cầu nhưng chỉ có một `primary_intervention_group` tại một thời điểm.
 
-- Hong quy dong mau so.
-- Hong phep tinh voi so am.
-- Da vung nen tang va can bai nang cao.
-- Chua du evidence va can quiz chan doan.
-
-Mot hoc sinh co the co nhieu nhu cau, nhung chi co mot `primary_intervention_group` tai mot thoi diem. Giao vien co the khoa nhom trong mot buoi hoc.
-
-### 13.2. Gap toan lop
+### 13.1. Gap toàn lớp
 
 ```text
 confirmed_gap_rate =
@@ -512,17 +402,15 @@ class_gap_score =
   * average_confidence
 ```
 
-Hoc sinh thieu evidence khong nam trong mau so ket luan; cac em duoc bao rieng.
-
-Nguong khoi tao:
+Học sinh thiếu evidence không nằm trong mẫu số kết luận.
 
 ```text
->= 40%       -> de xuat day lai ca lop
-15% den <40% -> de xuat day nhom nho
-< 15%        -> de xuat ho tro ca nhan
+>= 40%       -> đề xuất dạy lại cả lớp
+15% đến <40% -> đề xuất dạy nhóm nhỏ
+< 15%        -> đề xuất hỗ trợ cá nhân
 ```
 
-### 13.3. Hoc sinh can ho tro truoc
+### 13.2. Học sinh cần hỗ trợ trước
 
 ```text
 help_priority =
@@ -533,9 +421,9 @@ help_priority =
   * intervention_need
 ```
 
-`intervention_need` tang khi hoc sinh khong tien bo sau nhieu checkpoint. Hoc sinh confidence thap duoc uu tien chan doan, khong mac dinh uu tien giao vien kem truc tiep.
+Học sinh có confidence thấp được ưu tiên chẩn đoán, không mặc định được xếp đầu danh sách cần giáo viên kèm trực tiếp.
 
-### 13.4. Dau ra dashboard
+### 13.3. Đầu ra dashboard
 
 ```text
 ClassLearningInsight
@@ -551,202 +439,91 @@ ClassLearningInsight
 - changes_since_last_checkpoint
 ```
 
-Moi de xuat phai kem so lieu va ly do.
+## 14. Luồng xử lý end-to-end
 
-## 14. Luong xu ly end-to-end
+1. Giáo viên chọn lớp, topic mục tiêu và ràng buộc.
+2. Paper Evidence và Quiz Evidence được chuẩn hóa.
+3. Core Mastery Module cập nhật weighted BKT và confidence.
+4. Sự kiện `StudentTopicMasteryUpdated` được phát.
+5. Gap Diagnosis Engine truy ngược Knowledge Graph.
+6. Topic `uncertain` quan trọng được gửi sang Diagnostic Assessment Planner.
+7. Root-Cause Ranker xác định gap gốc.
+8. Path Planner tạo và tối ưu remediation subgraph.
+9. Hệ thống tạo Draft Path kèm giải thích.
+10. Giáo viên phê duyệt, sửa hoặc override.
+11. Học sinh thực hiện từng bước.
+12. Kết quả luyện tập tạo evidence mới.
+13. Tại checkpoint, hệ thống đánh giá lại mastery, lộ trình và dashboard lớp.
 
-1. Giao vien chon lop, topic muc tieu va rang buoc.
-2. Paper Evidence va Quiz Evidence duoc gui vao Evidence Ingestion.
-3. Evidence duoc validate, chong trung lap, hieu chinh va luu lineage.
-4. Core Mastery Module cap nhat weighted BKT va confidence.
-5. Su kien `StudentTopicMasteryUpdated` duoc phat.
-6. Gap Diagnosis Engine truy nguoc Knowledge Graph.
-7. Topic uncertain quan trong duoc gui sang Diagnostic Assessment Planner.
-8. Root-Cause Ranker xac dinh gap goc co confidence du cao.
-9. Path Planner tao remediation subgraph va toi uu theo rang buoc.
-10. He thong tao Draft Path va giai thich cho giao vien.
-11. Giao vien phe duyet, sua hoac override.
-12. Hoc sinh thuc hien tung buoc dang `available`.
-13. Ket qua luyen tap tao Quiz Mastery Evidence moi.
-14. Tai checkpoint, mastery va lo trinh duoc danh gia lai.
-15. He thong tao version moi neu can va cap nhat dashboard lop.
+Path Planner chỉ tái lập kế hoạch khi kết thúc assessment, học sinh hoàn thành bước, gap được xác nhận, giáo viên đổi ràng buộc, đến checkpoint hoặc evidence quan trọng bị sửa.
 
-## 15. Quy tac tai lap ke hoach
+## 15. Ngoại lệ
 
-Nhan su kien mastery khong dong nghia lap tuc thay doi toan bo lo trinh. Path Planner chi tai lap ke hoach khi:
+- **Không đủ evidence:** gắn `uncertain` và đề xuất quiz chẩn đoán.
+- **Evidence mâu thuẫn:** giảm confidence, hiển thị source breakdown và đề xuất assessment xác nhận.
+- **Graph có cycle:** trả `graph_validation_error` và không tạo lộ trình mới trên vùng lỗi.
+- **Topic chưa có mastery:** gắn `unknown`, không mặc định là gap.
+- **Không có đường tới mục tiêu:** trả `no_valid_prerequisite_path` và cảnh báo kiểm tra graph.
+- **Không đủ thời gian:** trả `minimum_required_minutes`, `blocked_target_topics`, `recommended_core_steps` và `deferred_steps`.
+- **Không có content:** giữ topic, gắn `content_unavailable` và cho phép giao hoạt động ngoài hệ thống.
+- **Evidence bị sửa:** đánh dấu evidence cũ `superseded`, tính lại mastery và đánh dấu path `stale`.
+- **Giáo viên override:** giữ override và cảnh báo nếu học sinh tiếp tục thất bại thay vì tự thêm lại topic.
+- **Cập nhật đồng thời:** dùng `version` và optimistic concurrency để không ghi đè quyết định của giáo viên.
 
-- Ket thuc quiz hoac bai kiem tra.
-- Hoc sinh hoan thanh mot path step.
-- Gap chuyen tu `uncertain` sang `confirmed_gap`.
-- Giao vien thay doi muc tieu hoac rang buoc.
-- Den review checkpoint.
-- Evidence quan trong bi sua hoac thu hoi.
+## 16. Kiểm thử và chỉ số đánh giá
 
-Moi lan thay doi tao version moi va phai cho biet topic nao duoc them, loai bo, doi thu tu va vi sao.
+Kiểm thử phải bao phủ:
 
-## 16. Ngoai le va cach xu ly
+- BKT với evidence đúng, sai, một phần, trùng lặp và bị thu hồi.
+- Confidence khi evidence ít, cũ hoặc mâu thuẫn.
+- Reverse traversal, cycle detection và root-cause diagnosis.
+- Topological order và bảo toàn prerequisite.
+- Required, excluded, locked topic và giới hạn thời gian.
+- Class-wide gap, intervention group và help priority.
+- Teacher override và version history.
 
-### 16.1. Khong du evidence
+Chỉ số đánh giá chính:
 
-- Gan `uncertain`, khong gan `confirmed_gap`.
-- De xuat quiz chan doan.
-- Khong tu dong dua vao nhom can giao vien kem.
+- BKT prediction accuracy, log loss và calibration.
+- Tỷ lệ gap được giáo viên xác nhận.
+- Mastery gain sau mỗi path step.
+- Thời gian để đạt topic mục tiêu.
+- Tỷ lệ học sinh quay lại theo kịp lớp.
+- Tỷ lệ đề xuất được giáo viên phê duyệt không cần sửa.
+- Độ chính xác của đề xuất dạy lại cả lớp.
 
-### 16.2. Evidence mau thuan
+## 17. Phạm vi phiên bản đầu
 
-- So sanh do moi, do kho, goi y, so lan thu va nguon.
-- Giam confidence neu mau thuan keo dai.
-- De xuat assessment xac nhan.
-- Hien thi source breakdown cho giao vien.
+Phiên bản đầu gồm:
 
-### 16.3. Knowledge Graph co cycle
-
-- Tra `graph_validation_error`.
-- Khong tao lo trinh moi tren vung graph loi.
-- Giu lo trinh dang active neu co.
-- Bao ro cac node va canh tao cycle.
-
-### 16.4. Topic chua co mastery state
-
-- Gan `unknown`, khong mac dinh la gap.
-- Lay evidence bang diagnostic assessment neu topic co anh huong cao.
-
-### 16.5. Khong co duong toi topic muc tieu
-
-- Tra `no_valid_prerequisite_path`.
-- Cho giao vien giao topic muc tieu truc tiep.
-- Tao canh bao kiem tra Knowledge Graph.
-
-### 16.6. Khong du thoi gian
-
-Tra ve:
-
-```text
-minimum_required_minutes
-available_minutes
-blocked_target_topics
-recommended_core_steps
-deferred_steps
-```
-
-Giao vien chon tang thoi luong, giam muc tieu hoac chap nhan phuong an rut gon.
-
-### 16.7. Khong co noi dung luyen tap
-
-- Giu topic trong lo trinh.
-- Gan `content_unavailable`.
-- Cho phep giao vien giao hoat dong ngoai he thong.
-- Khong coi thieu content la da hoan thanh.
-
-### 16.8. Evidence bi sua hoac thu hoi
-
-- Evidence cu duoc danh dau `superseded`.
-- Mastery duoc tinh lai tu event history.
-- Lo trinh lien quan duoc danh dau `stale`.
-- Tao version moi tai checkpoint hoac theo yeu cau giao vien.
-
-### 16.9. Giao vien override prerequisite
-
-- Luu ly do va pham vi.
-- Mo buoc phia sau theo override.
-- Van theo doi gap bi bo qua.
-- Neu hoc sinh tiep tuc that bai, canh bao giao vien thay vi tu them lai topic.
-
-### 16.10. Cap nhat dong thoi
-
-Dung `version` va optimistic concurrency cho knowledge state va learning path. Khi xung dot, tao lai de xuat tu trang thai moi nhat va khong ghi de quyet dinh cua giao vien.
-
-## 17. Kiem thu
-
-### 17.1. Core Mastery
-
-- BKT cap nhat dung sau evidence dung, sai va mot phan.
-- Evidence weight anh huong dung muc.
-- Mot `evidence_id` khong duoc xu ly hai lan.
-- Evidence bi superseded tao lai state dung.
-- Confidence thap khi evidence it, cu hoac mau thuan.
-
-### 17.2. Graph va chan doan
-
-- Reverse traversal lay dung ancestors.
-- Phat hien cycle.
-- Khong xem `unknown` la gap.
-- Tim dung root cause tren mot nhanh va nhieu nhanh prerequisite.
-- Tao yeu cau chan doan khi confidence thap.
-
-### 17.3. Path Planning
-
-- Bao toan prerequisite trong remediation subgraph.
-- Loai topic da mastered.
-- Topological order hop le.
-- Ton trong required/excluded/locked topic.
-- Tra phuong an rut gon khi thieu ngan sach.
-- Version va change explanation duoc tao dung.
-
-### 17.4. Lop hoc
-
-- Confirmed gap rate khong tinh hoc sinh thieu confidence vao mau so.
-- Nhom theo root cause, khong theo tong diem.
-- Priority thay doi dung theo urgency va intervention need.
-- Teacher override khong bi he thong tu dong dao nguoc.
-
-## 18. Chi so danh gia
-
-### 18.1. Chat luong mo hinh
-
-- BKT prediction accuracy va log loss.
-- Calibration cua mastery probability.
-- Ti le gap duoc giao vien xac nhan.
-- Ti le chan doan bo sung lam thay doi ket luan gap.
-
-### 18.2. Hieu qua hoc tap
-
-- Mastery gain sau moi path step.
-- Thoi gian dat topic muc tieu.
-- Ti le hoc sinh quay lai theo kip topic tren lop.
-- Ti le gap tai xuat sau mot khoang thoi gian.
-
-### 18.3. Hieu qua giao vien
-
-- Ti le de xuat duoc phe duyet khong can sua.
-- Thoi gian giao vien dung de tao nhom va giao bai.
-- Do chinh xac cua de xuat day lai ca lop.
-- Ti le hoc sinh uu tien nhan can thiep va co tien bo.
-
-## 19. Pham vi phien ban dau
-
-Phien ban dau nen gom:
-
-- Hai adapter evidence hien co.
-- Evidence calibration co cau hinh.
-- Weighted BKT theo student-topic.
-- Confidence score theo cong thuc trong tai lieu.
-- Reverse graph traversal va cycle validation.
+- Hai adapter evidence hiện có.
+- Evidence calibration có cấu hình.
+- Weighted BKT theo `student-topic`.
+- Confidence score.
+- Reverse graph traversal và cycle validation.
 - Rule-based root-cause ranking.
-- Remediation subgraph va topological sort.
-- Knapsack heuristic theo ngan sach.
-- Draft path, phe duyet, override va versioning.
-- Nhom theo root-cause topic.
-- Class-wide gap va help priority co giai thich.
+- Remediation subgraph, topological sort và knapsack heuristic.
+- Draft path, phê duyệt, override và versioning.
+- Gom nhóm theo root-cause topic.
+- Class-wide gap và help priority có giải thích.
 
-Chua can trong phien ban dau:
+Chưa cần trong phiên bản đầu:
 
-- Hoc tham so BKT rieng cho tung cau hoi.
+- Học tham số BKT riêng cho từng câu hỏi.
 - Integer Linear Programming.
-- Tu dong hoc evidence weight.
-- Mo hinh deep knowledge tracing.
-- Tu dong thay doi Knowledge Graph.
+- Tự động học evidence weight.
+- Deep Knowledge Tracing.
+- Tự động thay đổi Knowledge Graph.
 
-## 20. Quyet dinh thiet ke da chot
+## 18. Quyết định thiết kế đã chốt
 
-- Lo trinh dau ra o muc topic kem mastery muc tieu va dieu kien chuyen tiep.
-- Giao vien dat rang buoc; he thong tu tao va cap nhat trong pham vi do.
-- Cho phep truy nguoc prerequisite xuyen khoi lop.
-- Ket hop lich su va assessment chan doan bo sung.
-- Mastery cap nhat theo evidence; cau truc path cap nhat tai checkpoint.
-- Toi uu can bang giua bo sung nen tang va bat kip chuong trinh tren lop.
-- Dung BKT cho mastery, khong dung BKT nhu thuat toan tao lo trinh.
-- Dung graph traversal, root-cause ranking, topological sort va constrained optimization de tao path.
-- Tach `confidence_score` khoi `mastery_probability`.
-- Giao vien giu quyen phe duyet va override.
-- Dashboard phai gom nhom theo nhu cau, chi ra ai can ho tro truoc va gap nao can day lai ca lop.
+- Lộ trình ở mức topic kèm mastery mục tiêu và điều kiện chuyển tiếp.
+- Giáo viên đặt ràng buộc; hệ thống tự tạo và cập nhật trong phạm vi đó.
+- Cho phép truy ngược prerequisite xuyên khối lớp.
+- Kết hợp lịch sử và assessment chẩn đoán bổ sung.
+- Mastery cập nhật theo evidence; cấu trúc path cập nhật tại checkpoint.
+- Dùng BKT cho mastery, không dùng BKT như thuật toán tạo lộ trình.
+- Dùng graph traversal, root-cause ranking, topological sort và constrained optimization để tạo path.
+- Tách `confidence_score` khỏi `mastery_probability`.
+- Giáo viên giữ quyền phê duyệt và override.
+- Dashboard phải gom nhóm theo nhu cầu, chỉ ra ai cần hỗ trợ trước và gap nào cần dạy lại cả lớp.
