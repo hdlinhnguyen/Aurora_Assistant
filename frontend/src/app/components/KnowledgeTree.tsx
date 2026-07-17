@@ -127,6 +127,7 @@ export default function KnowledgeTree({
         }
       }
     }
+    if (onRefresh) onRefresh();
   };
 
   const handleRedo = async () => {
@@ -152,6 +153,7 @@ export default function KnowledgeTree({
         }
       }
     }
+    if (onRefresh) onRefresh();
   };
 
   // Keyboard shortcut listener for Ctrl+Z and Ctrl+Y
@@ -863,27 +865,6 @@ export default function KnowledgeTree({
 
           {mode === "teacher" && !isFocusedView && (
             <div className="flex items-center gap-1.5 ml-2">
-              <button
-                onClick={handleAddNode}
-                className="h-8 px-3 rounded-xl bg-[var(--mint)] text-foreground flex items-center gap-1.5 text-xs font-bold shadow-sm hover:brightness-95 active:scale-95 transition-all cursor-pointer"
-                title="Thêm nút kiến thức mới"
-              >
-                <Plus size={13} /> Thêm Node
-              </button>
-              <button
-                onClick={() => {
-                  setIsLinkingMode(!isLinkingMode);
-                  setLinkingSource(null);
-                }}
-                className={`h-8 px-3 rounded-xl border flex items-center gap-1.5 text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                  isLinkingMode
-                    ? "bg-orange-500 border-orange-500 text-white animate-pulse"
-                    : "bg-card border-border text-foreground hover:bg-muted"
-                }`}
-                title="Tạo liên kết tiên quyết một chiều"
-              >
-                <Link2 size={13} /> {isLinkingMode ? "Hủy Nối" : "Nối Node"}
-              </button>
               <button
                 onClick={handleAutoLayout}
                 className="h-8 px-3 rounded-xl border border-border bg-card text-foreground hover:bg-muted flex items-center gap-1.5 text-xs font-bold shadow-sm hover:brightness-95 active:scale-95 transition-all cursor-pointer"
