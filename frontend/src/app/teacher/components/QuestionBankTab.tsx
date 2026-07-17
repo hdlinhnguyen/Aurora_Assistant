@@ -79,9 +79,10 @@ export default function QuestionBankTab({
             className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
           >
             <option value="">Tất cả độ khó</option>
-            <option value="easy">Dễ</option>
-            <option value="medium">Trung bình</option>
-            <option value="hard">Khó</option>
+            <option value="easy">Nhận biết</option>
+            <option value="medium">Thông hiểu</option>
+            <option value="hard">Vận dụng</option>
+            <option value="very_hard">Vận dụng cao</option>
           </select>
         </div>
 
@@ -133,23 +134,29 @@ export default function QuestionBankTab({
                     {/* Row 1: Badges & metadata */}
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex flex-wrap gap-1.5 items-center">
-                        <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-[9px] text-indigo-700 font-extrabold uppercase">
-                          Q-{q.id.substring(0, 8)}
-                        </span>
                         <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-100 text-[9px] text-slate-500 font-extrabold">
                           {selectedSubject}
                         </span>
-                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[9px] text-slate-600 font-black uppercase max-w-[120px] truncate" title={matchedNode ? matchedNode.name : "Chủ đề ẩn"}>
+                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[9px] text-slate-600 font-black uppercase select-text" title={matchedNode ? matchedNode.name : "Chủ đề ẩn"}>
                           {matchedNode ? matchedNode.name : "Chủ đề ẩn"}
                         </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase border shrink-0 ${q.difficulty === "easy"
+                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase border shrink-0 ${
+                        q.difficulty === "easy"
                           ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                          : q.difficulty === "medium"
+                          ? "bg-amber-50 text-amber-600 border-amber-100"
                           : q.difficulty === "hard"
-                            ? "bg-rose-50 text-rose-600 border-rose-100"
-                            : "bg-amber-50 text-amber-600 border-amber-100"
-                        }`}>
-                        {q.difficulty === "easy" ? "Dễ" : q.difficulty === "hard" ? "Khó" : "T.Bình"}
+                          ? "bg-orange-50 text-orange-600 border-orange-100"
+                          : "bg-rose-50 text-rose-600 border-rose-100"
+                      }`}>
+                        {q.difficulty === "easy"
+                          ? "Nhận biết"
+                          : q.difficulty === "medium"
+                          ? "Thông hiểu"
+                          : q.difficulty === "hard"
+                          ? "Vận dụng"
+                          : "Vận dụng cao"}
                       </span>
                     </div>
 

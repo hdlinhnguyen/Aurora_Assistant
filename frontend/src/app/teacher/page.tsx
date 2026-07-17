@@ -1678,9 +1678,10 @@ export default function TeacherDashboard() {
                                       onChange={(e) => setQDifficulty(e.target.value)}
                                       className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs focus:outline-none font-bold"
                                     >
-                                      <option value="easy">Dễ (Easy)</option>
-                                      <option value="medium">Trung bình (Medium)</option>
-                                      <option value="hard">Khó (Hard)</option>
+                                      <option value="easy">Nhận biết</option>
+                                      <option value="medium">Thông hiểu</option>
+                                      <option value="hard">Vận dụng</option>
+                                      <option value="very_hard">Vận dụng cao</option>
                                     </select>
                                   </div>
                                 </div>
@@ -1709,13 +1710,22 @@ export default function TeacherDashboard() {
                                     <div key={q.id} className="p-3 bg-muted border border-border rounded-xl text-sm space-y-2 flex flex-col justify-between shadow-sm hover:border-[var(--mint)]/50 transition-colors">
                                       <div className="flex justify-between items-start">
                                         <p className="font-bold text-foreground leading-snug flex-1 pr-3">{q.content}</p>
-                                        <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border flex-shrink-0 ${q.difficulty === "easy"
+                                        <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border flex-shrink-0 ${
+                                          q.difficulty === "easy"
                                             ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                                            : q.difficulty === "medium"
+                                            ? "bg-amber-50 border-amber-200 text-amber-600"
                                             : q.difficulty === "hard"
-                                              ? "bg-rose-50 border-rose-200 text-rose-600"
-                                              : "bg-amber-50 border-amber-200 text-amber-600"
-                                          }`}>
-                                          {q.difficulty}
+                                            ? "bg-orange-50 border-orange-200 text-orange-600"
+                                            : "bg-rose-50 border-rose-200 text-rose-600"
+                                        }`}>
+                                          {q.difficulty === "easy"
+                                            ? "Nhận biết"
+                                            : q.difficulty === "medium"
+                                            ? "Thông hiểu"
+                                            : q.difficulty === "hard"
+                                            ? "Vận dụng"
+                                            : "Vận dụng cao"}
                                         </span>
                                       </div>
                                       <div className="flex gap-2 border-t border-border pt-2">
@@ -1924,9 +1934,10 @@ export default function TeacherDashboard() {
                     onChange={(e) => setQDifficulty(e.target.value)}
                     className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground"
                   >
-                    <option value="easy">Dễ (Easy)</option>
-                    <option value="medium">Trung bình (Medium)</option>
-                    <option value="hard">Khó (Hard)</option>
+                    <option value="easy">Nhận biết</option>
+                    <option value="medium">Thông hiểu</option>
+                    <option value="hard">Vận dụng</option>
+                    <option value="very_hard">Vận dụng cao</option>
                   </select>
                 </div>
 
