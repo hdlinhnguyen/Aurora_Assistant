@@ -1148,7 +1148,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn lịch sử học tập"})
 	}
 
-	var rawQuiz []RawQuizEvidence
+	rawQuiz := []RawQuizEvidence{}
 	for _, log := range logs {
 		score := 0.0
 		if log.Action == "answer_correct" {
