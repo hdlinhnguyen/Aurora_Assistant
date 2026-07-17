@@ -1,95 +1,93 @@
-%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
 flowchart TD
-    A[Giáo viên chọn bài kiểm tra] --> B[Load Approved Assessment Template]
+    A[Giáo viên chọn bài kiểm tra] --> B[Load Assessment Template]
 
     C[Giáo viên chụp hoặc upload<br/>bài làm viết tay đã chấm] --> D[Submission Intake]
-    E[Thông tin học sinh] --> D
+    E[Chọn học sinh] --> D
     B --> D
 
-    D --> F[Image Quality Validation]
+    D --> F[Kiểm tra chất lượng ảnh]
 
-    F --> F1{Ảnh hợp lệ?}
+    F --> G{Ảnh đạt yêu cầu?}
 
-    F1 -- Không --> F2[Yêu cầu chụp lại<br/>Ảnh mờ, thiếu trang, sai chiều]
-    F2 --> C
+    G -- Không --> H[Yêu cầu chụp lại<br/>ảnh mờ, thiếu trang hoặc bị cắt]
+    H --> C
 
-    F1 -- Có --> G[Image Preprocessing]
+    G -- Có --> I[Tiền xử lý ảnh]
 
-    G --> G1[Crop và chỉnh phối cảnh]
-    G --> G2[Khử nhiễu và tăng độ rõ]
-    G --> G3[Sắp xếp thứ tự trang]
+    I --> I1[Chỉnh góc và phối cảnh]
+    I --> I2[Khử nhiễu và tăng độ rõ]
+    I --> I3[Sắp xếp thứ tự trang]
 
-    G1 --> H[Template Alignment]
-    G2 --> H
-    G3 --> H
-    B --> H
+    I1 --> J[Align bài làm với đề gốc]
+    I2 --> J
+    I3 --> J
+    B --> J
 
-    H --> I[Mapping vùng ảnh với câu hỏi]
-    I --> I1[Answer Region theo Question ID]
+    J --> K[Tách vùng trả lời theo câu hỏi]
 
-    I1 --> J[Handwriting Recognition]
-    J --> J1[Nhận diện chữ viết tay]
-    J --> J2[Nhận diện số và biểu thức toán]
-    J --> J3[Nhận diện hình vẽ hoặc bảng nếu có]
+    K --> L[Handwriting OCR]
+    L --> L1[Nhận diện chữ viết tay]
+    L --> L2[Nhận diện số và công thức]
+    L --> L3[Nhận diện nội dung lời giải]
 
-    I1 --> K[Teacher Annotation Detection]
-    K --> K1[Dấu đúng hoặc sai]
-    K --> K2[Điểm giáo viên ghi]
-    K --> K3[Gạch sửa và nhận xét]
+    K --> M[Nhận diện annotation giáo viên]
+    M --> M1[Dấu đúng hoặc sai]
+    M --> M2[Điểm từng câu hoặc từng ý]
+    M --> M3[Gạch sửa và nhận xét]
 
-    J1 --> L[Answer Reconstruction]
-    J2 --> L
-    J3 --> L
-    K1 --> L
-    K2 --> L
-    K3 --> L
+    L1 --> N[Answer Reconstruction]
+    L2 --> N
+    L3 --> N
+    M1 --> N
+    M2 --> N
+    M3 --> N
 
-    B --> M[Load Rubric Items và Topic Mapping]
-    L --> N[Rubric Mapping Engine]
-    M --> N
+    B --> O[Load Question và Rubric Data]
+    N --> P[Answer-Rubric Mapping Engine]
+    O --> P
 
-    N --> O[Đánh giá từng Rubric Item]
+    P --> Q[Mapping nội dung bài làm<br/>với từng ý trong barem]
 
-    O --> O1[MET]
-    O --> O2[PARTIALLY MET]
-    O --> O3[NOT MET]
-    O --> O4[NOT ATTEMPTED]
-    O --> O5[UNREADABLE]
+    Q --> R[Đề xuất kết quả từng Rubric Item]
 
-    O1 --> P[Score Consistency Check]
-    O2 --> P
-    O3 --> P
-    O4 --> P
-    O5 --> P
+    R --> R1[Đạt]
+    R --> R2[Đạt một phần]
+    R --> R3[Chưa đạt]
+    R --> R4[Không làm]
+    R --> R5[Không đọc được]
 
-    P --> P1[So sánh tổng điểm theo barem]
-    P --> P2[So sánh điểm giáo viên đã ghi]
-    P --> P3[Phát hiện chênh lệch điểm]
+    R1 --> S[Kiểm tra tính nhất quán điểm]
+    R2 --> S
+    R3 --> S
+    R4 --> S
+    R5 --> S
 
-    P1 --> Q[Teacher Review]
-    P2 --> Q
-    P3 --> Q
+    S --> S1[So sánh điểm theo barem]
+    S --> S2[So sánh điểm giáo viên ghi]
+    S --> S3[Phát hiện chênh lệch]
 
-    Q --> R{Giáo viên approve?}
+    S1 --> T[Teacher Final Review]
+    S2 --> T
+    S3 --> T
 
-    R -- Chỉnh sửa --> S[Chỉnh trạng thái Rubric Item<br/>điểm hoặc mapping câu trả lời]
-    S --> Q
+    T --> U{Giáo viên xác nhận mapping?}
 
-    R -- Approve --> T[Approved Rubric Evaluation]
+    U -- Chưa đúng --> V[Giáo viên chỉnh kết quả<br/>của từng ý barem]
+    V --> T
 
-    T --> U[Mastery Evidence Generator]
-    M --> U
+    U -- Xác nhận --> W[Approved Rubric Evaluation]
 
-    U --> V[(Mastery Evidence Event)]
+    W --> X[Mastery Evidence Generator]
 
-    V --> V1[Student ID]
-    V --> V2[Topic ID]
-    V --> V3[Result và normalized score]
-    V --> V4[Assessment và Rubric Item]
-    V --> V5[Teacher approval]
-    V --> V6[Timestamp và evidence source]
+    B --> X
 
-    V --> W[Core Mastery Module]
+    X --> Y[(Mastery Evidence)]
 
-    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
-    linkStyle default stroke:#c8c8c8,stroke-width:1px
+    Y --> Y1[Student ID]
+    Y --> Y2[Topic từ Question Tag]
+    Y --> Y3[Topic từ Rubric Tag]
+    Y --> Y4[Kết quả và điểm]
+    Y --> Y5[Assessment và Rubric Item]
+    Y --> Y6[Teacher Confirmation]
+
+    Y --> Z[Core Mastery Module]

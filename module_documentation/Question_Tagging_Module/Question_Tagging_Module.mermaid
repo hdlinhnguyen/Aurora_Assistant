@@ -1,4 +1,3 @@
-%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
 flowchart TD
     A[Giáo viên tạo bài kiểm tra] --> B[Upload đề gốc DOCX/PDF]
     A --> C[Upload barem DOCX/PDF]
@@ -11,47 +10,47 @@ flowchart TD
     E --> F[Trích xuất cấu trúc đề]
     F --> F1[Câu hỏi]
     F --> F2[Câu hỏi con]
-    F --> F3[Hình ảnh, bảng biểu, công thức]
+    F --> F3[Nội dung, hình ảnh, bảng và công thức]
 
     E --> G[Trích xuất cấu trúc barem]
-    G --> G1[Tiêu chí chấm điểm]
-    G --> G2[Điểm tối đa từng tiêu chí]
+    G --> G1[Các ý chấm điểm]
+    G --> G2[Điểm tối đa của từng ý]
     G --> G3[Đáp án hoặc yêu cầu cần đạt]
 
-    F1 --> H[Question-Rubric Mapping]
+    F1 --> H[Teacher Authoring Interface]
     F2 --> H
     G1 --> H
     G2 --> H
     G3 --> H
 
-    H --> I[Danh sách Question và Rubric Item]
+    H --> I[Giáo viên kiểm tra và chỉnh sửa<br/>cấu trúc câu hỏi]
+    H --> J[Giáo viên kiểm tra và chỉnh sửa<br/>cấu trúc barem]
 
-    KG[(Knowledge Graph<br/>Topic và quan hệ cha-con)] --> J[Topic Tagging Engine]
-    I --> J
-    D --> J
+    KG[(Knowledge Graph<br/>Topic theo môn học)] --> K[Manual Topic Tagging]
 
-    J --> K[Đề xuất topic cho từng câu hỏi<br/>hoặc Rubric Item]
-    K --> L{Confidence đủ cao?}
+    I --> K
+    J --> K
 
-    L -- Có --> M[Teacher Review]
-    L -- Không --> N[Đánh dấu cần kiểm tra thủ công]
-    N --> M
+    K --> K1[Giáo viên chọn topic<br/>cho từng câu hỏi]
+    K --> K2[Giáo viên chọn topic<br/>cho từng câu hỏi con]
+    K --> K3[Giáo viên chọn topic<br/>cho từng ý trong barem]
 
-    M --> O{Giáo viên approve?}
+    K1 --> L[Question Topic Mapping]
+    K2 --> L
+    K3 --> M[Rubric Topic Mapping]
 
-    O -- Chỉnh sửa --> P[Sửa câu hỏi, barem hoặc topic]
-    P --> M
+    L --> N[Mapping câu hỏi với các ý barem]
+    M --> N
 
-    O -- Approve --> Q[Đóng băng phiên bản tagging]
-    Q --> R[(Approved Assessment Template)]
+    N --> O[Giáo viên lưu cấu hình bài kiểm tra]
 
-    R --> R1[Question Structure]
-    R --> R2[Rubric Items]
-    R --> R3[Topic Mappings]
-    R --> R4[Scoring Rules]
-    R --> R5[Template Version]
+    O --> P[(Assessment Template)]
 
-    R --> S[Được OCR Module tái sử dụng<br/>cho tất cả bài làm học sinh]
+    P --> P1[Question Structure]
+    P --> P2[Rubric Structure]
+    P --> P3[Question Topic Mappings]
+    P --> P4[Rubric Topic Mappings]
+    P --> P5[Question-Rubric Mappings]
+    P --> P6[Scoring Rules]
 
-    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
-    linkStyle default stroke:#c8c8c8,stroke-width:1px
+    P --> Q[OCR Module sử dụng lại<br/>cho mọi bài làm học sinh]
