@@ -1,0 +1,20 @@
+[
+  {"category": "self_harm", "severity": "high", "folded": false, "pattern": "tự tử|tự sát|tự hại"},
+  {"category": "self_harm", "severity": "high", "folded": true, "pattern": "\\bmuon chet\\b|khong muon song|ket thuc cuoc doi|chan song lam|\\btu sat\\b|cat tay minh|tu lam dau ban than"},
+
+  {"category": "abuse", "severity": "high", "folded": false, "pattern": "bị đánh|bạo hành|xâm hại|bị bắt nạt"},
+  {"category": "abuse", "severity": "high", "folded": true, "pattern": "bat nat em|danh em o|bao hanh|xam hai"},
+
+  {"category": "sexual", "severity": "medium", "folded": true, "pattern": "\\bsex\\b|khoa than|lam tinh|phim nguoi lon|coi truong|bo phan sinh duc"},
+
+  {"category": "violence", "severity": "medium", "folded": true, "pattern": "giet nguoi|giet ban|dam chem|che tao bom|lam bom|mua sung|vu khi"},
+
+  {"category": "profanity", "severity": "medium", "folded": true, "pattern": "dit me|du ma|deo me|con cac|cai lon|\\boc cho\\b|mat day|do ngu ngoc|thang cho|con cho nay|cut di|im mom"},
+  {"category": "profanity", "severity": "medium", "folded": true, "pattern": "\\bdkm\\b|\\bvcl\\b|\\bvl\\b|\\bclgt\\b|\\bcmnr\\b|\\bdcm\\b|\\bkmn\\b"},
+
+  {"category": "jailbreak", "severity": "low", "folded": true, "pattern": "bo qua (moi |cac )?(huong dan|quy tac|chi dan)|quen (het )?vai tro|ignore (all |previous )?instructions?|system prompt|bay gio ban la|gia vo la|pretend you are|jailbreak"},
+  {"category": "jailbreak", "severity": "low", "folded": true, "pattern": "cho (em |minh |tui |to )?(xin )?dap an|noi dap an|dap an luon|giai ho (em |minh )?(luon|het)|lam ho em (het |ca )?bai"},
+
+  {"category": "personal_info", "severity": "low", "folded": true, "pattern": "(so dien thoai|sdt|dia chi nha) (cua )?(em|minh|to) (la|o)"},
+  {"category": "personal_info", "severity": "low", "folded": true, "pattern": "\\b0\\d{9,10}\\b"}
+]
