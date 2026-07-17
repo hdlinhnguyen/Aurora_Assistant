@@ -29,6 +29,7 @@ interface KnowledgeTreeProps {
   edges: EdgeItem[];
   mode: "teacher" | "student" | "view-only";
   studentNodeStatus?: Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">;
+  nodeAccuracy?: Record<string, { correct: number; incorrect: number; total: number }>;
   initialNodeId?: string;
   currentNodeId?: string;
   onNodeClick?: (node: NodeItem) => void;
@@ -44,6 +45,7 @@ export default function KnowledgeTree({
   edges,
   mode,
   studentNodeStatus = {},
+  nodeAccuracy = {},
   initialNodeId,
   currentNodeId,
   onNodeClick,
@@ -1022,12 +1024,86 @@ export default function KnowledgeTree({
 
                 const status = studentNodeStatus[node.id] || "locked";
 
+                // Mastery ring calculation
+                const nodeAcc = nodeAccuracy[node.id];
+                const masteryPercent = nodeAcc && nodeAcc.total > 0
+                  ? Math.round((nodeAcc.correct / nodeAcc.total) * 100)
+                  : 0;
+                const hasMasteryData = nodeAcc && nodeAcc.total > 0;
+                const ringPad = 6;
+                const ringW = nodeWidth + ringPad * 2;
+                const ringH = nodeHeight + ringPad * 2;
+                const ringR = 18;
+                const ringPerimeter = 2 * (ringW - 2 * ringR) + 2 * (ringH - 2 * ringR) + 2 * Math.PI * ringR;
+                const ringFill = (masteryPercent / 100) * ringPerimeter;
+                const ringGap = ringPerimeter - ringFill;
+                const ringColor = masteryPercent >= 80 ? "#10b981" : masteryPercent >= 50 ? "#f59e0b" : "#ef4444";
+
                 return (
                   <g 
                     key={node.id} 
                     className="group/node"
                     style={{ opacity, transition: "opacity 0.2s" }}
                   >
+                    {/* Mastery Progress Ring */}
+                    {hasMasteryData && mode !== "teacher" && (
+                      <rect
+                        x={node.posX - ringPad}
+                        y={node.posY - ringPad}
+                        width={ringW}
+                        height={ringH}
+                        rx={ringR}
+                        ry={ringR}
+                        fill="none"
+                        stroke={ringColor}
+                        strokeWidth={3.5}
+                        strokeDasharray={`${ringFill} ${ringGap}`}
+                        strokeDashoffset={0}
+                        strokeLinecap="round"
+                        style={{
+                          filter: `drop-shadow(0 0 4px ${ringColor}40)`,
+                          transition: "stroke-dasharray 0.6s ease, stroke 0.4s ease",
+                        }}
+                      />
+                    )}
+                    {/* Mastery ring background track */}
+                    {hasMasteryData && mode !== "teacher" && (
+                      <rect
+                        x={node.posX - ringPad}
+                        y={node.posY - ringPad}
+                        width={ringW}
+                        height={ringH}
+                        rx={ringR}
+                        ry={ringR}
+                        fill="none"
+                        stroke="#e2e8f0"
+                        strokeWidth={1.5}
+                        opacity={0.4}
+                        style={{ pointerEvents: "none" }}
+                      />
+                    )}
+                    {/* Mastery percentage badge */}
+                    {hasMasteryData && mode !== "teacher" && (
+                      <foreignObject
+                        x={node.posX + nodeWidth - 18}
+                        y={node.posY - 14}
+                        width={40}
+                        height={20}
+                        className="overflow-visible"
+                        style={{ pointerEvents: "none" }}
+                      >
+                        <div
+                          className="text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm border text-center tabular-nums"
+                          style={{
+                            backgroundColor: masteryPercent >= 80 ? "#ecfdf5" : masteryPercent >= 50 ? "#fffbeb" : "#fef2f2",
+                            color: ringColor,
+                            borderColor: ringColor + "40",
+                          }}
+                        >
+                          {masteryPercent}%
+                        </div>
+                      </foreignObject>
+                    )}
                     <foreignObject
                       x={node.posX}
                       y={node.posY}
