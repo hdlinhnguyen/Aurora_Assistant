@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Chắc Gốc — Duyệt Knowledge Graph</title>
+<style>
+  :root {
+    --ink:#1c2434; --ink2:#4a5670; --muted:#7c88a3; --line:#dde3ee; --bg:#f5f7fb; --card:#fff;
+    --th:#2e7d4f; --thcs:#2f5fd0; --thpt:#b0367e; --demo:#c23b3b; --sug:#e08a00; --ok:#2e7d4f;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Segoe UI",system-ui,sans-serif; font-size:15px; background:var(--bg); color:var(--ink); padding:18px 20px 60px; }
+  h1 { font-size:22px; margin-bottom:4px; }
+  .sub { color:var(--ink2); font-size:14px; margin-bottom:14px; max-width:1000px; line-height:1.5; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .tabs button { font-size:15px; font-weight:600; padding:10px 18px; border:1.5px solid var(--line); background:#fff; color:var(--ink2); border-radius:10px; cursor:pointer; }
+  .tabs button.on { background:var(--ink); border-color:var(--ink); color:#fff; }
+  .tab { display:none; } .tab.on { display:block; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+
+  /* ---- MAP ---- */
+  .maprow { display:flex; gap:14px; align-items:flex-start; }
+  #mapCard { flex:1 1 auto; min-width:0; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--ink2); margin-bottom:10px; align-items:center; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .sw { width:24px; height:12px; border-radius:3px; display:inline-block; }
+  .swl { width:26px; height:0; border-top:3px solid; display:inline-block; }
+  .zoom { margin-left:auto; display:flex; gap:6px; align-items:center; }
+  .zoom button { width:34px; height:30px; font-size:16px; border:1.5px solid var(--line); background:#fff; border-radius:8px; cursor:pointer; color:var(--ink); }
+  #mapScroll { overflow:auto; border:1px solid var(--line); border-radius:10px; background:#fcfcfb; max-height:72vh; }
+  #mapInner { transform-origin:0 0; }
+  .hint { font-size:13px; color:var(--muted); margin-top:8px; }
+  #panel { flex:0 0 400px; max-width:100%; position:sticky; top:12px; max-height:86vh; overflow:auto; }
+  #panel h2 { font-size:17px; margin-bottom:8px; line-height:1.35; }
+  #panel .meta { font-size:13px; color:var(--ink2); line-height:1.7; margin-bottom:10px; }
+  #panel ul { padding-left:20px; }
+  #panel li { font-size:14px; line-height:1.6; margin-bottom:8px; }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:2px 9px; border-radius:99px; margin-left:6px; }
+  .chip { display:inline-block; font-size:12.5px; padding:3px 10px; border-radius:99px; background:#eef2f9; color:var(--ink2); margin:2px 3px 2px 0; cursor:pointer; border:1px solid var(--line); }
+  .chip:hover { background:#e2e9f6; }
+
+  .node-box { cursor:pointer; }
+  .node-box:hover rect.body { filter:brightness(.95); }
+  svg .dimmed { opacity:.10; }
+  svg path.hl { stroke:#222 !important; stroke-width:3.2 !important; opacity:1 !important; }
+  .node-selected rect.body { stroke:#111 !important; stroke-width:3 !important; }
+
+  /* ---- NODE LIST ---- */
+  .gradeblock { margin-bottom:22px; }
+  .gradeblock h3 { font-size:17px; margin-bottom:10px; color:var(--ink); }
+  .ncards { display:grid; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:12px; }
+  .ncard { background:#fff; border:1px solid var(--line); border-left:6px solid var(--line); border-radius:10px; padding:14px 16px; }
+  .ncard h4 { font-size:16px; margin-bottom:2px; }
+  .ncard .src { font-size:12.5px; color:var(--muted); margin-bottom:8px; line-height:1.5; }
+  .ncard ul { padding-left:20px; }
+  .ncard li { font-size:14px; line-height:1.6; margin-bottom:6px; }
+  .ncard .pre { margin-top:10px; font-size:13px; color:var(--ink2); }
+
+  /* ---- SUGGESTIONS ---- */
+  .scard { background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+  .scard.approved { border-color:var(--ok); box-shadow:0 0 0 2px rgba(46,125,79,.15); }
+  .shead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .snum { flex:0 0 auto; width:38px; height:38px; border-radius:50%; background:var(--sug); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:15px; }
+  .sedge { font-size:17px; font-weight:600; line-height:1.4; }
+  .sedge .arrow { color:var(--sug); font-weight:800; padding:0 6px; }
+  .lop { font-size:12.5px; font-weight:600; color:var(--ink2); background:#eef2f9; border-radius:99px; padding:2px 9px; margin-left:6px; white-space:nowrap; }
+  .sbody p { font-size:14.5px; line-height:1.65; margin-bottom:8px; }
+  .sbody .cancu { background:#f6f8fc; border-left:4px solid var(--line); padding:10px 12px; border-radius:6px; font-size:13.5px; color:var(--ink2); line-height:1.65; }
+  .sactions { margin-top:12px; }
+  .okbtn { font-size:15px; font-weight:600; padding:9px 20px; border-radius:9px; border:2px solid var(--ok); background:#fff; color:var(--ok); cursor:pointer; }
+  .scard.approved .okbtn { background:var(--ok); color:#fff; }
+  .actionbar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line); padding:12px 20px; display:none; align-items:center; gap:14px; z-index:9; }
+  .tab.on ~ .actionbar, .actionbar.show { display:flex; }
+  .actionbar b { font-size:15px; }
+  .actionbar button.primary { background:var(--thcs); color:#fff; border:0; border-radius:9px; padding:10px 18px; font-size:14.5px; font-weight:600; cursor:pointer; }
+  .actionbar button.ghost { background:#fff; color:var(--ink); border:1.5px solid var(--line); border-radius:9px; padding:10px 18px; font-size:14.5px; cursor:pointer; }
+  #outWrap { display:none; margin-top:14px; }
+  #outWrap.show { display:block; }
+  textarea { width:100%; height:200px; font-family:Consolas,monospace; font-size:12.5px; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  code { background:#eef2f9; padding:1px 6px; border-radius:4px; font-size:13px; }
+  .steps { font-size:14px; color:var(--ink2); line-height:1.7; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<h1>Chắc Gốc — Duyệt Knowledge Graph</h1>
+<div class="sub">Mạch <b>Số &amp; Đại số</b> lớp 4–10 · Yêu cầu cần đạt (YCCĐ) trích <b>nguyên văn</b> Thông tư 32/2018/TT-BGDĐT. Việc của bạn: (1) rà nội dung node ở tab <b>Nội dung node</b>, (2) duyệt 9 cạnh Gemini đề xuất ở tab <b>Duyệt cạnh</b>.</div>
+
+<div class="tabs">
+  <button class="on" data-tab="map">🗺️ Bản đồ</button>
+  <button data-tab="list">📋 Nội dung node</button>
+  <button data-tab="sug">🔶 Duyệt cạnh đề xuất</button>
+</div>
+
+<!-- ================= MAP ================= -->
+<div class="tab on" id="tab-map">
+  <div class="maprow">
+    <div class="card" id="mapCard">
+      <div class="legend">
+        <span><span class="sw" style="background:var(--th)"></span>Tiểu học</span>
+        <span><span class="sw" style="background:var(--thcs)"></span>THCS</span>
+        <span><span class="sw" style="background:var(--thpt)"></span>THPT</span>
+        <span><span class="sw" style="background:#e8ebf2;border:1.5px dashed #b6c0d4"></span>Node mờ</span>
+        <span><span class="swl" style="border-color:var(--demo)"></span>Chuỗi demo</span>
+        <span><span class="swl" style="border-color:#b6c0d4"></span>Cạnh đã có</span>
+        <span><span class="swl" style="border-top-style:dashed;border-color:var(--sug)"></span>Đề xuất S1–S9</span>
+        <span class="zoom"><button id="zOut">−</button><button id="zIn">＋</button><button id="zFit" style="width:auto;padding:0 10px;font-size:13px">vừa màn hình</button></span>
+      </div>
+      <div id="mapScroll"><div id="mapInner"></div></div>
+      <div class="hint">💡 Bố cục dọc: <b>nền tảng nằm DƯỚI, kiến thức tổng hợp nằm TRÊN</b> — mũi tên đi từ dưới lên = "kiến thức dưới đỡ kiến thức trên". <b>Bấm vào một node</b> để làm nổi chuỗi liên quan (nền tảng phía dưới, phụ thuộc phía trên) và ẩn mờ phần còn lại — bấm nền trống để bỏ chọn.</div>
+    </div>
+    <div class="card" id="panel">
+      <h2 id="pTitle">Bấm vào một node trên bản đồ…</h2>
+      <div class="meta" id="pMeta"></div>
+      <ul id="pYccd"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- ================= NODE LIST ================= -->
+<div class="tab" id="tab-list">
+  <div class="steps">Đọc lần lượt từng lớp. Mỗi thẻ = 1 node; các dòng là YCCĐ <b>nguyên văn</b> — kiểm tra: tên node có phản ánh đúng YCCĐ không, node có bị gán nhầm lớp không.</div>
+  <div id="nodeList"></div>
+</div>
+
+<!-- ================= SUGGESTIONS ================= -->
+<div class="tab" id="tab-sug">
+  <div class="steps">
+    Gemini đề xuất <b>9 cạnh tiên quyết bổ sung</b> (chưa vào graph). Với mỗi thẻ: đọc <b>lý do</b> + <b>căn cứ YCCĐ</b>, đúng thì bấm <b>Đồng ý</b>.
+    Xong hết → bấm <b>Tạo JSON</b> ở thanh dưới cùng → Copy → lưu thành <code>app/data/edges-approved.json</code> → chạy <code>npx tsx scripts/build-graph.ts</code> rồi <code>npx tsx scripts/check-graph.ts</code> (phải ra 17 PASS).
+  </div>
+  <div id="sugList"></div>
+  <div id="outWrap" class="card">
+    <b>Nội dung <code>data/edges-approved.json</code>:</b>
+    <textarea id="out" readonly></textarea>
+  </div>
+</div>
+
+<div class="actionbar" id="bar">
+  <b id="barCount">0 cạnh được chọn</b>
+  <button class="primary" id="genBtn">Tạo JSON các cạnh đã Đồng ý</button>
+  <button class="ghost" id="copyBtn">Copy</button>
+  <span style="font-size:13px;color:var(--muted)" id="barMsg"></span>
+</div>
+
+<script>
+const GRAPH = {
+  "nguon": "Yêu cầu cần đạt trích nguyên văn từ Chương trình GDPT môn Toán 2018 (Thông tư 32/2018/TT-BGDĐT); mạch Số và Đại số, lớp 4–10.",
+  "nodes": [
+    {
+      "id": "l4-khai-niem-phan-so",
+      "ten": "Khái niệm phân số",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Khái niệm ban đầu về phân số",
+      "yccd": [
+        "Nhận biết được khái niệm ban đầu về phân số, tử số, mẫu số.",
+        "Đọc, viết được các phân số."
+      ],
+      "tienQuyet": [],
+      "mo": false,
+      "x": 70,
+      "y": 60
+    },
+    {
+      "id": "l4-tinh-chat-phan-so",
+      "ten": "Tính chất phân số — rút gọn, quy đồng",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Tính chất cơ bản của phân số",
+      "yccd": [
+        "Nhận biết được tính chất cơ bản của phân số.",
+        "Thực hiện được việc rút gọn phân số trong những trường hợp đơn giản.",
+        "Thực hiện được việc quy đồng mẫu số hai phân số trong trường hợp có một mẫu số chia hết cho mẫu số còn lại."
+      ],
+      "tienQuyet": [
+        "l4-khai-niem-phan-so",
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 150
+    },
+    {
+      "id": "l4-so-sanh-phan-so",
+      "ten": "So sánh phân số",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "So sánh phân số",
+      "yccd": [
+        "So sánh và sắp xếp được thứ tự các phân số trong những trường hợp sau: các phân số có cùng mẫu số; có một mẫu số chia hết cho các mẫu số còn lại.",
+        "Xác định được phân số lớn nhất, bé nhất (trong một nhóm có không quá 4 phân số) trong những trường hợp sau: các phân số có cùng mẫu số; có một mẫu số chia hết cho các mẫu số còn lại."
+      ],
+      "tienQuyet": [
+        "l4-tinh-chat-phan-so",
+        "l4-khai-niem-phan-so"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 240
+    },
+    {
+      "id": "l4-phep-tinh-phan-so",
+      "ten": "Cộng, trừ, nhân, chia phân số",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với phân số",
+      "chuDeCon": "Các phép tính cộng, trừ, nhân, chia với phân số",
+      "yccd": [
+        "Thực hiện được phép cộng, phép trừ phân số trong những trường hợp sau: các phân số có cùng mẫu số; có một mẫu số chia hết cho các mẫu số còn lại.",
+        "Thực hiện được phép nhân, phép chia hai phân số.",
+        "Giải quyết được một số vấn đề gắn với việc giải các bài toán (có đến hai hoặc ba bước tính) liên quan đến 4 phép tính với phân số (ví dụ: bài toán liên quan đến tìm phân số của một số)."
+      ],
+      "tienQuyet": [
+        "l4-tinh-chat-phan-so",
+        "l4-khai-niem-phan-so"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 330
+    },
+    {
+      "id": "l4-nhan-chia-so-tu-nhien",
+      "ten": "Nhân, chia số tự nhiên",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với số tự nhiên",
+      "chuDeCon": "Phép nhân, phép chia",
+      "yccd": [
+        "Tính được số trung bình cộng của hai hay nhiều số.",
+        "Thực hiện được phép nhân với các số có không quá hai chữ số.",
+        "Thực hiện được phép chia cho số có không quá hai chữ số.",
+        "Thực hiện được phép nhân với 10; 100; 1000;... và phép chia cho 10; 100; 1000;...",
+        "Vận dụng được tính chất giao hoán, tính chất kết hợp của phép nhân và mối quan hệ giữa phép nhân với phép chia trong thực hành tính toán."
+      ],
+      "tienQuyet": [],
+      "mo": false,
+      "x": 70,
+      "y": 420
+    },
+    {
+      "id": "l4-bieu-thuc-chu",
+      "ten": "Biểu thức số & biểu thức chữ",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với số tự nhiên",
+      "chuDeCon": "Biểu thức số và biểu thức chữ",
+      "yccd": [
+        "Làm quen với biểu thức chứa một, hai, ba chữ và tính được giá trị của biểu thức chứa một, hai, hoặc ba chữ (trường hợp đơn giản).",
+        "Vận dụng được tính chất phân phối của phép nhân đối với phép cộng trong tính giá trị của biểu thức."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 510
+    },
+    {
+      "id": "l5-quy-dong-phan-so",
+      "ten": "Quy đồng mẫu số & phép tính phân số khác mẫu",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số và các phép tính với phân số",
+      "chuDeCon": "Ôn tập về phân số và các phép tính với phân số",
+      "yccd": [
+        "Rút gọn được phân số.",
+        "Quy đồng, so sánh, xếp thứ tự được các phân số trong trường hợp có một mẫu số chia hết cho các mẫu số còn lại.",
+        "Thực hiện được phép cộng, phép trừ các phân số trong trường hợp có một mẫu số chia hết cho các mẫu số còn lại và nhân, chia phân số.",
+        "Thực hiện được phép cộng, phép trừ hai phân số bằng cách lấy mẫu số chung là tích của hai mẫu số.",
+        "Nhận biết được phân số thập phân và cách viết phân số thập phân ở dạng hỗn số.",
+        "Giải quyết được vấn đề gắn với việc giải các bài toán (có một hoặc một vài bước tính) liên quan đến các phép tính về phân số."
+      ],
+      "tienQuyet": [
+        "l4-phep-tinh-phan-so",
+        "l4-so-sanh-phan-so"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 60
+    },
+    {
+      "id": "l5-so-thap-phan",
+      "ten": "Số thập phân",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thập phân",
+      "chuDeCon": "Số thập phân",
+      "yccd": [
+        "Đọc, viết được số thập phân.",
+        "Nhận biết được số thập phân gồm phần nguyên, phần thập phân và hàng của số thập phân.",
+        "Thể hiện được các số đo đại lượng bằng cách dùng số thập phân."
+      ],
+      "tienQuyet": [
+        "l5-quy-dong-phan-so"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 150
+    },
+    {
+      "id": "l5-phep-tinh-so-thap-phan",
+      "ten": "Phép tính với số thập phân",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với số thập phân",
+      "chuDeCon": "Các phép tính cộng, trừ, nhân, chia với số thập phân",
+      "yccd": [
+        "Thực hiện được phép cộng, phép trừ hai số thập phân.",
+        "Thực hiện được phép nhân một số với số thập phân có không quá hai chữ số ở dạng: a,b và 0,ab.",
+        "Thực hiện được phép chia một số với số thập phân có không quá hai chữ số khác không ở dạng: a,b và 0,ab.",
+        "Vận dụng được tính chất của các phép tính với số thập phân và quan hệ giữa các phép tính đó trong thực hành tính toán.",
+        "Thực hiện được phép nhân, chia nhẩm một số thập phân với (cho) 10; 100; 1000;... hoặc với (cho) 0,1; 0,01; 0,001;...",
+        "Giải quyết vấn đề gắn với việc giải các bài toán (có một hoặc một vài bước tính) liên quan đến các phép tính với các số thập phân."
+      ],
+      "tienQuyet": [
+        "l5-so-thap-phan"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 240
+    },
+    {
+      "id": "l5-ti-so-phan-tram",
+      "ten": "Tỉ số & tỉ số phần trăm",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Tỉ số. Tỉ số phần trăm",
+      "chuDeCon": "Tỉ số. Tỉ số phần trăm",
+      "yccd": [
+        "Nhận biết được tỉ số, tỉ số phần trăm của hai đại lượng cùng loại.",
+        "Giải quyết được một số vấn đề gắn với việc giải các bài toán liên quan đến: tìm hai số khi biết tổng (hoặc hiệu) và tỉ số của hai số đó; tính tỉ số phần trăm của hai số; tìm giá trị phần trăm của một số cho trước.",
+        "Nhận biết được tỉ lệ bản đồ. Vận dụng được tỉ lệ bản đồ để giải quyết một số tình huống thực tiễn."
+      ],
+      "tienQuyet": [
+        "l5-quy-dong-phan-so"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 330
+    },
+    {
+      "id": "l6-luy-thua",
+      "ten": "Phép tính số tự nhiên & luỹ thừa",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số tự nhiên",
+      "chuDeCon": "Các phép tính với số tự nhiên. Phép tính luỹ thừa với số mũ tự nhiên",
+      "yccd": [
+        "Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số tự nhiên.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng trong tính toán.",
+        "Thực hiện được phép tính luỹ thừa với số mũ tự nhiên; thực hiện được các phép nhân và phép chia hai luỹ thừa cùng cơ số với số mũ tự nhiên.",
+        "Nhận biết được thứ tự thực hiện các phép tính.",
+        "Vận dụng được các tính chất của phép tính (kể cả phép tính luỹ thừa với số mũ tự nhiên) để tính nhẩm, tính nhanh một cách hợp lí.",
+        "Giải quyết được những vấn đề thực tiễn gắn với thực hiện các phép tính (ví dụ: tính tiền mua sắm, tính lượng hàng mua được từ số tiền đã có,...)."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 60
+    },
+    {
+      "id": "l6-uoc-boi",
+      "ten": "Chia hết, số nguyên tố, ƯC–BC",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số tự nhiên",
+      "chuDeCon": "Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+      "yccd": [
+        "Nhận biết được quan hệ chia hết, khái niệm ước và bội.",
+        "Vận dụng được dấu hiệu chia hết cho 2, 5, 9, 3 để xác định một số đã cho có chia hết cho 2, 5, 9, 3 hay không.",
+        "Nhận biết được khái niệm số nguyên tố, hợp số.",
+        "Thực hiện được việc phân tích một số tự nhiên lớn hơn 1 thành tích của các thừa số nguyên tố trong những trường hợp đơn giản.",
+        "Xác định được ước chung, ước chung lớn nhất; xác định được bội chung, bội chung nhỏ nhất của hai hoặc ba số tự nhiên; nhận biết được phân số tối giản; thực hiện được phép cộng, phép trừ phân số bằng cách sử dụng ước chung lớn nhất, bội chung nhỏ nhất.",
+        "Nhận biết được phép chia có dư, định lí về phép chia có dư.",
+        "Vận dụng được kiến thức số học vào giải quyết những vấn đề thực tiễn (ví dụ: tính toán tiền hay lượng hàng hoá khi mua sắm, xác định số đồ vật cần thiết để sắp xếp chúng theo những quy tắc cho trước,...)."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 150
+    },
+    {
+      "id": "l6-khai-niem-so-nguyen",
+      "ten": "Số nguyên âm — khái niệm & thứ tự",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số nguyên",
+      "chuDeCon": "Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+      "yccd": [
+        "Nhận biết được số nguyên âm, tập hợp các số nguyên.",
+        "Biểu diễn được số nguyên trên trục số.",
+        "Nhận biết được số đối của một số nguyên.",
+        "Nhận biết được thứ tự trong tập hợp các số nguyên. So sánh được hai số nguyên cho trước.",
+        "Nhận biết được ý nghĩa của số nguyên âm trong một số bài toán thực tiễn."
+      ],
+      "tienQuyet": [],
+      "mo": true,
+      "x": 330,
+      "y": 240
+    },
+    {
+      "id": "l6-phep-tinh-so-nguyen",
+      "ten": "Phép tính với số nguyên",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số nguyên",
+      "chuDeCon": "Các phép tính với số nguyên. Tính chia hết trong tập hợp các số nguyên",
+      "yccd": [
+        "Thực hiện được các phép tính: cộng, trừ, nhân, chia (chia hết) trong tập hợp các số nguyên.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc trong tập hợp các số nguyên trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+        "Nhận biết được quan hệ chia hết, khái niệm ước và bội trong tập hợp các số nguyên.",
+        "Giải quyết được những vấn đề thực tiễn gắn với thực hiện các phép tính về số nguyên (ví dụ: tính lỗ lãi khi buôn bán,...)."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien",
+        "l6-khai-niem-so-nguyen"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 330
+    },
+    {
+      "id": "l6-phan-so-tinh-chat",
+      "ten": "Phân số tử/mẫu nguyên & so sánh",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+      "yccd": [
+        "Nhận biết được phân số với tử số hoặc mẫu số là số nguyên âm.",
+        "Nhận biết được khái niệm hai phân số bằng nhau và nhận biết được quy tắc bằng nhau của hai phân số.",
+        "Nêu được hai tính chất cơ bản của phân số.",
+        "So sánh được hai phân số cho trước.",
+        "Nhận biết được số đối của một phân số.",
+        "Nhận biết được hỗn số dương."
+      ],
+      "tienQuyet": [
+        "l5-quy-dong-phan-so",
+        "l6-phep-tinh-so-nguyen",
+        "l6-uoc-boi"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 420
+    },
+    {
+      "id": "l6-phep-tinh-phan-so",
+      "ten": "Phép tính với phân số (mở rộng)",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Các phép tính với phân số",
+      "yccd": [
+        "Thực hiện được các phép tính cộng, trừ, nhân, chia với phân số.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với phân số trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+        "Tính được giá trị phân số của một số cho trước và tính được một số biết giá trị phân số của số đó.",
+        "Giải quyết được một số vấn đề thực tiễn gắn với các phép tính về phân số (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí,...)."
+      ],
+      "tienQuyet": [
+        "l6-phan-so-tinh-chat",
+        "l6-uoc-boi"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 510
+    },
+    {
+      "id": "l7-so-huu-ti-khai-niem",
+      "ten": "Số hữu tỉ — khái niệm & thứ tự",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số hữu tỉ",
+      "chuDeCon": "Số hữu tỉ và tập hợp các số hữu tỉ. Thứ tự trong tập hợp các số hữu tỉ",
+      "yccd": [
+        "Nhận biết được số hữu tỉ và lấy được ví dụ về số hữu tỉ.",
+        "Nhận biết được tập hợp các số hữu tỉ.",
+        "Biểu diễn được số hữu tỉ trên trục số.",
+        "Nhận biết được số đối của một số hữu tỉ.",
+        "Nhận biết được thứ tự trong tập hợp các số hữu tỉ. So sánh được hai số hữu tỉ."
+      ],
+      "tienQuyet": [
+        "l6-phan-so-tinh-chat",
+        "l6-phep-tinh-so-nguyen"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 60
+    },
+    {
+      "id": "l7-phep-tinh-so-huu-ti",
+      "ten": "Phép tính với số hữu tỉ",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số hữu tỉ",
+      "chuDeCon": "Các phép tính với số hữu tỉ",
+      "yccd": [
+        "Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.",
+        "Mô tả được phép tính luỹ thừa với số mũ tự nhiên của một số hữu tỉ và một số tính chất của phép tính đó (tích và thương của hai luỹ thừa cùng cơ số, luỹ thừa của luỹ thừa).",
+        "Mô tả được thứ tự thực hiện các phép tính, quy tắc dấu ngoặc, quy tắc chuyển vế trong tập hợp số hữu tỉ.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với số hữu tỉ trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+        "Giải quyết được một số vấn đề thực tiễn gắn với các phép tính về số hữu tỉ (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí, trong đo đạc,...)."
+      ],
+      "tienQuyet": [
+        "l7-so-huu-ti-khai-niem",
+        "l6-phep-tinh-phan-so",
+        "l6-luy-thua",
+        "l6-phep-tinh-so-nguyen",
+        "l5-phep-tinh-so-thap-phan"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 150
+    },
+    {
+      "id": "l7-can-bac-hai",
+      "ten": "Căn bậc hai số học",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Căn bậc hai số học",
+      "yccd": [
+        "Nhận biết được khái niệm căn bậc hai số học của một số không âm.",
+        "Tính được giá trị (đúng hoặc gần đúng) căn bậc hai số học của một số nguyên dương bằng máy tính cầm tay."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": true,
+      "x": 460,
+      "y": 240
+    },
+    {
+      "id": "l7-so-thuc",
+      "ten": "Số vô tỉ & số thực",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Số vô tỉ. Số thực",
+      "yccd": [
+        "Nhận biết được số thập phân hữu hạn và số thập phân vô hạn tuần hoàn.",
+        "Nhận biết được số vô tỉ, số thực, tập hợp các số thực.",
+        "Nhận biết được trục số thực và biểu diễn được số thực trên trục số trong trường hợp thuận lợi.",
+        "Nhận biết được số đối của một số thực.",
+        "Nhận biết được thứ tự trong tập hợp các số thực.",
+        "Nhận biết được giá trị tuyệt đối của một số thực.",
+        "Thực hiện được ước lượng và làm tròn số căn cứ vào độ chính xác cho trước."
+      ],
+      "tienQuyet": [
+        "l7-can-bac-hai"
+      ],
+      "mo": true,
+      "x": 460,
+      "y": 330
+    },
+    {
+      "id": "l7-ti-le-thuc",
+      "ten": "Tỉ lệ thức & dãy tỉ số bằng nhau",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Tỉ lệ thức và dãy tỉ số bằng nhau",
+      "yccd": [
+        "Nhận biết được tỉ lệ thức và các tính chất của tỉ lệ thức.",
+        "Vận dụng được tính chất của tỉ lệ thức trong giải toán.",
+        "Nhận biết được dãy tỉ số bằng nhau.",
+        "Vận dụng được tính chất của dãy tỉ số bằng nhau trong giải toán (ví dụ: chia một số thành các phần tỉ lệ với các số cho trước,...)."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti",
+        "l5-ti-so-phan-tram"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 420
+    },
+    {
+      "id": "l7-bieu-thuc-dai-so",
+      "ten": "Biểu thức đại số",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Biểu thức đại số",
+      "yccd": [
+        "Nhận biết được biểu thức số.",
+        "Nhận biết được biểu thức đại số.",
+        "Tính được giá trị của một biểu thức đại số."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti",
+        "l4-bieu-thuc-chu"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 510
+    },
+    {
+      "id": "l7-da-thuc-mot-bien",
+      "ten": "Đa thức một biến",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Đa thức một biến",
+      "yccd": [
+        "Nhận biết được định nghĩa đa thức một biến.",
+        "Nhận biết được cách biểu diễn đa thức một biến; xác định được bậc của đa thức một biến.",
+        "Tính được giá trị của đa thức khi biết giá trị của biến.",
+        "Nhận biết được khái niệm nghiệm của đa thức một biến.",
+        "Thực hiện được các phép tính: phép cộng, phép trừ, phép nhân, phép chia trong tập hợp các đa thức một biến; vận dụng được những tính chất của các phép tính đó trong tính toán."
+      ],
+      "tienQuyet": [
+        "l7-bieu-thuc-dai-so"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 600
+    },
+    {
+      "id": "l8-da-thuc-nhieu-bien",
+      "ten": "Đa thức nhiều biến",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Đa thức nhiều biến. Các phép toán cộng, trừ, nhân, chia các đa thức nhiều biến",
+      "yccd": [
+        "Nhận biết được các khái niệm về đơn thức, đa thức nhiều biến.",
+        "Tính được giá trị của đa thức khi biết giá trị của các biến.",
+        "Thực hiện được việc thu gọn đơn thức, đa thức.",
+        "Thực hiện được phép nhân đơn thức với đa thức và phép chia hết một đơn thức cho một đơn thức.",
+        "Thực hiện được các phép tính: phép cộng, phép trừ, phép nhân các đa thức nhiều biến trong những trường hợp đơn giản.",
+        "Thực hiện được phép chia hết một đa thức cho một đơn thức trong những trường hợp đơn giản."
+      ],
+      "tienQuyet": [
+        "l7-da-thuc-mot-bien"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 240
+    },
+    {
+      "id": "l8-hang-dang-thuc",
+      "ten": "Hằng đẳng thức đáng nhớ",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Hằng đẳng thức đáng nhớ",
+      "yccd": [
+        "Nhận biết được các khái niệm: đồng nhất thức, hằng đẳng thức.",
+        "Mô tả được các hằng đẳng thức: bình phương của tổng và hiệu; hiệu hai bình phương; lập phương của tổng và hiệu; tổng và hiệu hai lập phương.",
+        "Vận dụng được các hằng đẳng thức để phân tích đa thức thành nhân tử ở dạng: vận dụng trực tiếp hằng đẳng thức; vận dụng hằng đẳng thức thông qua nhóm hạng tử và đặt nhân tử chung."
+      ],
+      "tienQuyet": [
+        "l8-da-thuc-nhieu-bien"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 330
+    },
+    {
+      "id": "l8-phan-thuc-dai-so",
+      "ten": "Phân thức đại số",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Phân thức đại số. Tính chất cơ bản của phân thức đại số. Các phép toán cộng, trừ, nhân, chia các phân thức đại số",
+      "yccd": [
+        "Nhận biết được các khái niệm cơ bản về phân thức đại số: định nghĩa; điều kiện xác định; giá trị của phân thức đại số; hai phân thức bằng nhau.",
+        "Mô tả được những tính chất cơ bản của phân thức đại số.",
+        "Thực hiện được các phép tính: phép cộng, phép trừ, phép nhân, phép chia đối với hai phân thức đại số.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với phân thức đại số trong tính toán."
+      ],
+      "tienQuyet": [
+        "l8-da-thuc-nhieu-bien",
+        "l6-phep-tinh-phan-so"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 420
+    },
+    {
+      "id": "l8-phuong-trinh-bac-nhat",
+      "ten": "Phương trình bậc nhất",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phương trình",
+      "chuDeCon": "Phương trình bậc nhất",
+      "yccd": [
+        "Hiểu được khái niệm phương trình bậc nhất một ẩn và cách giải.",
+        "Giải quyết được một số vấn đề thực tiễn gắn với phương trình bậc nhất (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí, các bài toán liên quan đến Hoá học,...)."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti",
+        "l7-da-thuc-mot-bien",
+        "l6-phep-tinh-phan-so"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 60
+    },
+    {
+      "id": "l8-ham-so-bac-nhat",
+      "ten": "Hàm số bậc nhất",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Hàm số bậc nhất y = ax + b (a ≠ 0) và đồ thị. Hệ số góc của đường thẳng y = ax + b (a ≠ 0).",
+      "yccd": [
+        "Thiết lập được bảng giá trị của hàm số bậc nhất y = ax + b (a ≠ 0).",
+        "Vẽ được đồ thị của hàm số bậc nhất y = ax + b (a ≠ 0).",
+        "Nhận biết được khái niệm hệ số góc của đường thẳng y = ax + b (a ≠ 0).",
+        "Sử dụng được hệ số góc của đường thẳng để nhận biết và giải thích được sự cắt nhau hoặc song song của hai đường thẳng cho trước.",
+        "Vận dụng được hàm số bậc nhất và đồ thị vào giải quyết một số bài toán thực tiễn (ví dụ: bài toán về chuyển động đều trong Vật lí,...)."
+      ],
+      "tienQuyet": [
+        "l8-phuong-trinh-bac-nhat",
+        "l7-ti-le-thuc",
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": true,
+      "x": 590,
+      "y": 150
+    },
+    {
+      "id": "l9-can-thuc",
+      "ten": "Căn thức",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Căn thức",
+      "chuDeCon": "Căn bậc hai và căn bậc ba của số thực",
+      "yccd": [
+        "Nhận biết được khái niệm về căn bậc hai của số thực không âm, căn bậc ba của một số thực.",
+        "Tính được giá trị (đúng hoặc gần đúng) căn bậc hai, căn bậc ba của một số hữu tỉ bằng máy tính cầm tay.",
+        "Thực hiện được một số phép tính đơn giản về căn bậc hai của số thực không âm (căn bậc hai của một bình phương, căn bậc hai của một tích, căn bậc hai của một thương, đưa thừa số ra ngoài dấu căn bậc hai, đưa thừa số vào trong dấu căn bậc hai)."
+      ],
+      "tienQuyet": [
+        "l7-can-bac-hai",
+        "l7-so-thuc"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 60
+    },
+    {
+      "id": "l9-ham-so-y-ax2",
+      "ten": "Hàm số y = ax²",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Hàm số y = ax2 (a ≠ 0) và đồ thị",
+      "yccd": [
+        "Thiết lập được bảng giá trị của hàm số y = ax2 (a ≠ 0).",
+        "Vẽ được đồ thị của hàm số y = ax2 (a ≠ 0).",
+        "Nhận biết được tính đối xứng (trục) và trục đối xứng của đồ thị hàm số y = ax2 (a ≠ 0).",
+        "Giải quyết được một số vấn đề thực tiễn gắn với hàm số y = ax2 (a ≠ 0) và đồ thị (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí,...)."
+      ],
+      "tienQuyet": [
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 150
+    },
+    {
+      "id": "l9-he-phuong-trinh",
+      "ten": "Hệ phương trình bậc nhất hai ẩn",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phương trình và hệ phương trình",
+      "chuDeCon": "Phương trình và hệ phương trình bậc nhất hai ẩn",
+      "yccd": [
+        "Nhận biết được khái niệm phương trình bậc nhất hai ẩn, hệ hai phương trình bậc nhất hai ẩn.",
+        "Nhận biết được khái niệm nghiệm của hệ hai phương trình bậc nhất hai ẩn.",
+        "Giải được hệ hai phương trình bậc nhất hai ẩn.",
+        "Tính được nghiệm của hệ hai phương trình bậc nhất hai ẩn bằng máy tính cầm tay.",
+        "Giải quyết được một số vấn đề thực tiễn gắn với hệ hai phương trình bậc nhất hai ẩn (ví dụ: các bài toán liên quan đến cân bằng phản ứng trong Hoá học,...)."
+      ],
+      "tienQuyet": [
+        "l8-phuong-trinh-bac-nhat",
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 240
+    },
+    {
+      "id": "l9-phuong-trinh-bac-hai",
+      "ten": "Phương trình bậc hai",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phương trình và hệ phương trình",
+      "chuDeCon": "Phương trình bậc hai một ẩn. Định lí Viète",
+      "yccd": [
+        "Nhận biết được khái niệm phương trình bậc hai một ẩn. Giải được phương trình bậc hai một ẩn.",
+        "Tính được nghiệm phương trình bậc hai một ẩn bằng máy tính cầm tay.",
+        "Giải thích được định lí Viète và ứng dụng (ví dụ: tính nhẩm nghiệm của phương trình bậc hai, tìm hai số biết tổng và tích của chúng,...).",
+        "Vận dụng được phương trình bậc hai vào giải quyết bài toán thực tiễn."
+      ],
+      "tienQuyet": [
+        "l8-phuong-trinh-bac-nhat",
+        "l8-hang-dang-thuc",
+        "l9-can-thuc",
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 330
+    },
+    {
+      "id": "l10-ham-so",
+      "ten": "Hàm số & đồ thị",
+      "lop": 10,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Khái niệm cơ bản về hàm số và đồ thị",
+      "yccd": [
+        "Nhận biết được những mô hình thực tế (dạng bảng, biểu đồ, công thức) dẫn đến khái niệm hàm số.",
+        "Mô tả được các khái niệm cơ bản về hàm số: định nghĩa hàm số, tập xác định, tập giá trị, hàm số đồng biến, hàm số nghịch biến, đồ thị của hàm số.",
+        "Mô tả được các đặc trưng hình học của đồ thị hàm số đồng biến, hàm số nghịch biến.",
+        "Vận dụng được kiến thức của hàm số vào giải quyết bài toán thực tiễn (ví dụ: xây dựng hàm số bậc nhất trên những khoảng khác nhau để tính số tiền y (phải trả) theo số phút gọi x đối với một gói cước điện thoại,...)."
+      ],
+      "tienQuyet": [
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 850,
+      "y": 60
+    },
+    {
+      "id": "l10-ham-so-bac-hai",
+      "ten": "Hàm số bậc hai",
+      "lop": 10,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Hàm số bậc hai, đồ thị hàm số bậc hai và ứng dụng",
+      "yccd": [
+        "Thiết lập được bảng giá trị của hàm số bậc hai.",
+        "Vẽ được Parabola (parabol) là đồ thị hàm số bậc hai.",
+        "Nhận biết được các tính chất cơ bản của Parabola như đỉnh, trục đối xứng.",
+        "Nhận biết và giải thích được các tính chất của hàm số bậc hai thông qua đồ thị.",
+        "Vận dụng được kiến thức về hàm số bậc hai và đồ thị vào giải quyết bài toán thực tiễn (ví dụ: xác định độ cao của cầu, cổng có hình dạng Parabola,...)."
+      ],
+      "tienQuyet": [
+        "l10-ham-so",
+        "l9-phuong-trinh-bac-hai",
+        "l9-ham-so-y-ax2",
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 850,
+      "y": 150
+    },
+    {
+      "id": "l11-ham-so-mu-log",
+      "ten": "Hàm số mũ & lôgarit",
+      "lop": 11,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số mũ và hàm số lôgarit",
+      "chuDeCon": "Hàm số mũ. Hàm số lôgarit",
+      "yccd": [
+        "Nhận biết được hàm số mũ và hàm số lôgarit. Nêu được một số ví dụ thực tế về hàm số mũ, hàm số lôgarit.",
+        "Nhận dạng được đồ thị của các hàm số mũ, hàm số lôgarit.",
+        "Giải thích được các tính chất của hàm số mũ, hàm số lôgarit thông qua đồ thị của chúng.",
+        "Giải quyết được một số vấn đề có liên quan đến môn học khác hoặc có liên quan đến thực tiễn gắn với hàm số mũ và hàm số lôgarit (ví dụ: lãi suất, sự tăng trưởng,...)."
+      ],
+      "tienQuyet": [
+        "l10-ham-so"
+      ],
+      "mo": true,
+      "x": 980,
+      "y": 60
+    },
+    {
+      "id": "l11-dao-ham",
+      "ten": "Đạo hàm",
+      "lop": 11,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Đạo hàm",
+      "chuDeCon": "Khái niệm đạo hàm. Ý nghĩa hình học của đạo hàm",
+      "yccd": [
+        "Nhận biết được một số bài toán dẫn đến khái niệm đạo hàm như: xác định vận tốc tức thời của một vật chuyển động không đều, xác định tốc độ thay đổi của nhiệt độ.",
+        "Nhận biết được định nghĩa đạo hàm. Tính được đạo hàm của một số hàm đơn giản bằng định nghĩa.",
+        "Nhận biết được ý nghĩa hình học của đạo hàm.",
+        "Thiết lập được phương trình tiếp tuyến của đồ thị hàm số tại một điểm thuộc đồ thị.",
+        "Nhận biết được số e thông qua bài toán mô hình hoá lãi suất ngân hàng."
+      ],
+      "tienQuyet": [
+        "l10-ham-so",
+        "l10-ham-so-bac-hai"
+      ],
+      "mo": true,
+      "x": 980,
+      "y": 150
+    },
+    {
+      "id": "l12-khao-sat-ham-so",
+      "ten": "Khảo sát hàm số",
+      "lop": 12,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Ứng dụng đạo hàm để khảo sát và vẽ đồ thị của hàm số",
+      "chuDeCon": "Tính đơn điệu của hàm số",
+      "yccd": [
+        "Nhận biết được tính đồng biến, nghịch biến của một hàm số trên một khoảng dựa vào dấu của đạo hàm cấp một của nó.",
+        "Thể hiện được tính đồng biến, nghịch biến của hàm số trong bảng biến thiên.",
+        "Nhận biết được tính đơn điệu, điểm cực trị, giá trị cực trị của hàm số thông qua bảng biến thiên hoặc thông qua hình ảnh hình học của đồ thị hàm số."
+      ],
+      "tienQuyet": [
+        "l11-dao-ham"
+      ],
+      "mo": true,
+      "x": 1110,
+      "y": 60
+    },
+    {
+      "id": "l12-tich-phan",
+      "ten": "Tích phân",
+      "lop": 12,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Nguyên hàm. Tích phân",
+      "chuDeCon": "Tích phân. Ứng dụng hình học của tích phân",
+      "yccd": [
+        "Nhận biết được định nghĩa và các tính chất của tích phân.",
+        "Tính được tích phân trong những trường hợp đơn giản.",
+        "Sử dụng được tích phân để tính diện tích của một số hình phẳng, thể tích của một số hình khối.",
+        "Vận dụng được tích phân để giải một số bài toán có liên quan đến thực tiễn."
+      ],
+      "tienQuyet": [
+        "l11-dao-ham"
+      ],
+      "mo": true,
+      "x": 1110,
+      "y": 150
+    }
+  ]
+};
+const SUGGESTED_RAW = [
+  {
+    "tienQuyet": "l4-khai-niem-phan-so",
+    "node": "l4-so-sanh-phan-so",
+    "canCu": "Yêu cầu cần đạt của 'l4-khai-niem-phan-so': \"Nhận biết được khái niệm ban đầu về phân số, tử số, mẫu số.\" và của 'l4-so-sanh-phan-so': \"So sánh và sắp xếp được thứ tự các phân số trong những trường hợp sau: các phân số có cùng mẫu số\".",
+    "lyDo": "Để so sánh hai phân số có cùng mẫu số, học sinh phải hiểu khái niệm tử số và mẫu số để có thể so sánh hai tử số trong khi giữ nguyên mẫu số. Đây là trường hợp so sánh cơ bản nhất."
+  },
+  {
+    "tienQuyet": "l4-khai-niem-phan-so",
+    "node": "l4-phep-tinh-phan-so",
+    "canCu": "Yêu cầu cần đạt của 'l4-khai-niem-phan-so': \"Nhận biết được khái niệm ban đầu về phân số, tử số, mẫu số.\" và của 'l4-phep-tinh-phan-so': \"Thực hiện được phép cộng, phép trừ phân số trong những trường hợp sau: các phân số có cùng mẫu số\".",
+    "lyDo": "Để thực hiện phép cộng hoặc trừ hai phân số có cùng mẫu số, học sinh phải vận dụng khái niệm tử số và mẫu số để thực hiện phép tính trên các tử số và giữ nguyên mẫu số chung."
+  },
+  {
+    "tienQuyet": "l6-phep-tinh-so-nguyen",
+    "node": "l7-phep-tinh-so-huu-ti",
+    "canCu": "Yêu cầu cần đạt của 'l6-phep-tinh-so-nguyen': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia (chia hết) trong tập hợp các số nguyên.\" và của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\"",
+    "lyDo": "Các quy tắc thực hiện phép tính với số hữu tỉ (dưới dạng phân số a/b) được xây dựng trực tiếp từ các phép tính trên tử số và mẫu số, vốn là các số nguyên. Nắm vững phép tính số nguyên là điều kiện cần để thực hiện đúng các phép tính với số hữu tỉ."
+  },
+  {
+    "tienQuyet": "l5-phep-tinh-so-thap-phan",
+    "node": "l7-phep-tinh-so-huu-ti",
+    "canCu": "Yêu cầu cần đạt của 'l5-phep-tinh-so-thap-phan': \"Thực hiện được phép cộng, phép trừ hai số thập phân. · Thực hiện được phép nhân... · Thực hiện được phép chia...\" và của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\"",
+    "lyDo": "Số thập phân là một dạng biểu diễn của số hữu tỉ. Việc thực hiện thành thạo các phép tính với số thập phân là kĩ năng cần có để thực hiện các phép tính trong tập hợp số hữu tỉ, vốn bao gồm cả số thập phân và phân số."
+  },
+  {
+    "tienQuyet": "l6-phep-tinh-phan-so",
+    "node": "l8-phuong-trinh-bac-nhat",
+    "canCu": "Yêu cầu cần đạt của 'l6-phep-tinh-phan-so': \"Thực hiện được các phép tính cộng, trừ, nhân, chia với phân số.\" và của 'l8-phuong-trinh-bac-nhat': \"Hiểu được khái niệm phương trình bậc nhất một ẩn và cách giải.\"",
+    "lyDo": "Quá trình giải phương trình bậc nhất một ẩn (ví dụ: ax + b = c) thường xuyên sử dụng các phép biến đổi tương đương như nhân, chia, cộng, trừ các hệ số là phân số, và kết quả (nghiệm) của phương trình cũng thường là phân số."
+  },
+  {
+    "tienQuyet": "l7-phep-tinh-so-huu-ti",
+    "node": "l8-ham-so-bac-nhat",
+    "canCu": "Yêu cầu cần đạt của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\" và của 'l8-ham-so-bac-nhat': \"Thiết lập được bảng giá trị của hàm số bậc nhất y = ax + b (a ≠ 0).\"",
+    "lyDo": "Để lập bảng giá trị của hàm số bậc nhất, học sinh cần thay các giá trị x (thường là số hữu tỉ) vào biểu thức y = ax + b và tính giá trị y tương ứng. Việc này đòi hỏi phải thực hiện thành thạo các phép tính với số hữu tỉ."
+  },
+  {
+    "tienQuyet": "l8-ham-so-bac-nhat",
+    "node": "l9-he-phuong-trinh",
+    "canCu": "Yêu cầu cần đạt của 'l8-ham-so-bac-nhat': \"Vẽ được đồ thị của hàm số bậc nhất y = ax + b (a ≠ 0).\" và của 'l9-he-phuong-trinh': \"Nhận biết được khái niệm nghiệm của hệ hai phương trình bậc nhất hai ẩn.\"",
+    "lyDo": "Hiểu và vẽ được đồ thị của hàm số bậc nhất giúp học sinh trực quan hóa và hiểu được ý nghĩa hình học của nghiệm của hệ hai phương trình bậc nhất hai ẩn chính là tọa độ giao điểm của hai đường thẳng."
+  },
+  {
+    "tienQuyet": "l7-phep-tinh-so-huu-ti",
+    "node": "l9-phuong-trinh-bac-hai",
+    "canCu": "Yêu cầu cần đạt của 'l7-phep-tinh-so-huu-ti': \"Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.\" và của 'l9-phuong-trinh-bac-hai': \"Giải được phương trình bậc hai một ẩn.\"",
+    "lyDo": "Việc giải phương trình bậc hai, đặc biệt là sử dụng công thức nghiệm, đòi hỏi phải thực hiện các phép tính cộng, trừ, nhân, chia với các hệ số a, b, c, vốn là các số hữu tỉ. Kỹ năng tính toán với số hữu tỉ là nền tảng để tìm nghiệm chính xác."
+  },
+  {
+    "tienQuyet": "l8-ham-so-bac-nhat",
+    "node": "l10-ham-so-bac-hai",
+    "canCu": "Yêu cầu cần đạt của 'l8-ham-so-bac-nhat': \"Thiết lập được bảng giá trị của hàm số bậc nhất... · Vẽ được đồ thị của hàm số bậc nhất...\" và của 'l10-ham-so-bac-hai': \"Thiết lập được bảng giá trị của hàm số bậc hai. · Vẽ được Parabola...\"",
+    "lyDo": "Các kỹ năng cơ bản về hàm số như lập bảng giá trị và vẽ đồ thị được giới thiệu và thực hành với hàm số bậc nhất. Đây là nền tảng để học sinh tiếp cận và thực hiện các kỹ năng tương tự đối với hàm số bậc hai phức tạp hơn."
+  }
+];
+const DEMO_EDGES = new Set([
+  "l4-khai-niem-phan-so>l4-tinh-chat-phan-so","l4-tinh-chat-phan-so>l4-phep-tinh-phan-so",
+  "l4-tinh-chat-phan-so>l4-so-sanh-phan-so","l4-phep-tinh-phan-so>l5-quy-dong-phan-so",
+  "l4-so-sanh-phan-so>l5-quy-dong-phan-so","l5-quy-dong-phan-so>l6-phan-so-tinh-chat",
+  "l6-phan-so-tinh-chat>l6-phep-tinh-phan-so","l6-phep-tinh-phan-so>l7-phep-tinh-so-huu-ti",
+]);
+const CAPCOLOR = { TH:"#2e7d4f", THCS:"#2f5fd0", THPT:"#b0367e" };
+const capName = l => l<=5 ? "Tiểu học" : l<=9 ? "THCS" : "THPT";
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+const nodes = GRAPH.nodes, byId = new Map(nodes.map(n=>[n.id,n]));
+// Suggestions already merged into the graph stop being "pending" — hide their overlay.
+const SUGGESTED = SUGGESTED_RAW.filter(e => !byId.get(e.node).tienQuyet.includes(e.tienQuyet));
+// parents/children index
+const children = new Map();
+nodes.forEach(n => n.tienQuyet.forEach(p => children.set(p, [...(children.get(p)??[]), n.id])));
+function walk(id, dir) { // dir: "up" (tienQuyet) | "down" (children)
+  const acc = new Set(); const stack = dir==="up" ? [...byId.get(id).tienQuyet] : [...(children.get(id)??[])];
+  while (stack.length) { const c = stack.pop(); if (acc.has(c)) continue; acc.add(c);
+    stack.push(...(dir==="up" ? byId.get(c).tienQuyet : (children.get(c)??[]))); }
+  return acc;
+}
+
+/* ---------- MAP ---------- */
+/* Vertical layout: foundations at the BOTTOM, higher grades stack upward. */
+const W=250, H=88, COLW=278, BANDH=152, TOP=24, GUT=100;
+const maxLop = Math.max(...nodes.map(n=>n.lop)), minLop = Math.min(...nodes.map(n=>n.lop));
+const pos = new Map();
+for (const n of nodes) {
+  const slot = Math.round((n.y-60)/90); // horizontal slot within the grade band
+  pos.set(n.id, { x: GUT + slot*COLW, y: TOP + (maxLop-n.lop)*BANDH });
+}
+
+function edgePath(a,b,offset){
+  const pa=pos.get(a), pb=pos.get(b);
+  const off = offset ? 12 : 0;
+  if (pa.y===pb.y){ // same grade band: dip below the band, left-to-right
+    const sx=pa.x+W/2+off, ex=pb.x+W/2+off, dy=pa.y+H+34+(offset?10:0);
+    return `M ${sx} ${pa.y+H} C ${sx} ${dy}, ${ex} ${dy}, ${ex} ${pb.y+H}`;
+  }
+  // cross-band: leave the TOP of the prerequisite (below), enter the BOTTOM of the dependent (above)
+  const sx=pa.x+W/2+off, sy=pa.y, ex=pb.x+W/2+off, ey=pb.y+H, my=(sy+ey)/2;
+  return `M ${sx} ${sy} C ${sx} ${my}, ${ex} ${my}, ${ex} ${ey}`;
+}
+function wrap2(t,max){ if(t.length<=max) return [t];
+  const c=t.lastIndexOf(" ",max), i=c>6?c:max, r=t.slice(i+(c>6?1:0));
+  return [t.slice(0,i), r.length>max? r.slice(0,max-1)+"…" : r]; }
+
+const maxSlot = Math.max(...nodes.map(n=>Math.round((n.y-60)/90)));
+const width = GUT+(maxSlot+1)*COLW+10, height = TOP+(maxLop-minLop+1)*BANDH+10;
+let svg = `<svg id="thesvg" viewBox="0 0 ${width} ${height}" width="${width}" xmlns="http://www.w3.org/2000/svg">`;
+svg += `<defs>
+  <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#b6c0d4"/></marker>
+  <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#c23b3b"/></marker>
+  <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#e08a00"/></marker>
+</defs>`;
+svg += `<rect x="0" y="0" width="${width}" height="${height}" fill="#fcfcfb" id="bgclick"/>`;
+for (let l=minLop;l<=maxLop;l++){
+  const by = TOP + (maxLop-l)*BANDH;
+  if ((maxLop-l)%2===1) svg += `<rect x="0" y="${by-30}" width="${width}" height="${BANDH}" fill="#f1f5fa" pointer-events="none"/>`;
+  svg += `<text x="14" y="${by+H/2-2}" font-size="16" font-weight="700" fill="#3c4a63" pointer-events="none">Lớp ${l}</text>`;
+  svg += `<text x="14" y="${by+H/2+16}" font-size="11.5" fill="#7c88a3" pointer-events="none">${capName(l)}</text>`;
+}
+for (const n of nodes) for (const p of n.tienQuyet){
+  const demo = DEMO_EDGES.has(`${p}>${n.id}`);
+  svg += `<path class="edge" data-from="${p}" data-to="${n.id}" d="${edgePath(p,n.id,false)}" fill="none" stroke="${demo?"#c23b3b":"#b6c0d4"}" stroke-width="${demo?3:1.7}" marker-end="url(#${demo?"a2":"a1"})"/>`;
+}
+SUGGESTED.forEach((e,i)=>{ svg += `<path class="edge sug" data-i="${i}" data-from="${e.tienQuyet}" data-to="${e.node}" d="${edgePath(e.tienQuyet,e.node,true)}" fill="none" stroke="#e08a00" stroke-width="2.6" stroke-dasharray="8 6" marker-end="url(#a3)" style="cursor:pointer"/>`; });
+SUGGESTED.forEach((e,i)=>{ const pa=pos.get(e.tienQuyet), pb=pos.get(e.node); let lx,ly;
+  if(pa.y===pb.y){ lx=(pa.x+pb.x+W)/2; ly=pa.y+H+40; } else { lx=(pa.x+pb.x+W)/2+14; ly=(pa.y+pb.y+H)/2; }
+  svg += `<g class="sugbtn" data-i="${i}" style="cursor:pointer"><circle cx="${lx}" cy="${ly}" r="13" fill="#e08a00"/><text x="${lx}" y="${ly+4.5}" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">S${i+1}</text></g>`; });
+for (const n of nodes){
+  const p=pos.get(n.id), lines=wrap2(n.ten,26);
+  const fill = n.mo? "#eef1f6" : "#ffffff", stroke = n.mo? "#b6c0d4" : CAPCOLOR[n.cap];
+  svg += `<g class="node-box" data-id="${n.id}">
+    <rect class="body" x="${p.x}" y="${p.y}" width="${W}" height="${H}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="2" ${n.mo?'stroke-dasharray="6 4"':''}/>
+    <rect x="${p.x}" y="${p.y}" width="7" height="${H}" rx="3.5" fill="${n.mo?"#b6c0d4":CAPCOLOR[n.cap]}"/>`;
+  lines.forEach((ln,i)=>{ svg += `<text x="${p.x+18}" y="${p.y+(lines.length===1?36:28+i*19)}" font-size="14" font-weight="600" fill="${n.mo?"#7c88a3":"#1c2434"}">${esc(ln)}</text>`; });
+  svg += `<text x="${p.x+18}" y="${p.y+H-12}" font-size="11.5" fill="#98a3ba">Lớp ${n.lop}${n.mo?" · node mờ (không câu hỏi)":""}</text></g>`;
+}
+svg += `</svg>`;
+document.getElementById("mapInner").innerHTML = svg;
+
+/* focus mode */
+let selected = null;
+function clearFocus(){
+  document.querySelectorAll("#thesvg .edge, #thesvg .node-box, #thesvg .sugbtn").forEach(el=>el.classList.remove("dimmed"));
+  document.querySelectorAll("#thesvg path.hl").forEach(el=>el.classList.remove("hl"));
+  if (selected) selected.classList.remove("node-selected"); selected=null;
+}
+function focusNode(g){
+  clearFocus(); selected=g; g.classList.add("node-selected");
+  const id=g.dataset.id, keep=new Set([id,...walk(id,"up"),...walk(id,"down")]);
+  document.querySelectorAll("#thesvg .node-box").forEach(el=>{ if(!keep.has(el.dataset.id)) el.classList.add("dimmed"); });
+  document.querySelectorAll("#thesvg .edge").forEach(el=>{
+    const rel = keep.has(el.dataset.from)&&keep.has(el.dataset.to);
+    if(!rel) el.classList.add("dimmed"); else if(!el.classList.contains("sug")) el.classList.add("hl");
+  });
+  document.querySelectorAll("#thesvg .sugbtn").forEach(el=>{
+    const e=SUGGESTED[+el.dataset.i];
+    if(!(keep.has(e.tienQuyet)&&keep.has(e.node))) el.classList.add("dimmed");
+  });
+  const n=byId.get(id);
+  document.getElementById("pTitle").textContent = n.ten;
+  document.getElementById("pMeta").innerHTML =
+    `Lớp <b>${n.lop}</b> · ${capName(n.lop)} ${n.mo?`<span class="badge" style="background:#eef1f6;color:#7c88a3">node mờ — không câu hỏi</span>`:""}<br>`+
+    `Chủ đề trong CT: <b>${esc(n.chuDe)}</b><br>Mục nguyên văn: <i>${esc(n.chuDeCon)}</i><br>`+
+    `Cần học trước: ${n.tienQuyet.length? n.tienQuyet.map(t=>`<span class="chip" data-go="${t}">${esc(byId.get(t).ten)}</span>`).join(""):"— (node gốc)"}`;
+  document.getElementById("pYccd").innerHTML =
+    `<div style="font-size:13px;font-weight:700;margin:6px 0;color:#3c4a63">Yêu cầu cần đạt (nguyên văn CT 2018):</div>`+
+    n.yccd.map(y=>`<li>${esc(y)}</li>`).join("");
+  document.querySelectorAll("#pMeta .chip").forEach(c=>c.addEventListener("click",()=>{ const t=document.querySelector(`.node-box[data-id="${c.dataset.go}"]`); if(t) focusNode(t); }));
+}
+document.querySelectorAll("#thesvg .node-box").forEach(g=>g.addEventListener("click",ev=>{ ev.stopPropagation(); focusNode(g); }));
+document.getElementById("bgclick").addEventListener("click", clearFocus);
+document.querySelectorAll("#thesvg .sugbtn, #thesvg .sug").forEach(el=>el.addEventListener("click",ev=>{
+  ev.stopPropagation(); showTab("sug");
+  const card=document.getElementById("scard-"+el.dataset.i);
+  card.scrollIntoView({behavior:"smooth",block:"center"});
+  card.style.boxShadow="0 0 0 3px rgba(224,138,0,.5)"; setTimeout(()=>card.style.boxShadow="",1800);
+}));
+
+/* zoom */
+let scale=1; const inner=document.getElementById("mapInner");
+function setScale(s){ scale=Math.min(1.6,Math.max(.4,s)); inner.style.transform=`scale(${scale})`; inner.style.width=(width*scale)+"px"; inner.style.height=(height*scale)+"px"; }
+document.getElementById("zIn").onclick=()=>setScale(scale+.15);
+document.getElementById("zOut").onclick=()=>setScale(scale-.15);
+document.getElementById("zFit").onclick=()=>setScale((document.getElementById("mapScroll").clientWidth-20)/width);
+setScale((document.getElementById("mapScroll").clientWidth-20)/width || 1);
+
+/* ---------- NODE LIST ---------- */
+const listEl=document.getElementById("nodeList");
+[...new Set(nodes.map(n=>n.lop))].sort((a,b)=>a-b).forEach(l=>{
+  const block=document.createElement("div"); block.className="gradeblock";
+  block.innerHTML=`<h3>Lớp ${l} <span style="font-weight:400;color:var(--muted)">· ${capName(l)}</span></h3><div class="ncards"></div>`;
+  nodes.filter(n=>n.lop===l).forEach(n=>{
+    const card=document.createElement("div"); card.className="ncard"; card.id="ncard-"+n.id;
+    card.style.borderLeftColor = n.mo? "#b6c0d4" : CAPCOLOR[n.cap];
+    card.innerHTML=`<h4>${esc(n.ten)} ${n.mo?`<span class="badge" style="background:#eef1f6;color:#7c88a3">mờ</span>`:""}</h4>
+      <div class="src">Nguyên văn CT: <i>${esc(n.chuDeCon)}</i> (chủ đề: ${esc(n.chuDe)})</div>
+      <ul>${n.yccd.map(y=>`<li>${esc(y)}</li>`).join("")}</ul>
+      <div class="pre"><b>Cần học trước:</b> ${n.tienQuyet.length? n.tienQuyet.map(t=>`<span class="chip" data-go="${t}">${esc(byId.get(t).ten)} (L${byId.get(t).lop})</span>`).join(""):"— node gốc"}</div>`;
+    block.querySelector(".ncards").appendChild(card);
+  });
+  listEl.appendChild(block);
+});
+listEl.addEventListener("click",ev=>{
+  const chip=ev.target.closest(".chip"); if(!chip) return;
+  const t=document.getElementById("ncard-"+chip.dataset.go);
+  if(t){ t.scrollIntoView({behavior:"smooth",block:"center"}); t.style.boxShadow="0 0 0 3px rgba(47,95,208,.4)"; setTimeout(()=>t.style.boxShadow="",1600); }
+});
+
+/* ---------- SUGGESTIONS ---------- */
+const approved=new Set();
+const sugEl=document.getElementById("sugList");
+if (SUGGESTED.length===0) sugEl.innerHTML = `<div class="card" style="font-size:15px">✅ Không còn cạnh nào chờ duyệt — mọi đề xuất đã được duyệt và merge vào graph (hiển thị thành cạnh xám trên bản đồ).</div>`;
+SUGGESTED.forEach((e,i)=>{
+  const a=byId.get(e.tienQuyet), b=byId.get(e.node);
+  const card=document.createElement("div"); card.className="scard"; card.id="scard-"+i;
+  card.innerHTML=`<div class="shead"><div class="snum">S${i+1}</div>
+      <div class="sedge">${esc(a.ten)}<span class="lop">Lớp ${a.lop}</span><span class="arrow">→</span>${esc(b.ten)}<span class="lop">Lớp ${b.lop}</span></div></div>
+    <div class="sbody">
+      <p><b>Lý do:</b> ${esc(e.lyDo)}</p>
+      <div class="cancu"><b>Căn cứ YCCĐ:</b> ${esc(e.canCu)}</div>
+    </div>
+    <div class="sactions"><button class="okbtn" data-i="${i}">✓ Đồng ý cạnh này</button></div>`;
+  sugEl.appendChild(card);
+});
+sugEl.addEventListener("click",ev=>{
+  const btn=ev.target.closest(".okbtn"); if(!btn) return;
+  const i=+btn.dataset.i, card=document.getElementById("scard-"+i);
+  if(approved.has(i)){ approved.delete(i); card.classList.remove("approved"); btn.textContent="✓ Đồng ý cạnh này"; }
+  else { approved.add(i); card.classList.add("approved"); btn.textContent="✓ Đã đồng ý — bấm để bỏ"; }
+  document.getElementById("barCount").textContent = approved.size+" cạnh được chọn";
+});
+document.getElementById("genBtn").addEventListener("click",()=>{
+  const sel=[...approved].sort((a,b)=>a-b).map(i=>SUGGESTED[i]);
+  document.getElementById("out").value=JSON.stringify(sel,null,2);
+  document.getElementById("outWrap").classList.add("show");
+  document.getElementById("barMsg").textContent="→ lưu thành app/data/edges-approved.json rồi chạy build-graph + check-graph";
+  document.getElementById("out").scrollIntoView({behavior:"smooth",block:"center"});
+});
+document.getElementById("copyBtn").addEventListener("click",()=>{
+  const ta=document.getElementById("out"); if(!ta.value){ document.getElementById("barMsg").textContent="Bấm 'Tạo JSON' trước đã."; return; }
+  ta.select(); document.execCommand("copy"); document.getElementById("barMsg").textContent="Đã copy vào clipboard ✓";
+});
+
+/* ---------- TABS ---------- */
+function showTab(name){
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===name));
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id==="tab-"+name));
+  document.getElementById("bar").classList.toggle("show",name==="sug");
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>showTab(b.dataset.tab)));
+showTab("map");
+</script>
+</body>
+</html>
