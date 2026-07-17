@@ -1140,91 +1140,111 @@ export default function StudentTutorPage() {
               {/* Right Column: BKT Gauge, Questions & Socratic Inline Helper */}
               <div className="flex-1 bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm overflow-y-auto">
                 
-                {/* 1. BKT Circular Progress Gauge */}
-                {(() => {
-                  const bkt = getBktScoreForNode(selectedNode.id);
-                  const masteryPercent = Math.round(bkt.mastery * 100);
-                  const confidencePercent = Math.round(bkt.confidence * 100);
-                  return (
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      {/* Card 1: Mastery */}
-                      <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
-                        {/* Tooltip - below card */}
-                        <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
-                          <div className="font-extrabold mb-1 text-[var(--mint)] flex items-center gap-1">
-                            <Compass size={11} /> Độ thông thạo
-                          </div>
-                          Được tính từ tỷ lệ trả lời đúng và mức độ hiểu sâu kiến thức. Khi đạt trên 85%, em đã thông suốt chủ đề này!
-                        </div>
-
-                        <div className="relative w-24 h-14 flex justify-center mb-1">
-                          <svg className="w-24 h-14" viewBox="0 0 80 40">
-                            <path
-                              d="M 10 40 A 30 30 0 0 1 70 40"
-                              fill="transparent"
-                              className="stroke-slate-100"
-                              strokeWidth="5.5"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M 10 40 A 30 30 0 0 1 70 40"
-                              fill="transparent"
-                              className="stroke-[var(--mint)] transition-all duration-500 ease-out"
-                              strokeWidth="5.5"
-                              strokeLinecap="round"
-                              strokeDasharray="94.2"
-                              strokeDashoffset={94.2 - (94.2 * bkt.mastery)}
-                            />
-                          </svg>
-                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
-                            <span className="text-sm font-black text-slate-800">{masteryPercent}%</span>
-                          </div>
-                        </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
-                          Độ thông thạo <HelpCircle size={10} className="text-slate-355" />
-                        </span>
-                      </div>
-
-                      {/* Card 2: Confidence */}
-                      <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
-                        {/* Tooltip - below card */}
-                        <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
-                          <div className="font-extrabold mb-1 text-[var(--purple)] flex items-center gap-1">
-                            <Award size={11} /> Độ tự tin (BKT)
-                          </div>
-                          Chỉ số ước lượng bằng thuật toán Bayesian Knowledge Tracing. Đánh giá xác suất em thực sự nắm vững kiến thức, loại bỏ yếu tố may rủi.
-                        </div>
-
-                        <div className="relative w-24 h-14 flex justify-center mb-1">
-                          <svg className="w-24 h-14" viewBox="0 0 80 40">
-                            <path
-                              d="M 10 40 A 30 30 0 0 1 70 40"
-                              fill="transparent"
-                              className="stroke-slate-100"
-                              strokeWidth="5.5"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M 10 40 A 30 30 0 0 1 70 40"
-                              fill="transparent"
-                              className="stroke-[var(--purple)] transition-all duration-500 ease-out"
-                              strokeWidth="5.5"
-                              strokeLinecap="round"
-                              strokeDasharray="94.2"
-                              strokeDashoffset={94.2 - (94.2 * bkt.confidence)}
-                            />
-                          </svg>
-                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
-                            <span className="text-sm font-black text-slate-800">{confidencePercent}%</span>
-                          </div>
-                        </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
-                          Độ tự tin <HelpCircle size={10} className="text-slate-355" />
-                        </span>
-                      </div>
+                {/* 1. Conditional Progress Header: Gauge for Practice, Test Card for Diagnostic */}
+                {quizMode === "diagnostic" ? (
+                  <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-5 text-white shadow-md flex items-center justify-between mb-6 animate-[fadeIn_0.2s_ease-out]">
+                    <div className="space-y-1.5">
+                      <span className="text-[9px] bg-white/20 text-white font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full font-mono">
+                        Chế độ Chẩn đoán Năng lực
+                      </span>
+                      <h3 className="text-sm font-black uppercase tracking-tight">
+                        Bài đánh giá năng lực thích ứng
+                      </h3>
+                      <p className="text-[10px] text-blue-100/90 font-medium">
+                        Làm bài hết sức mình. Hệ thống sẽ tự động đo đạc, phân tích lỗ hổng và xếp lớp chính xác cho em.
+                      </p>
                     </div>
-                  );
-                })()}
+                    <div className="text-right shrink-0 bg-white/10 px-4 py-2 rounded-2xl border border-white/25">
+                      <span className="text-2xl font-black leading-none block">{currentQIndex + 1}</span>
+                      <span className="text-[9px] text-blue-200 font-extrabold uppercase tracking-wide">Câu hỏi</span>
+                    </div>
+                  </div>
+                ) : (
+                  (() => {
+                    const bkt = getBktScoreForNode(selectedNode.id);
+                    const masteryPercent = Math.round(bkt.mastery * 100);
+                    const confidencePercent = Math.round(bkt.confidence * 100);
+                    return (
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        {/* Card 1: Mastery */}
+                        <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
+                          {/* Tooltip - below card */}
+                          <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
+                            <div className="font-extrabold mb-1 text-[var(--mint)] flex items-center gap-1">
+                              <Compass size={11} /> Độ thông thạo
+                            </div>
+                            Được tính từ tỷ lệ trả lời đúng và mức độ hiểu sâu kiến thức. Khi đạt trên 85%, em đã thông suốt chủ đề này!
+                          </div>
+
+                          <div className="relative w-24 h-14 flex justify-center mb-1">
+                            <svg className="w-24 h-14" viewBox="0 0 80 40">
+                              <path
+                                d="M 10 40 A 30 30 0 0 1 70 40"
+                                fill="transparent"
+                                className="stroke-slate-100"
+                                strokeWidth="5.5"
+                                strokeLinecap="round"
+                              />
+                              <path
+                                d="M 10 40 A 30 30 0 0 1 70 40"
+                                fill="transparent"
+                                className="stroke-[var(--mint)] transition-all duration-500 ease-out"
+                                strokeWidth="5.5"
+                                strokeLinecap="round"
+                                strokeDasharray="94.2"
+                                strokeDashoffset={94.2 - (94.2 * bkt.mastery)}
+                              />
+                            </svg>
+                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+                              <span className="text-sm font-black text-slate-800">{masteryPercent}%</span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
+                            Độ thông thạo <HelpCircle size={10} className="text-slate-355" />
+                          </span>
+                        </div>
+
+                        {/* Card 2: Confidence */}
+                        <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
+                          {/* Tooltip - below card */}
+                          <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
+                            <div className="font-extrabold mb-1 text-[var(--purple)] flex items-center gap-1">
+                              <Award size={11} /> Độ tự tin (BKT)
+                            </div>
+                            Chỉ số ước lượng bằng thuật toán Bayesian Knowledge Tracing. Đánh giá xác suất em thực sự nắm vững kiến thức, loại bỏ yếu tố may rủi.
+                          </div>
+
+                          <div className="relative w-24 h-14 flex justify-center mb-1">
+                            <svg className="w-24 h-14" viewBox="0 0 80 40">
+                              <path
+                                d="M 10 40 A 30 30 0 0 1 70 40"
+                                fill="transparent"
+                                className="stroke-slate-100"
+                                strokeWidth="5.5"
+                                strokeLinecap="round"
+                              />
+                              <path
+                                d="M 10 40 A 30 30 0 0 1 70 40"
+                                fill="transparent"
+                                className="stroke-[var(--purple)] transition-all duration-500 ease-out"
+                                strokeWidth="5.5"
+                                strokeLinecap="round"
+                                strokeDasharray="94.2"
+                                strokeDashoffset={94.2 - (94.2 * bkt.confidence)}
+                              />
+                            </svg>
+                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+                              <span className="text-sm font-black text-slate-800">{confidencePercent}%</span>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
+                            Độ tự tin <HelpCircle size={10} className="text-slate-355" />
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
 
                 {/* 2. Practice Questions & Actions */}
                 {filteredQuestions.length > 0 ? (
@@ -1337,14 +1357,16 @@ export default function StudentTutorPage() {
                             {submitting ? "Đang gửi..." : "Gửi đáp án"}
                           </button>
 
-                          <button
-                            onClick={handleRequestHint}
-                            disabled={hintLoading || submitting}
-                            className="bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-50 font-black text-xs px-4.5 py-3.5 rounded-2xl transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5 duration-200"
-                          >
-                            <Sparkles size={13} className="text-indigo-600" />
-                            {hintPressCount === 0 ? "Xem gợi ý" : hintPressCount === 1 ? "Gợi ý 2" : hintPressCount === 2 ? "Gợi ý 3" : "Hết gợi ý"}
-                          </button>
+                          {quizMode === "practice" && (
+                            <button
+                              onClick={handleRequestHint}
+                              disabled={hintLoading || submitting}
+                              className="bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-50 font-black text-xs px-4.5 py-3.5 rounded-2xl transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5 duration-200"
+                            >
+                              <Sparkles size={13} className="text-indigo-600" />
+                              {hintPressCount === 0 ? "Xem gợi ý" : hintPressCount === 1 ? "Gợi ý 2" : hintPressCount === 2 ? "Gợi ý 3" : "Hết gợi ý"}
+                            </button>
+                          )}
 
                           <button
                             onClick={handleCantDo}
@@ -1431,59 +1453,61 @@ export default function StudentTutorPage() {
                         )}
 
                         {/* 3. Inline Socratic Question RAG Chatbot Helper */}
-                        <div className="pt-6 border-t border-slate-200 space-y-3 bg-indigo-50/20 p-4 rounded-[24px] border border-indigo-100/60 shadow-inner mt-4">
-                          <div className="flex items-center gap-2">
-                            <MessageSquare size={13} className="text-indigo-650" />
-                            <h4 className="text-xs font-black text-slate-850">Cần trợ giúp? Trò chuyện Socratic về câu hỏi này</h4>
-                          </div>
+                        {quizMode === "practice" && (
+                          <div className="pt-6 border-t border-slate-200 space-y-3 bg-indigo-50/20 p-4 rounded-[24px] border border-indigo-100/60 shadow-inner mt-4">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare size={13} className="text-indigo-650" />
+                              <h4 className="text-xs font-black text-slate-855">Cần trợ giúp? Trò chuyện Socratic về câu hỏi này</h4>
+                            </div>
 
-                          {/* Question Chat logs */}
-                          <div className="max-h-[220px] overflow-y-auto border border-slate-100/80 rounded-2xl p-3 bg-white space-y-2 text-[11px] font-semibold">
-                            {qChat.length === 0 ? (
-                              <div className="text-center py-4 text-slate-400 font-semibold">
-                                Chưa có hội thoại. Nhập câu hỏi bên dưới để bắt đầu thảo luận Socratic với AI về bài tập này nhé!
-                              </div>
-                            ) : (
-                              qChat.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                                  <div className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm transition-all ${
-                                    msg.sender === "student"
-                                      ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
-                                      : "bg-indigo-50/70 border-indigo-100 text-indigo-950 rounded-bl-none"
-                                  }`}>
-                                    {msg.content}
+                            {/* Question Chat logs */}
+                            <div className="max-h-[220px] overflow-y-auto border border-slate-100/80 rounded-2xl p-3 bg-white space-y-2 text-[11px] font-semibold">
+                              {qChat.length === 0 ? (
+                                <div className="text-center py-4 text-slate-400 font-semibold">
+                                  Chưa có hội thoại. Nhập câu hỏi bên dưới để bắt đầu thảo luận Socratic với AI về bài tập này nhé!
+                                </div>
+                              ) : (
+                                qChat.map((msg, idx) => (
+                                  <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
+                                    <div className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm transition-all ${
+                                      msg.sender === "student"
+                                        ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
+                                        : "bg-indigo-50/70 border-indigo-100 text-indigo-950 rounded-bl-none"
+                                    }`}>
+                                      {msg.content}
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                              {questionChatLoading && (
+                                <div className="flex justify-start animate-pulse">
+                                  <div className="bg-indigo-50/70 border border-indigo-100 text-indigo-400 rounded-2xl rounded-bl-none px-3.5 py-1.5 flex items-center gap-1">
+                                    <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce" />
+                                    <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce [animation-delay:0.2s]" />
                                   </div>
                                 </div>
-                              ))
-                            )}
-                            {questionChatLoading && (
-                              <div className="flex justify-start animate-pulse">
-                                <div className="bg-indigo-50/70 border border-indigo-100 text-indigo-400 rounded-2xl rounded-bl-none px-3.5 py-1.5 flex items-center gap-1">
-                                  <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce" />
-                                  <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce [animation-delay:0.2s]" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                              )}
+                            </div>
 
-                          {/* Question Chat Input form */}
-                          <form onSubmit={(e) => handleSendQuestionChat(e, currentQ.id)} className="relative flex items-center border border-slate-250/70 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-50 bg-white rounded-2xl transition-all duration-200 p-1.5 shadow-sm">
-                            <input
-                              type="text"
-                              placeholder="Hỏi AI về câu hỏi này..."
-                              value={questionChatInput}
-                              onChange={(e) => setQuestionChatInput(e.target.value)}
-                              className="flex-1 bg-transparent text-xs px-2.5 py-2 text-zinc-950 focus:outline-none font-semibold"
-                            />
-                            <button
-                              type="submit"
-                              disabled={questionChatLoading || !questionChatInput.trim()}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
-                            >
-                              <Send size={12} />
-                            </button>
-                          </form>
-                        </div>
+                            {/* Question Chat Input form */}
+                            <form onSubmit={(e) => handleSendQuestionChat(e, currentQ.id)} className="relative flex items-center border border-slate-250/70 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-50 bg-white rounded-2xl transition-all duration-200 p-1.5 shadow-sm">
+                              <input
+                                type="text"
+                                placeholder="Hỏi AI về câu hỏi này..."
+                                value={questionChatInput}
+                                onChange={(e) => setQuestionChatInput(e.target.value)}
+                                className="flex-1 bg-transparent text-xs px-2.5 py-2 text-zinc-955 focus:outline-none font-semibold"
+                              />
+                              <button
+                                type="submit"
+                                disabled={questionChatLoading || !questionChatInput.trim()}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
+                              >
+                                <Send size={12} />
+                              </button>
+                            </form>
+                          </div>
+                        )}
                       </div>
                     );
                   })()
