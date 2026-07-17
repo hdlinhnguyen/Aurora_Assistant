@@ -304,6 +304,7 @@ export default function StudentTutorPage() {
   };
 
   const handleNodeClick = (node: NodeItem) => {
+    console.log("[DEBUG] tutor/page.tsx handleNodeClick called with:", node.name);
     // If student state is nil and node is not root, they must click root or select first
     if (!studentState && !node.isRoot) {
       alert("Vui lòng chọn nút Gốc (Tên môn học) để bắt đầu lộ trình học!");
@@ -320,6 +321,7 @@ export default function StudentTutorPage() {
 
     setNodeForPurpose(node);
     setShowPurposeModal(true);
+    console.log("[DEBUG] tutor/page.tsx showPurposeModal set to true");
   };
 
   const handleStartNodeMode = (node: NodeItem, selectedMode: "theory" | "practice" | "diagnostic") => {

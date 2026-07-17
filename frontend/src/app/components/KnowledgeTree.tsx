@@ -383,6 +383,11 @@ export default function KnowledgeTree({
     if (onFocusedNodeChange) {
       onFocusedNodeChange(node.id);
     }
+
+    // Call prop callback to notify parent tutor page
+    if (onNodeClick) {
+      onNodeClick(node);
+    }
   };
 
   const createNewEdge = async (sourceId: string, targetId: string) => {
