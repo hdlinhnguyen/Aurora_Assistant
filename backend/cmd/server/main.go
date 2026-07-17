@@ -222,8 +222,10 @@ func main() {
 	api.Post("/subjects/:subject/edges", tutorHandler.CreateEdge)
 	api.Delete("/subjects/edges/:id", tutorHandler.DeleteEdge)
 
+	api.Get("/subjects/:subject/questions", tutorHandler.GetSubjectQuestions)
 	api.Get("/nodes/:nodeId/questions", tutorHandler.GetQuestions)
 	api.Post("/nodes/:nodeId/questions", tutorHandler.CreateQuestion)
+	api.Post("/nodes/:nodeId/questions/bulk", tutorHandler.CreateQuestionsBulk)
 	api.Put("/questions/:id", tutorHandler.UpdateQuestion)
 	api.Delete("/questions/:id", tutorHandler.DeleteQuestion)
 
@@ -243,6 +245,7 @@ func main() {
 	api.Post("/student/hints", tutorHandler.RequestHint)
 
 	api.Get("/teacher/students-progress", tutorHandler.GetStudentsProgress)
+	api.Get("/teacher/monitoring/:subject", tutorHandler.GetMonitoringData)
 	api.Get("/teacher/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)
 	api.Post("/teacher/students/:studentId/re-diagnostic", tutorHandler.RequestReDiagnostic)
 

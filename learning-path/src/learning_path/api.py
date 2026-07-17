@@ -44,8 +44,8 @@ DEFAULT_GRAPH_JSON = Path(__file__).resolve().parents[3] / "knowledge-graph" / "
 
 class CreatePathBody(BaseModel):
     request: LearningPathRequest
-    raw_quiz: list[RawQuizEvidence] = Field(default_factory=list)
-    raw_paper: list[RawPaperEvidence] = Field(default_factory=list)
+    raw_quiz: list[RawQuizEvidence] | None = Field(default_factory=list)
+    raw_paper: list[RawPaperEvidence] | None = Field(default_factory=list)
     as_of: datetime
 
 
@@ -55,8 +55,8 @@ class ApproveBody(BaseModel):
 
 
 class EvidenceBody(BaseModel):
-    raw_quiz: list[RawQuizEvidence] = Field(default_factory=list)
-    raw_paper: list[RawPaperEvidence] = Field(default_factory=list)
+    raw_quiz: list[RawQuizEvidence] | None = Field(default_factory=list)
+    raw_paper: list[RawPaperEvidence] | None = Field(default_factory=list)
     as_of: datetime
 
 
@@ -146,8 +146,8 @@ def create_app(
         result = pipeline.invoke(
             {
                 "request": body.request,
-                "raw_quiz": body.raw_quiz,
-                "raw_paper": body.raw_paper,
+                "raw_quiz": body.raw_quiz or [],
+                "raw_paper": body.raw_paper or [],
                 "as_of": body.as_of,
                 "path_version": 1,
             },
@@ -187,8 +187,8 @@ def create_app(
         result = pipeline.invoke(
             {
                 "request": current["request"],
-                "raw_quiz": current.get("raw_quiz", []) + body.raw_quiz,
-                "raw_paper": current.get("raw_paper", []) + body.raw_paper,
+                "raw_quiz": current.get("raw_quiz", []) + (body.raw_quiz or []),
+                "raw_paper": current.get("raw_paper", []) + (body.raw_paper or []),
                 "as_of": body.as_of,
                 "path_version": next_version,
             },

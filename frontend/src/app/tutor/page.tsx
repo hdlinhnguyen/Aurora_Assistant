@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle } from "lucide-react";
 import KnowledgeTree from "../components/KnowledgeTree";
 
@@ -249,7 +250,7 @@ export default function StudentTutorPage() {
       setHintPressCount(nextPressCount);
       setActiveHint(res.content || "Chưa có gợi ý nào cho cấp độ này.");
     } catch (err: any) {
-      alert("Không thể tải gợi ý: " + err.message);
+      toast.error("Không thể tải gợi ý: " + err.message);
     } finally {
       setHintLoading(false);
     }
@@ -266,7 +267,7 @@ export default function StudentTutorPage() {
       setSelectedNode(node);
       setDrawerTab("theory");
     } catch (err: any) {
-      alert("Lỗi khi bắt đầu học: " + err.message);
+      toast.error("Lỗi khi bắt đầu học: " + err.message);
     }
   };
 
@@ -336,7 +337,7 @@ export default function StudentTutorPage() {
     console.log("[DEBUG] tutor/page.tsx handleNodeClick called with:", node.name);
     // If student state is nil and node is not root, they must click root or select first
     if (!studentState && !node.isRoot) {
-      alert("Vui lòng chọn nút Gốc (Tên môn học) để bắt đầu lộ trình học!");
+      toast.warning("Vui lòng chọn nút Gốc (Tên môn học) để bắt đầu lộ trình học!");
       return;
     }
 
@@ -478,13 +479,17 @@ export default function StudentTutorPage() {
         method: "POST"
       });
       if (res.hasParent) {
-        alert(`⚠️ NHẬN DIỆN HỔNG KIẾN THỨC NỀN: Phần này có vẻ hơi khó với em. Hãy cùng ôn tập bài học nền tảng "${res.parentName}" trước nhé!`);
+        toast.warning("HẠ CẤP THÍCH ỨNG", {
+          description: `⚠️ NHẬN DIỆN HỔNG KIẾN THỨC NỀN: Phần này có vẻ hơi khó với em. Hãy cùng ôn tập bài học nền tảng "${res.parentName}" trước nhé!`
+        });
         const parentNode = nodes.find(n => n.id === res.parentId);
         if (parentNode) {
           handleStartNodeMode(parentNode, "practice");
         }
       } else {
-        alert("⚠️ HỔNG KIẾN THỨC: Em đã dùng hết gợi ý nhưng chưa vượt qua được thử thách này. Hãy đọc lại lý thuyết nhé!");
+        toast.warning("HỔNG KIẾN THỨC", {
+          description: "⚠️ Em đã dùng hết gợi ý nhưng chưa vượt qua được thử thách này. Hãy đọc lại lý thuyết nhé!"
+        });
         setDrawerTab("theory");
       }
       loadStudentState();
@@ -550,7 +555,7 @@ export default function StudentTutorPage() {
         }
       }
     } catch (err: any) {
-      alert("Lỗi khi nộp bài: " + err.message);
+      toast.error("Lỗi khi nộp bài: " + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -576,7 +581,7 @@ export default function StudentTutorPage() {
       setTimeout(() => setShake(false), 500);
       loadStudentState(); // reload logs
     } catch (err: any) {
-      alert("Lỗi xử lý: " + err.message);
+      toast.error("Lỗi xử lý: " + err.message);
     } finally {
       setSubmitting(false);
     }
@@ -1004,7 +1009,7 @@ export default function StudentTutorPage() {
                   if (selectedNode) {
                     handleShowContent(selectedNode);
                   } else {
-                    alert("Vui lòng click chọn một bài học trên Sơ đồ Cây trước!");
+                    toast.warning("Vui lòng click chọn một bài học trên Sơ đồ Cây trước!");
                   }
                 }}
                 className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${

@@ -13,6 +13,15 @@ import (
 	"gorm.io/gorm"
 )
 
+type StudentStat struct {
+	StudentID      string  `json:"studentId"`
+	StudentName    string  `json:"studentName"`
+	TotalAnswers   int     `json:"totalAnswers"`
+	CorrectAnswers int     `json:"correctAnswers"`
+	MasteryRate    float64 `json:"masteryRate"`
+	IsOutlier      bool    `json:"isOutlier"`
+}
+
 type TutorService interface {
 	CreateSession(studentID uuid.UUID, topic string, mode string) (*model.ChatSession, error)
 	GetStudentSessions(studentID uuid.UUID) ([]model.ChatSession, error)
@@ -40,6 +49,7 @@ type TutorService interface {
 
 	// Questions
 	GetQuestions(nodeID uuid.UUID) ([]model.Question, error)
+	GetSubjectQuestions(subject string) ([]model.Question, error)
 	CreateQuestion(q *model.Question) error
 	UpdateQuestion(qID uuid.UUID, updates map[string]interface{}) error
 	DeleteQuestion(qID uuid.UUID) error
@@ -56,6 +66,7 @@ type TutorService interface {
 	// Teacher Dashboard Progress
 	GetStudentsProgress() ([]map[string]interface{}, error)
 	GetStudentSubjectProgress(studentID uuid.UUID, subject string) (map[string]interface{}, error)
+	GetMonitoringData(subject string) ([]StudentStat, error)
 
 	// Socratic RAG Chat
 	ChatNodeTheory(nodeID uuid.UUID, message string, history []map[string]string) (string, error)
@@ -311,6 +322,17 @@ func (s *tutorService) DeleteEdge(edgeID uuid.UUID) error {
 func (s *tutorService) GetQuestions(nodeID uuid.UUID) ([]model.Question, error) {
 	var questions []model.Question
 	err := s.db.Where("node_id = ?", nodeID).Order("created_at asc").Find(&questions).Error
+	return questions, err
+}
+
+func (s *tutorService) GetSubjectQuestions(subject string) ([]model.Question, error) {
+	var questions []model.Question
+	err := s.db.Table("questions").
+		Select("questions.*").
+		Joins("join nodes on questions.node_id = nodes.id").
+		Where("nodes.subject = ? AND questions.deleted_at IS NULL", subject).
+		Order("questions.created_at asc").
+		Find(&questions).Error
 	return questions, err
 }
 
@@ -1247,6 +1269,44 @@ func (s *tutorService) SaveTree(subject string, finalGraph ParsedGraph) error {
 	}
 	fmt.Println("[CURRICULUM PARSER] HOÀN TẤT LƯU CÂY KIẾN THỨC THÀNH CÔNG!")
 	return nil
+}
+
+func (s *tutorService) GetMonitoringData(subject string) ([]StudentStat, error) {
+	var students []model.User
+	if err := s.db.Where("role = ?", "student").Order("name asc").Find(&students).Error; err != nil {
+		return nil, err
+	}
+
+	var stats []StudentStat
+	for _, student := range students {
+		var total int64
+		var correct int64
+
+		s.db.Model(&model.ActivityLog{}).
+			Where("student_id = ? AND subject = ? AND action IN ('answer_correct', 'answer_incorrect')", student.ID, subject).
+			Count(&total)
+
+		s.db.Model(&model.ActivityLog{}).
+			Where("student_id = ? AND subject = ? AND action = 'answer_correct'", student.ID, subject).
+			Count(&correct)
+
+		rate := 0.0
+		if total > 0 {
+			rate = float64(correct) / float64(total)
+		}
+
+		isOutlier := total > 3 && rate < 0.40
+
+		stats = append(stats, StudentStat{
+			StudentID:      student.ID.String(),
+			StudentName:    student.Name,
+			TotalAnswers:   int(total),
+			CorrectAnswers: int(correct),
+			MasteryRate:    rate * 100,
+			IsOutlier:      isOutlier,
+		})
+	}
+	return stats, nil
 }
 
 

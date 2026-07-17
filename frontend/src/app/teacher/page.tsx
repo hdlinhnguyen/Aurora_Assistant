@@ -3,6 +3,22 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine
+} from "recharts";
 import KnowledgeTree from "../components/KnowledgeTree";
 import { 
   Users, 
@@ -28,7 +44,10 @@ import {
   ChevronRight,
   ListTodo,
   Check,
-  RefreshCw
+  RefreshCw,
+  Database,
+  TrendingUp,
+  BarChart2
 } from "lucide-react";
 
 interface NodeItem {
@@ -86,7 +105,7 @@ interface Question {
   difficulty: string;
 }
 
-type ActiveTab = "students" | "graph-designer" | "learning-path";
+type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring";
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -102,6 +121,7 @@ export default function TeacherDashboard() {
   const [selectedTargetTopics, setSelectedTargetTopics] = useState<string[]>([]);
   const [generatingPath, setGeneratingPath] = useState(false);
   const [approvingPath, setApprovingPath] = useState(false);
+  const [pathErrorDetail, setPathErrorDetail] = useState<string | null>(null);
 
   // Graph Data
   const [nodes, setNodes] = useState<NodeItem[]>([]);
@@ -114,6 +134,12 @@ export default function TeacherDashboard() {
   const [studentsProgress, setStudentsProgress] = useState<StudentProgress[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentProgress | null>(null);
   const [studentDetail, setStudentDetail] = useState<StudentDetailProgress | null>(null);
+  const [subjectQuestions, setSubjectQuestions] = useState<Question[]>([]);
+  const [qbSearchText, setQbSearchText] = useState("");
+  const [qbFilterNodeId, setQbFilterNodeId] = useState("");
+  const [qbFilterDifficulty, setQbFilterDifficulty] = useState("");
+  const [monitoringStats, setMonitoringStats] = useState<any[]>([]);
+  const [loadingMonitoring, setLoadingMonitoring] = useState(false);
   const [studentNodeStatus, setStudentNodeStatus] = useState<Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -157,14 +183,154 @@ export default function TeacherDashboard() {
     loadStudentsProgress();
   }, [router]);
 
+  const loadSubjectQuestions = async () => {
+    if (!selectedSubject) return;
+    try {
+      const data = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/questions`);
+      setSubjectQuestions(data || []);
+    } catch (err) {
+      console.error("Failed to load subject questions:", err);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = ["Chủ đề", "Câu hỏi", "Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D", "Đáp án đúng (0-3)", "Độ khó (easy/medium/hard)"];
+    const sampleRows = [
+      ["Cộng phân số cùng mẫu", "Tính 1/5 + 2/5 = ?", "3/5", "4/5", "5/5", "2/5", 0, "easy"],
+      ["Cộng phân số cùng mẫu", "Tính 3/7 + 2/7 = ?", "5/14", "5/7", "1/7", "6/7", 1, "easy"],
+      ["Cộng phân số khác mẫu", "Tính 1/2 + 1/3 = ?", "2/5", "5/6", "1/5", "5/5", 1, "medium"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "mau_nhap_cau_hoi.xlsx");
+    toast.success("Đã tải xuống file mẫu Excel!");
+  };
+
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLoading(true);
+    setLoadingMessage("Đang đọc và phân tích file Excel...");
+    
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
+        
+        if (data.length <= 1) {
+          toast.warning("File Excel không có dữ liệu câu hỏi.");
+          setLoading(false);
+          return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+        const questionsByNode: Record<string, any[]> = {};
+        
+        for (let i = 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row || row.length < 2) continue;
+          
+          const topicName = row[0]?.toString().trim();
+          const content = row[1]?.toString().trim();
+          const optA = row[2]?.toString().trim() || "";
+          const optB = row[3]?.toString().trim() || "";
+          const optC = row[4]?.toString().trim() || "";
+          const optD = row[5]?.toString().trim() || "";
+          let correctOption = parseInt(row[6]?.toString().trim());
+          if (isNaN(correctOption)) correctOption = 0;
+          const difficulty = row[7]?.toString().trim().toLowerCase() || "medium";
+          
+          if (!topicName || !content) {
+            failCount++;
+            continue;
+          }
+          
+          const matchedNode = nodes.find(n => n.name.toLowerCase() === topicName.toLowerCase());
+          if (!matchedNode) {
+            failCount++;
+            continue;
+          }
+          
+          const options = [optA, optB, optC, optD];
+          const questionPayload = {
+            content: content,
+            optionsJson: JSON.stringify(options),
+            correctOption: correctOption,
+            difficulty: difficulty
+          };
+          
+          if (!questionsByNode[matchedNode.id]) {
+            questionsByNode[matchedNode.id] = [];
+          }
+          questionsByNode[matchedNode.id].push(questionPayload);
+        }
+        
+        for (const nodeId in questionsByNode) {
+          const qs = questionsByNode[nodeId];
+          await apiFetch(`/nodes/${nodeId}/questions/bulk`, {
+            method: "POST",
+            body: JSON.stringify(qs)
+          });
+          successCount += qs.length;
+        }
+        
+        toast.success(`Nhập Excel thành công: Đã import ${successCount} câu hỏi!`, {
+          description: failCount > 0 ? `Bỏ qua ${failCount} dòng do không khớp tên chủ đề hoặc thiếu thông tin.` : undefined
+        });
+        
+        loadSubjectQuestions();
+        if (editingNode) {
+          loadNodeQuestions(editingNode.id);
+        }
+      } catch (err: any) {
+        toast.error("Lỗi khi đọc file Excel: " + err.message);
+      } finally {
+        setLoading(false);
+        e.target.value = "";
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const loadMonitoringData = async () => {
+    if (!selectedSubject) return;
+    setLoadingMonitoring(true);
+    try {
+      const data = await apiFetch(`/teacher/monitoring/${encodeURIComponent(selectedSubject)}`);
+      setMonitoringStats(data || []);
+    } catch (err) {
+      console.error("Failed to load monitoring stats:", err);
+    } finally {
+      setLoadingMonitoring(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedSubject) {
       loadTreeData();
       if (selectedStudent) {
         loadStudentDetailProgress(selectedStudent.studentId);
       }
+      loadSubjectQuestions();
+      loadMonitoringData();
     }
   }, [selectedSubject]);
+
+  useEffect(() => {
+    if (activeTab === "question-bank" && selectedSubject) {
+      loadSubjectQuestions();
+    }
+    if (activeTab === "monitoring" && selectedSubject) {
+      loadMonitoringData();
+    }
+  }, [activeTab, selectedSubject]);
 
   const loadSubjects = async (selectSubjectName?: string) => {
     try {
@@ -172,7 +338,11 @@ export default function TeacherDashboard() {
       setSubjects(data || []);
       if (selectSubjectName && data && data.includes(selectSubjectName)) {
         setSelectedSubject(selectSubjectName);
-      } else if (selectedSubject && data && !data.includes(selectedSubject)) {
+      } else if (selectedSubject && data && data.includes(selectedSubject)) {
+        // Keep currently selected
+      } else if (data && data.length > 0) {
+        setSelectedSubject(data[0]);
+      } else {
         setSelectedSubject("");
       }
     } catch (err) {
@@ -200,10 +370,10 @@ export default function TeacherDashboard() {
         method: "POST",
         body: JSON.stringify(rootNode),
       });
-      alert(`Đã tạo môn học "${trimmed}" thành công!`);
+      toast.success(`Đã tạo môn học "${trimmed}" thành công!`);
       await loadSubjects(trimmed);
     } catch (err: any) {
-      alert("Lỗi khi tạo môn học: " + (err.message || err));
+      toast.error("Lỗi khi tạo môn học: " + (err.message || err));
     } finally {
       setLoading(false);
       setLoadingMessage("");
@@ -223,7 +393,7 @@ export default function TeacherDashboard() {
         method: "PUT",
         body: JSON.stringify({ newName: trimmed }),
       });
-      alert("Đổi tên môn học thành công!");
+      toast.success("Đổi tên môn học thành công!");
       
       if (selectedSubject === subjectName) {
         await loadSubjects(trimmed);
@@ -231,7 +401,7 @@ export default function TeacherDashboard() {
         await loadSubjects();
       }
     } catch (err: any) {
-      alert("Lỗi khi đổi tên môn học: " + (err.message || err));
+      toast.error("Lỗi khi đổi tên môn học: " + (err.message || err));
     } finally {
       setLoading(false);
       setLoadingMessage("");
@@ -250,13 +420,13 @@ export default function TeacherDashboard() {
       await apiFetch(`/subjects/${encodeURIComponent(subjectName)}`, {
         method: "DELETE",
       });
-      alert("Xóa môn học thành công!");
+      toast.success("Xóa môn học thành công!");
       if (selectedSubject === subjectName) {
         setSelectedSubject("");
       }
       await loadSubjects();
     } catch (err: any) {
-      alert("Lỗi khi xóa môn học: " + (err.message || err));
+      toast.error("Lỗi khi xóa môn học: " + (err.message || err));
     } finally {
       setLoading(false);
       setLoadingMessage("");
@@ -299,12 +469,32 @@ export default function TeacherDashboard() {
       console.error("Failed to load students progress:", err);
     }
   };
+  const formatBackendError = (errStr: string) => {
+    if (!errStr) return "Lỗi không xác định";
+    let cleanStr = errStr.replace(/^Máy chủ tính toán báo lỗi:\s*/, "");
+    try {
+      const parsed = JSON.parse(cleanStr);
+      if (parsed.detail && Array.isArray(parsed.detail)) {
+        return parsed.detail.map((d: any) => {
+          const loc = d.loc ? d.loc.join(" -> ") : "";
+          const msg = d.msg || "";
+          return `[Trường: ${loc}] ${msg}`;
+        }).join("; ");
+      }
+      if (parsed.error) return parsed.error;
+      return cleanStr;
+    } catch (e) {
+      return errStr;
+    }
+  };
+
   const handleGenerateLearningPath = async () => {
     if (selectedTargetTopics.length === 0) {
-      alert("Vui lòng chọn ít nhất một chủ đề mục tiêu để phân tích.");
+      toast.warning("Vui lòng chọn ít nhất một chủ đề mục tiêu để phân tích.");
       return;
     }
     setGeneratingPath(true);
+    setPathErrorDetail(null);
     try {
       const res = await apiFetch("/teacher/learning-path", {
         method: "POST",
@@ -316,8 +506,11 @@ export default function TeacherDashboard() {
       setActiveThreadId(res.thread_id);
       setInsights(res.class_insight);
       setDraftPaths(res.paths);
+      toast.success("Lập lộ trình nháp thành công!");
     } catch (err: any) {
-      alert("Lỗi khi lập lộ trình: " + err.message);
+      const detail = formatBackendError(err.message || err.toString());
+      setPathErrorDetail(detail);
+      toast.error("Lỗi khi lập lộ trình", { description: detail });
     } finally {
       setGeneratingPath(false);
     }
@@ -335,12 +528,12 @@ export default function TeacherDashboard() {
           custom_paths: draftPaths,
         }),
       });
-      alert("Đã phê duyệt và kích hoạt lộ trình học tập cho học sinh!");
+      toast.success("Đã phê duyệt và kích hoạt lộ trình học tập cho học sinh!");
       setActiveThreadId(null);
       setInsights(null);
       setDraftPaths(null);
     } catch (err: any) {
-      alert("Lỗi khi phê duyệt: " + err.message);
+      toast.error("Lỗi khi phê duyệt: " + err.message);
     } finally {
       setApprovingPath(false);
     }
@@ -441,10 +634,10 @@ export default function TeacherDashboard() {
           method: "POST",
           body: JSON.stringify({ subject: selectedStudent.subject })
         });
-        alert("Đã gửi yêu cầu chẩn đoán lại năng lực thành công!");
+        toast.success("Đã gửi yêu cầu chẩn đoán lại năng lực thành công!");
         loadStudentDetailProgress(selectedStudent.studentId);
       } catch (err: any) {
-        alert("Lỗi khi yêu cầu chẩn đoán lại: " + err.message);
+        toast.error("Lỗi khi yêu cầu chẩn đoán lại: " + err.message);
       }
     }
   };
@@ -489,7 +682,7 @@ export default function TeacherDashboard() {
         body: formData,
       });
 
-      alert("Lưu lý thuyết thành công!");
+      toast.success("Lưu lý thuyết thành công!");
       setUploadFile(null);
       if (res.theory) {
         setTheoryText(res.theory);
@@ -499,7 +692,7 @@ export default function TeacherDashboard() {
       }
       loadTreeData();
     } catch (err: any) {
-      alert("Lỗi khi lưu lý thuyết: " + err.message);
+      toast.error("Lỗi khi lưu lý thuyết: " + err.message);
     } finally {
       setLoading(false);
       setLoadingMessage("");
@@ -511,7 +704,7 @@ export default function TeacherDashboard() {
     if (!file) return;
 
     if (!selectedSubject) {
-      alert("Vui lòng chọn môn học trước khi tải lên tài liệu!");
+      toast.warning("Vui lòng chọn môn học trước khi tải lên tài liệu!");
       return;
     }
 
@@ -561,7 +754,7 @@ export default function TeacherDashboard() {
         console.log("Dựng cây kiến thức đã bị hủy.");
         return;
       }
-      alert("Lỗi khi dựng cây kiến thức: " + err.message);
+      toast.error("Lỗi khi dựng cây kiến thức: " + err.message);
     } finally {
       setLoading(false);
       setAbortController(null);
@@ -652,7 +845,7 @@ export default function TeacherDashboard() {
       signal: ctrl.signal,
     });
 
-    alert("Dựng cây kiến thức thành công!");
+    toast.success("Dựng cây kiến thức thành công!");
     setExtractedChunks([]);
     setParsedGraphsCache([]);
     setFailedChunkIndex(null);
@@ -719,7 +912,7 @@ export default function TeacherDashboard() {
     if (!editingNode || !editingQuestion) return;
 
     if (!qContent.trim()) {
-      alert("Nội dung câu hỏi không được để trống!");
+      toast.warning("Nội dung câu hỏi không được để trống!");
       return;
     }
 
@@ -743,9 +936,11 @@ export default function TeacherDashboard() {
           body: JSON.stringify(payload),
         });
       }
+      toast.success("Lưu câu hỏi thành công!");
       loadNodeQuestions(editingNode.id);
+      loadSubjectQuestions();
     } catch (err: any) {
-      alert("Lỗi khi lưu câu hỏi: " + err.message);
+      toast.error("Lỗi khi lưu câu hỏi: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -758,9 +953,11 @@ export default function TeacherDashboard() {
       await apiFetch(`/questions/${qId}`, {
         method: "DELETE",
       });
+      toast.success("Xóa câu hỏi thành công!");
       if (editingNode) loadNodeQuestions(editingNode.id);
+      loadSubjectQuestions();
     } catch (err: any) {
-      alert("Lỗi khi xóa câu hỏi: " + err.message);
+      toast.error("Lỗi khi xóa câu hỏi: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -895,7 +1092,33 @@ export default function TeacherDashboard() {
                     : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                <ListTodo size={16} /> Lập lộ trình & Giám sát
+                <ListTodo size={16} /> Lập lộ trình cá nhân
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("question-bank");
+                  setSelectedStudent(null);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${
+                  activeTab === "question-bank"
+                    ? "bg-foreground border-foreground text-background shadow-md"
+                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <Database size={16} /> Ngân hàng Câu hỏi
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("monitoring");
+                  setSelectedStudent(null);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${
+                  activeTab === "monitoring"
+                    ? "bg-foreground border-foreground text-background shadow-md"
+                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <TrendingUp size={16} /> Giám sát Lớp học
               </button>
             </>
           ) : (
@@ -1142,9 +1365,23 @@ export default function TeacherDashboard() {
                       ? "Báo cáo tiến độ học tập" 
                       : activeTab === "graph-designer" 
                       ? "Thiết kế & Biên soạn sơ đồ cây" 
-                      : "Lập lộ trình & Giám sát học tập"}
+                      : activeTab === "learning-path"
+                      ? "Lập lộ trình cá nhân hóa"
+                      : activeTab === "question-bank"
+                      ? "Ngân hàng Câu hỏi"
+                      : "Giám sát & Đánh giá lớp học"}
                   </h1>
-                  <p className="text-xs text-muted-foreground mt-1">Lập lộ trình học tập cá nhân hóa & xem báo cáo lỗ hổng lớp học</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {activeTab === "students"
+                      ? "Theo dõi hành trình học tập và kết quả của từng học sinh"
+                      : activeTab === "graph-designer"
+                      ? "Biên soạn các nút lý thuyết, liên kết mối quan hệ tiên quyết"
+                      : activeTab === "learning-path"
+                      ? "Phân tích lỗ hổng gốc rễ và tự động đề xuất lộ trình phụ đạo"
+                      : activeTab === "question-bank"
+                      ? "Quản lý câu hỏi trắc nghiệm, hỗ trợ nhập nhanh từ file Excel"
+                      : "Trực quan hóa phân bố năng lực và khoanh vùng học sinh đi lệch hướng"}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -1531,7 +1768,7 @@ export default function TeacherDashboard() {
                   </>
                 )}
               </div>
-            ) : (
+            ) : activeTab === "learning-path" ? (
               // Tab 3: Learning Path & Class Insights Dashboard
               <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6">
                 
@@ -1595,9 +1832,25 @@ export default function TeacherDashboard() {
                   </div>
                 </div>
 
+                {/* Calculation Error Detail */}
+                {pathErrorDetail && (
+                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-900 rounded-3xl flex items-start gap-3 shadow-sm animate-[fadeIn_0.2s_ease-out]">
+                    <AlertTriangle className="text-rose-500 shrink-0 mt-0.5" size={16} />
+                    <div className="space-y-1">
+                      <span className="font-extrabold text-xs">LỖI THIẾT LẬP LỘ TRÌNH</span>
+                      <p className="text-[10px] text-rose-700 font-mono leading-relaxed select-text">
+                        {pathErrorDetail}
+                      </p>
+                      <span className="text-[9px] text-rose-500 font-semibold block pt-1">
+                        Khuyến nghị: Vui lòng kiểm tra lại cấu trúc cây kiến thức hoặc dữ liệu nộp bài của học sinh.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Step 2: Display Results if available */}
                 {insights && (
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-[fadeIn_0.3s_ease-out]">
                     
                     {/* Left: Class Insights (Gaps, Intervention Groups, Priority List) */}
                     <div className="xl:col-span-2 space-y-6">
@@ -1818,6 +2071,368 @@ export default function TeacherDashboard() {
                   </div>
                 )}
 
+              </div>
+            ) : activeTab === "question-bank" ? (
+              // Tab 4: Question Bank Management Panel
+              <div className="flex-1 flex flex-col gap-5 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+                {/* Search & Filters & Import excel row */}
+                <div className="bg-card border border-border rounded-3xl p-5 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+                  <div className="flex flex-wrap gap-3 items-center flex-1">
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm câu hỏi..."
+                      value={qbSearchText}
+                      onChange={(e) => setQbSearchText(e.target.value)}
+                      className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] w-full max-w-[240px] font-semibold bg-white"
+                    />
+                    
+                    <select
+                      value={qbFilterNodeId}
+                      onChange={(e) => setQbFilterNodeId(e.target.value)}
+                      className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+                    >
+                      <option value="">Tất cả chủ đề</option>
+                      {nodes.map(n => (
+                        <option key={n.id} value={n.id}>{n.name}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={qbFilterDifficulty}
+                      onChange={(e) => setQbFilterDifficulty(e.target.value)}
+                      className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+                    >
+                      <option value="">Tất cả độ khó</option>
+                      <option value="easy">Dễ</option>
+                      <option value="medium">Trung bình</option>
+                      <option value="hard">Khó</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                    >
+                      Tải file mẫu Excel
+                    </button>
+                    
+                    <label className="px-4 py-2 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground rounded-xl text-xs font-black transition-all shadow-[var(--shadow-card)] flex items-center gap-1.5 cursor-pointer">
+                      <Upload size={14} /> Nhập từ Excel
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleExcelImport}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Question List Area */}
+                <div className="flex-1 bg-card border border-border rounded-3xl p-6 shadow-sm overflow-y-auto space-y-4">
+                  {(() => {
+                    const filtered = subjectQuestions.filter(q => {
+                      const matchSearch = qbSearchText ? q.content.toLowerCase().includes(qbSearchText.toLowerCase()) : true;
+                      const matchNode = qbFilterNodeId ? q.nodeId === qbFilterNodeId : true;
+                      const matchDiff = qbFilterDifficulty ? q.difficulty.toLowerCase() === qbFilterDifficulty.toLowerCase() : true;
+                      return matchSearch && matchNode && matchDiff;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="text-center py-12 text-muted-foreground font-semibold">
+                          Không tìm thấy câu hỏi nào phù hợp với bộ lọc.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {filtered.map(q => {
+                          const matchedNode = nodes.find(n => n.id === q.nodeId);
+                          let opts = ["", "", "", ""];
+                          try {
+                            opts = JSON.parse(q.optionsJson);
+                          } catch (e) {}
+
+                          return (
+                            <div key={q.id} className="p-4 border border-border rounded-2xl bg-white hover:shadow-md transition-shadow flex flex-col justify-between gap-3 shadow-sm">
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-slate-500 font-extrabold uppercase max-w-[180px] truncate" title={matchedNode ? matchedNode.name : "Chủ đề ẩn"}>
+                                    {matchedNode ? matchedNode.name : "Chủ đề ẩn"}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${
+                                    q.difficulty === "easy"
+                                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                      : q.difficulty === "hard"
+                                      ? "bg-rose-50 text-rose-600 border-rose-100"
+                                      : "bg-amber-50 text-amber-600 border-amber-100"
+                                  }`}>
+                                    {q.difficulty === "easy" ? "Dễ" : q.difficulty === "hard" ? "Khó" : "T.Bình"}
+                                  </span>
+                                </div>
+                                <p className="text-xs font-bold text-slate-800 leading-relaxed line-clamp-3" title={q.content}>
+                                  {q.content}
+                                </p>
+                                <div className="space-y-1">
+                                  {opts.map((opt, oIdx) => (
+                                    <div
+                                      key={oIdx}
+                                      className={`p-2 rounded-xl text-[10px] font-semibold border ${
+                                        oIdx === q.correctOption
+                                          ? "bg-emerald-50/50 border-emerald-200 text-emerald-800 font-bold"
+                                          : "bg-slate-50 border-slate-100 text-slate-600"
+                                      }`}
+                                    >
+                                      <span className="font-extrabold mr-1.5">{String.fromCharCode(65 + oIdx)}.</span>
+                                      {opt}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                <button
+                                  onClick={() => {
+                                    setEditingNode(matchedNode || null);
+                                    handleStartEditQuestion(q);
+                                  }}
+                                  className="p-1.5 rounded-lg border border-border hover:bg-muted text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
+                                  title="Chỉnh sửa câu hỏi"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingNode(matchedNode || null);
+                                    handleDeleteQuestion(q.id);
+                                  }}
+                                  className="p-1.5 rounded-lg border border-rose-100 hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-all cursor-pointer"
+                                  title="Xóa câu hỏi"
+                                >
+                                  <Trash size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            ) : (
+              // Tab 5: Classroom Monitoring Dashboards (Telemetry & Charts)
+              <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6 animate-[fadeIn_0.3s_ease-out]">
+                {/* Outliers Alert Bar */}
+                {(() => {
+                  const outliers = monitoringStats.filter(s => s.isOutlier);
+                  if (outliers.length === 0) return null;
+                  return (
+                    <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-3xl flex items-start gap-3 shadow-sm animate-pulse">
+                      <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} />
+                      <div className="space-y-1">
+                        <span className="font-extrabold text-xs">CẢNH BÁO OUTLIERS: Gom nhóm học sinh chệch hướng</span>
+                        <p className="text-[10px] text-amber-700 font-semibold leading-relaxed">
+                          Phát hiện <span className="font-black text-amber-900">{outliers.length} học sinh</span> có dấu hiệu hổng kiến thức nghiêm trọng, tỷ lệ chính xác làm bài dưới 40% mặc dù đã có nhiều lượt nộp bài. Khuyến nghị lập lộ trình bổ trợ cá nhân ngay lập tức!
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Mastery distribution Pie chart */}
+                  <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4 flex flex-col">
+                    <div>
+                      <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
+                        Phân bố độ thông thạo lớp học (Sơ đồ quạt)
+                      </h3>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Tỷ lệ học sinh trong các nhóm năng lực Yếu, Trung bình, Khá/Giỏi</p>
+                    </div>
+                    
+                    <div className="h-[260px] w-full flex items-center justify-center">
+                      {monitoringStats.length === 0 ? (
+                        <span className="text-xs text-muted-foreground font-semibold animate-pulse">Đang tính toán dữ liệu lớp học...</span>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={(() => {
+                                const thap = monitoringStats.filter(s => s.totalAnswers > 0 && s.masteryRate < 30).length;
+                                const vua = monitoringStats.filter(s => s.totalAnswers > 0 && s.masteryRate >= 30 && s.masteryRate < 70).length;
+                                const cao = monitoringStats.filter(s => s.totalAnswers > 0 && s.masteryRate >= 70).length;
+                                const thieu = monitoringStats.filter(s => s.totalAnswers === 0).length;
+
+                                return [
+                                  { name: "Yếu / Cần hỗ trợ (<30%)", value: thap, color: "#ef4444" },
+                                  { name: "Trung bình (30% - 70%)", value: vua, color: "#f59e0b" },
+                                  { name: "Khá / Giỏi (>70%)", value: cao, color: "#10b981" },
+                                  { name: "Chưa bắt đầu / Thiếu dữ liệu", value: thieu, color: "#94a3b8" }
+                                ].filter(d => d.value > 0);
+                              })()}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={90}
+                              paddingAngle={4}
+                              dataKey="value"
+                              label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                            >
+                              {
+                                [
+                                  { name: "Yếu / Cần hỗ trợ (<30%)", color: "#ef4444" },
+                                  { name: "Trung bình (30% - 70%)", color: "#f59e0b" },
+                                  { name: "Khá / Giỏi (>70%)", color: "#10b981" },
+                                  { name: "Chưa bắt đầu / Thiếu dữ liệu", color: "#94a3b8" }
+                                ].map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))
+                              }
+                            </Pie>
+                            <Tooltip formatter={(value) => [`${value} học sinh`, 'Số lượng']} />
+                            <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 10, fontWeight: 700 }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scatter plot chart of outlier deviation */}
+                  <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4 flex flex-col">
+                    <div>
+                      <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
+                        Biểu đồ phân tán & Học sinh lệch hướng (Outliers)
+                      </h3>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">So sánh độ thông thạo cá nhân với đường trung bình tập thể lớp</p>
+                    </div>
+
+                    <div className="h-[260px] w-full">
+                      {monitoringStats.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-xs text-muted-foreground font-semibold animate-pulse">Đang tải biểu đồ phân tán...</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              type="number"
+                              dataKey="totalAnswers"
+                              name="Tổng lượt trả lời"
+                              unit=" câu"
+                              label={{ value: 'Tổng số câu trả lời', position: 'insideBottom', offset: -10, fontSize: 9, fontWeight: 700 }}
+                            />
+                            <YAxis
+                              type="number"
+                              dataKey="masteryRate"
+                              name="Tỷ lệ đúng"
+                              unit="%"
+                              domain={[0, 100]}
+                              label={{ value: 'Tỷ lệ đúng (%)', angle: -90, position: 'insideLeft', fontSize: 9, fontWeight: 700 }}
+                            />
+                            <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value, name) => [value, name]} />
+                            <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700 }} />
+                            
+                            {/* Target mastery reference line (outlier boundary) */}
+                            <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Ranh giới hổng kiến thức', fill: '#f59e0b', fontSize: 9, fontWeight: 700, position: 'top' }} />
+
+                            {/* Collective Average Line */}
+                            <ReferenceLine
+                              y={(() => {
+                                const activeStudents = monitoringStats.filter(s => s.totalAnswers > 0);
+                                if (activeStudents.length === 0) return 50;
+                                return activeStudents.reduce((acc, curr) => acc + curr.masteryRate, 0) / activeStudents.length;
+                              })()}
+                              stroke="#6366f1"
+                              strokeWidth={1.5}
+                              label={{ value: 'Đường trung bình lớp', fill: '#6366f1', fontSize: 9, fontWeight: 700, position: 'bottom' }}
+                            />
+
+                            {/* Active learning students */}
+                            <Scatter
+                              name="Học sinh bình thường"
+                              data={monitoringStats.filter(s => !s.isOutlier && s.totalAnswers > 0)}
+                              fill="#6366f1"
+                            />
+
+                            {/* Outliers */}
+                            <Scatter
+                              name="Học sinh đi lệch / Cần hỗ trợ"
+                              data={monitoringStats.filter(s => s.isOutlier)}
+                              fill="#ef4444"
+                            />
+                          </ScatterChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Outliers list detail table */}
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex-1 overflow-hidden flex flex-col">
+                  <div>
+                    <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide mb-3">
+                      Danh sách học sinh cần hỗ trợ & Can thiệp phụ đạo
+                    </h3>
+                  </div>
+                  
+                  <div className="overflow-x-auto flex-1">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground font-black uppercase tracking-wider text-[10px]">
+                          <th className="py-3 px-4">Học sinh</th>
+                          <th className="py-3 px-4">Tổng số câu làm</th>
+                          <th className="py-3 px-4">Số câu trả lời đúng</th>
+                          <th className="py-3 px-4">Tỷ lệ đúng thực tế</th>
+                          <th className="py-3 px-4">Trạng thái chệch hướng</th>
+                          <th className="py-3 px-4 text-center">Khuyến nghị giáo viên</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border font-medium text-foreground/80">
+                        {monitoringStats.map((stat, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-3.5 px-4 font-black text-slate-900">{stat.studentName}</td>
+                            <td className="py-3.5 px-4 font-semibold text-slate-500">{stat.totalAnswers} câu</td>
+                            <td className="py-3.5 px-4 font-semibold text-slate-500">{stat.correctAnswers} câu</td>
+                            <td className="py-3.5 px-4 font-extrabold text-slate-700">{stat.masteryRate.toFixed(1)}%</td>
+                            <td className="py-3.5 px-4 font-bold">
+                              {stat.isOutlier ? (
+                                <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-600 font-extrabold uppercase text-[9px] border border-rose-100">
+                                  Outlier (Yếu)
+                                </span>
+                              ) : stat.totalAnswers === 0 ? (
+                                <span className="px-2 py-0.5 rounded bg-slate-50 text-slate-400 font-bold uppercase text-[9px] border border-slate-100">
+                                  Chưa có dữ liệu
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 font-extrabold uppercase text-[9px] border border-emerald-100">
+                                  Ổn định
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {stat.isOutlier ? (
+                                <button
+                                  onClick={() => {
+                                    setActiveTab("learning-path");
+                                    setSelectedTargetTopics(nodes.map(n => n.id));
+                                    toast.info(`Đã chọn tất cả chủ đề để phân tích lộ trình phụ đạo cho ${stat.studentName}.`);
+                                  }}
+                                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[9px] font-black uppercase tracking-wider rounded-lg transition-all active:scale-95 cursor-pointer shadow-sm"
+                                >
+                                  Lập lộ trình phụ đạo
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground font-semibold">Tự động giám sát...</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
           </div>

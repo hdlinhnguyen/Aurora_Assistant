@@ -472,6 +472,19 @@ func (h *TutorHandler) GetQuestions(c fiber.Ctx) error {
 	return c.JSON(questions)
 }
 
+func (h *TutorHandler) GetSubjectQuestions(c fiber.Ctx) error {
+	subjectRaw := c.Params("subject")
+	subject, err := url.PathUnescape(subjectRaw)
+	if err != nil {
+		subject = subjectRaw
+	}
+	questions, err := h.svc.GetSubjectQuestions(subject)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(questions)
+}
+
 func (h *TutorHandler) CreateQuestion(c fiber.Ctx) error {
 	nodeIdStr := c.Params("nodeId")
 	nodeID, err := uuid.Parse(nodeIdStr)
@@ -487,6 +500,26 @@ func (h *TutorHandler) CreateQuestion(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.Status(fiber.StatusCreated).JSON(q)
+}
+
+func (h *TutorHandler) CreateQuestionsBulk(c fiber.Ctx) error {
+	nodeIdStr := c.Params("nodeId")
+	nodeID, err := uuid.Parse(nodeIdStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
+	}
+	var qs []model.Question
+	if err := c.Bind().JSON(&qs); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu không hợp lệ"})
+	}
+	for i := range qs {
+		qs[i].ID = uuid.New()
+		qs[i].NodeID = nodeID
+		if err := h.svc.CreateQuestion(&qs[i]); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
+	return c.Status(fiber.StatusCreated).JSON(qs)
 }
 
 func (h *TutorHandler) UpdateQuestion(c fiber.Ctx) error {
@@ -673,6 +706,33 @@ func (h *TutorHandler) GetStudentsProgress(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(progress)
+}
+
+func (h *TutorHandler) GetMonitoringData(c fiber.Ctx) error {
+	token, ok := c.Locals("user").(*jwt.Token)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	role, _ := claims["role"].(string)
+	if role != "teacher" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem dữ liệu giám sát"})
+	}
+
+	subjectRaw := c.Params("subject")
+	subject, err := url.PathUnescape(subjectRaw)
+	if err != nil {
+		subject = subjectRaw
+	}
+
+	stats, err := h.svc.GetMonitoringData(subject)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(stats)
 }
 
 func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
