@@ -1183,20 +1183,27 @@ export default function TeacherDashboard() {
                     </thead>
                     <tbody className="divide-y divide-border font-medium text-foreground/80">
                       {studentsProgress.filter(p => p.subject === selectedSubject).map((progress, idx) => (
-                        <tr key={idx} className="hover:bg-muted/50 transition-colors">
-                          <td className="py-4 px-4 font-black text-foreground flex items-center gap-2">
-                            <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground"><User size={12} /></span>
+                        <tr 
+                          key={idx} 
+                          onClick={() => handleInspectStudent(progress)}
+                          className="hover:bg-slate-50 transition-colors cursor-pointer group active:bg-slate-100"
+                        >
+                          <td className="py-4 px-4 font-black text-slate-900 flex items-center gap-2">
+                            <span className="h-6 w-6 rounded-full bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center text-[10px] text-slate-500 group-hover:text-indigo-600 transition-colors"><User size={12} /></span>
                             {progress.studentName}
                           </td>
-                          <td className="py-4 px-4 text-muted-foreground">{progress.studentEmail}</td>
-                          <td className="py-4 px-4"><span className="bg-muted text-foreground/70 px-2 py-0.5 rounded font-bold">{progress.subject}</span></td>
+                          <td className="py-4 px-4 text-slate-500 font-semibold">{progress.studentEmail}</td>
+                          <td className="py-4 px-4"><span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-bold border border-slate-200">{progress.subject}</span></td>
                           <td className="py-4 px-4 text-[var(--mint)] font-bold">{progress.initialNode || "Chưa bắt đầu"}</td>
                           <td className="py-4 px-4 text-emerald-600 font-bold">{progress.currentNode || "Chưa bắt đầu"}</td>
-                          <td className="py-4 px-4 text-muted-foreground">{new Date(progress.updatedAt).toLocaleString("vi-VN")}</td>
+                          <td className="py-4 px-4 text-slate-500 font-semibold">{new Date(progress.updatedAt).toLocaleString("vi-VN")}</td>
                           <td className="py-4 px-4 text-center">
                             <button
-                              onClick={() => handleInspectStudent(progress)}
-                              className="px-3.5 py-1.5 bg-foreground hover:opacity-90 text-background rounded-xl text-[10px] font-black tracking-wide uppercase transition-all shadow-sm cursor-pointer flex items-center gap-1 mx-auto"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleInspectStudent(progress);
+                              }}
+                              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black tracking-wide uppercase transition-all shadow-sm cursor-pointer flex items-center gap-1 mx-auto"
                             >
                               <Eye size={12} /> Xem hành trình
                             </button>

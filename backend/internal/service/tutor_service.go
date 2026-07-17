@@ -521,41 +521,67 @@ func (s *tutorService) AdaptiveDowngrade(studentID uuid.UUID, nodeID uuid.UUID) 
 func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 	
-	var states []struct {
-		StudentID          uuid.UUID `gorm:"column:student_id"`
-		StudentName        string    `gorm:"column:student_name"`
-		StudentEmail       string    `gorm:"column:student_email"`
-		Subject            string    `gorm:"column:subject"`
-		InitialLevelNodeID uuid.UUID `gorm:"column:initial_level_node_id"`
-		CurrentLevelNodeID uuid.UUID `gorm:"column:current_level_node_id"`
-		UpdatedAt          time.Time `gorm:"column:updated_at"`
-	}
-
-	err := s.db.Table("student_states").
-		Select("student_states.student_id, student_states.subject, student_states.initial_level_node_id, student_states.current_level_node_id, student_states.updated_at, users.name as student_name, users.email as student_email").
-		Joins("join users on student_states.student_id = users.id").
-		Order("student_states.updated_at desc").
-		Scan(&states).Error
+	// 1. Get all unique subjects
+	subjects, err := s.GetSubjects()
 	if err != nil {
 		return nil, err
 	}
+	if len(subjects) == 0 {
+		subjects = []string{"Toán đại số"}
+	}
 
-	for _, state := range states {
-		var initialNodeName, currentNodeName string
-		s.db.Table("nodes").Where("id = ?", state.InitialLevelNodeID).Select("name").Row().Scan(&initialNodeName)
-		s.db.Table("nodes").Where("id = ?", state.CurrentLevelNodeID).Select("name").Row().Scan(&currentNodeName)
+	// 2. Get all users with student role
+	var students []model.User
+	if err := s.db.Where("role = ?", "student").Order("name asc").Find(&students).Error; err != nil {
+		return nil, err
+	}
 
-		results = append(results, map[string]interface{}{
-			"studentId":     state.StudentID,
-			"studentName":   state.StudentName,
-			"studentEmail":  state.StudentEmail,
-			"subject":       state.Subject,
-			"initialNodeId": state.InitialLevelNodeID,
-			"initialNode":   initialNodeName,
-			"currentNodeId": state.CurrentLevelNodeID,
-			"currentNode":   currentNodeName,
-			"updatedAt":     state.UpdatedAt,
-		})
+	// 3. For each student and subject, obtain status
+	for _, student := range students {
+		for _, subject := range subjects {
+			var state model.StudentState
+			err := s.db.Where("student_id = ? AND subject = ?", student.ID, subject).First(&state).Error
+			
+			var initialNodeName, currentNodeName string
+			var initialNodeId, currentNodeId interface{}
+			var updatedAtVal time.Time
+
+			if err == nil {
+				initialNodeId = state.InitialLevelNodeID
+				currentNodeId = state.CurrentLevelNodeID
+				updatedAtVal = state.UpdatedAt
+
+				if state.InitialLevelNodeID != uuid.Nil {
+					s.db.Table("nodes").Where("id = ?", state.InitialLevelNodeID).Select("name").Row().Scan(&initialNodeName)
+				} else {
+					initialNodeName = "Chưa chẩn đoán/Chưa học"
+				}
+
+				if state.CurrentLevelNodeID != uuid.Nil {
+					s.db.Table("nodes").Where("id = ?", state.CurrentLevelNodeID).Select("name").Row().Scan(&currentNodeName)
+				} else {
+					currentNodeName = "Chưa học"
+				}
+			} else {
+				initialNodeId = nil
+				currentNodeId = nil
+				initialNodeName = "Chưa chẩn đoán/Chưa học"
+				currentNodeName = "Chưa học"
+				updatedAtVal = student.CreatedAt
+			}
+
+			results = append(results, map[string]interface{}{
+				"studentId":     student.ID,
+				"studentName":   student.Name,
+				"studentEmail":  student.Email,
+				"subject":       subject,
+				"initialNodeId": initialNodeId,
+				"initialNode":   initialNodeName,
+				"currentNodeId": currentNodeId,
+				"currentNode":   currentNodeName,
+				"updatedAt":     updatedAtVal,
+			})
+		}
 	}
 
 	return results, nil
