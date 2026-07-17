@@ -61,6 +61,7 @@ class PipelineState(TypedDict, total=False):
     class_insight: ClassLearningInsight | None
     paths: dict[str, PersonalizedLearningPath]
     teacher_decision: dict
+    path_version: int  # tăng mỗi lần re-plan trên cùng thread (spec mục 11, 15)
 
 
 def build_pipeline(
@@ -99,6 +100,7 @@ def build_pipeline(
                     "request": state["request"],
                     "states": state["states_by_student"].get(sid, {}),
                     "as_of": state["as_of"],
+                    "path_version": state.get("path_version", 1),
                 },
             )
             for sid in state["request"].student_ids
@@ -113,7 +115,14 @@ def build_pipeline(
         path = None
         if d.error is None and r.candidates:
             path = plan_path(
-                request, d, r, curriculum, states, student_id=sid, generated_at=payload["as_of"]
+                request,
+                d,
+                r,
+                curriculum,
+                states,
+                student_id=sid,
+                generated_at=payload["as_of"],
+                version=payload.get("path_version", 1),
             )
         return {"student_results": [StudentResult(student_id=sid, diagnosis=d, ranking=r, path=path)]}
 

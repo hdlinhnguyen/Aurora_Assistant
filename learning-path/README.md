@@ -34,10 +34,18 @@ ingest_evidence → update_mastery_bkt
 
 ```bash
 uv sync                                  # cài deps
-uv run pytest                            # 78 test, offline hoàn toàn
-uv run uvicorn learning_path.api:app     # API: POST /learning-path → .../approve
+uv run pytest                            # 84 test, offline hoàn toàn
+uv run uvicorn learning_path.api:app     # API server
 ```
 
+Endpoint:
+
+- `POST /learning-path` — tạo lộ trình: chạy pipeline tới interrupt, trả Draft + insight lớp
+- `POST /learning-path/{thread_id}/approve` — giáo viên duyệt → Approved
+- `POST /learning-path/{thread_id}/evidence` — nộp evidence mới (học sinh làm xong bước/bài mới) → re-plan cùng thread, version tăng, bản Draft mới chờ duyệt lại
+- `POST /hints` — thang gợi ý 3 bậc (`topic_id`, `press_count`, `chosen_misconception?`)
+
+Đặt `LEARNING_PATH_DB=lp.sqlite` để phiên duyệt sống qua restart server (mặc định in-memory).
 Lưu ý Windows: đặt `PYTHONIOENCODING=utf-8` nếu in JSON tiếng Việt ra console.
 
 ## Điểm hiệu chỉnh so với số minh họa trong spec
@@ -49,4 +57,4 @@ Lưu ý Windows: đặt `PYTHONIOENCODING=utf-8` nếu in JSON tiếng Việt ra
 
 LLM diễn giải (`diagnosis_summary` văn tự nhiên, hint polish — theo pattern
 pre-generate rồi verifier rồi fallback), ILP thay knapsack heuristic,
-Deep Knowledge Tracing, tự học tham số BKT, SqliteSaver thay InMemorySaver.
+Deep Knowledge Tracing, tự học tham số BKT.
