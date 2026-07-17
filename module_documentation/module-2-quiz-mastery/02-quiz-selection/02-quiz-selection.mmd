@@ -1,0 +1,40 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
+flowchart TD
+    A[Học sinh bắt đầu phiên học] --> B[Load Student Profile]
+
+    B --> B1[Mastery hiện tại]
+    B --> B2[Lịch sử làm bài]
+    B --> B3[Topic đang học]
+    B --> B4[Topic cần củng cố]
+
+    C[(Approved Question Bank)] --> D[Quiz Selection Engine]
+    E[(Topic Knowledge Graph)] --> D
+
+    B1 --> D
+    B2 --> D
+    B3 --> D
+    B4 --> D
+
+    F[Giáo viên giao quiz] --> G{Cách tạo quiz}
+    D --> G
+
+    G -- Giáo viên chỉ định --> H[Teacher-assigned Quiz]
+    G -- Hệ thống đề xuất --> I[Adaptive Quiz]
+
+    H --> J[Quiz Definition]
+    I --> J
+
+    J --> J1[Danh sách câu hỏi]
+    J --> J2[Thứ tự câu hỏi]
+    J --> J3[Topic mục tiêu]
+    J --> J4[Thời gian làm bài]
+    J --> J5[Quy tắc số lần thử]
+
+    J1 --> K[Khởi tạo Quiz Session]
+    J2 --> K
+    J3 --> K
+    J4 --> K
+    J5 --> K
+
+    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    linkStyle default stroke:#c8c8c8,stroke-width:1px

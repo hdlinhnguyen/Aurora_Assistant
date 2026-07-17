@@ -1,93 +1,39 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "lineColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
 flowchart TD
-    A[Giáo viên chọn bài kiểm tra] --> B[Load Assessment Template]
+    A[Giảng viên chọn lớp, học sinh,<br/>bài kiểm tra và câu hỏi] --> B[Chụp liên tục hoặc upload<br/>ảnh/PDF nhiều trang]
+    B --> C[Submission Intake]
+    C --> D[Kiểm tra file, chất lượng ảnh,<br/>thứ tự trang và checksum]
+    D --> E{Chọn chế độ xử lý}
 
-    C[Giáo viên chụp hoặc upload<br/>bài làm viết tay đã chấm] --> D[Submission Intake]
-    E[Chọn học sinh] --> D
-    B --> D
+    E -- AI hỗ trợ --> F[Upload Manager<br/>nén có kiểm soát, chia phần, resume]
+    F --> G[OCR Job Queue]
+    G --> H[Datalab.to OCR API]
+    H --> I{OCR thành công?}
 
-    D --> F[Kiểm tra chất lượng ảnh]
+    I -- Có --> J[Chuẩn hóa OCR blocks<br/>text, math, table, figure]
+    J --> K[Mapping Job Queue]
+    K --> L[Qwen 8B self-host]
+    L --> M{Mapping hợp lệ?}
+    M -- Có --> N[Draft Rubric Mapping<br/>bằng chứng và confidence]
+    M -- Không --> O[Partial fallback<br/>giữ OCR, giảng viên tự đánh dấu]
 
-    F --> G{Ảnh đạt yêu cầu?}
+    I -- Không --> P[Full manual<br/>dùng ảnh gốc và barem]
+    E -- Làm thủ công --> P
 
-    G -- Không --> H[Yêu cầu chụp lại<br/>ảnh mờ, thiếu trang hoặc bị cắt]
-    H --> C
+    N --> Q[Teacher Review bắt buộc]
+    O --> Q
+    P --> Q
 
-    G -- Có --> I[Tiền xử lý ảnh]
+    Q --> R[Giảng viên xác nhận từng ý<br/>Đúng / Sai / Không làm]
+    R --> S{Đã đủ trạng thái<br/>cho mọi ý barem?}
+    S -- Chưa --> Q
+    S -- Đủ --> T[(Approved Rubric Mapping)]
 
-    I --> I1[Chỉnh góc và phối cảnh]
-    I --> I2[Khử nhiễu và tăng độ rõ]
-    I --> I3[Sắp xếp thứ tự trang]
+    T --> U[Module chấm điểm hoặc tạo evidence<br/>ở phía sau nếu cần]
 
-    I1 --> J[Align bài làm với đề gốc]
-    I2 --> J
-    I3 --> J
-    B --> J
-
-    J --> K[Tách vùng trả lời theo câu hỏi]
-
-    K --> L[Handwriting OCR]
-    L --> L1[Nhận diện chữ viết tay]
-    L --> L2[Nhận diện số và công thức]
-    L --> L3[Nhận diện nội dung lời giải]
-
-    K --> M[Nhận diện annotation giáo viên]
-    M --> M1[Dấu đúng hoặc sai]
-    M --> M2[Điểm từng câu hoặc từng ý]
-    M --> M3[Gạch sửa và nhận xét]
-
-    L1 --> N[Answer Reconstruction]
-    L2 --> N
-    L3 --> N
-    M1 --> N
-    M2 --> N
-    M3 --> N
-
-    B --> O[Load Question và Rubric Data]
-    N --> P[Answer-Rubric Mapping Engine]
-    O --> P
-
-    P --> Q[Mapping nội dung bài làm<br/>với từng ý trong barem]
-
-    Q --> R[Đề xuất kết quả từng Rubric Item]
-
-    R --> R1[Đạt]
-    R --> R2[Đạt một phần]
-    R --> R3[Chưa đạt]
-    R --> R4[Không làm]
-    R --> R5[Không đọc được]
-
-    R1 --> S[Kiểm tra tính nhất quán điểm]
-    R2 --> S
-    R3 --> S
-    R4 --> S
-    R5 --> S
-
-    S --> S1[So sánh điểm theo barem]
-    S --> S2[So sánh điểm giáo viên ghi]
-    S --> S3[Phát hiện chênh lệch]
-
-    S1 --> T[Teacher Final Review]
-    S2 --> T
-    S3 --> T
-
-    T --> U{Giáo viên xác nhận mapping?}
-
-    U -- Chưa đúng --> V[Giáo viên chỉnh kết quả<br/>của từng ý barem]
-    V --> T
-
-    U -- Xác nhận --> W[Approved Rubric Evaluation]
-
-    W --> X[Mastery Evidence Generator]
-
-    B --> X
-
-    X --> Y[(Mastery Evidence)]
-
-    Y --> Y1[Student ID]
-    Y --> Y2[Topic từ Question Tag]
-    Y --> Y3[Topic từ Rubric Tag]
-    Y --> Y4[Kết quả và điểm]
-    Y --> Y5[Assessment và Rubric Item]
-    Y --> Y6[Teacher Confirmation]
-
-    Y --> Z[Core Mastery Module]
+    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    classDef decision fill:#2a2a2a,stroke:#e0b76a,color:#fff2cc,stroke-width:1.5px
+    classDef store fill:#1f1f1f,stroke:#76b7b2,color:#dff7f5,stroke-width:1.5px
+    class E,I,M,S decision
+    class T store
+    linkStyle default stroke:#c8c8c8,stroke-width:1px

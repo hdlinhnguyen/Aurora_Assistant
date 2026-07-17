@@ -1,0 +1,46 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
+flowchart TD
+    A[Nhận Student Answer] --> B[Load Question Data]
+
+    C[(Approved Question Bank)] --> B
+
+    B --> C1[Đáp án chuẩn]
+    B --> C2[Barem hoặc Rubric]
+    B --> C3[Loại câu hỏi]
+    B --> C4[Điểm tối đa]
+    B --> C5[Topic Tag]
+
+    C1 --> D[Answer Evaluation Engine]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    C5 --> D
+
+    D --> E{Loại câu hỏi}
+
+    E -- Trắc nghiệm --> F[Đối chiếu đáp án]
+    E -- Điền đáp án ngắn --> G[So khớp đáp án chuẩn]
+    E -- Nhiều đáp án --> H[Chấm từng lựa chọn]
+    E -- Tự luận ngắn --> I[Chấm theo Rubric<br/>nếu được hỗ trợ]
+
+    F --> J[Question Result]
+    G --> J
+    H --> J
+    I --> J
+
+    J --> J1[Đúng]
+    J --> J2[Sai]
+    J --> J3[Đúng một phần]
+    J --> J4[Không trả lời]
+    J --> J5[Cần giáo viên review]
+
+    J --> K[Result Metadata]
+
+    K --> K1[Điểm đạt được]
+    K --> K2[Thời gian trả lời]
+    K --> K3[Số lần thử]
+    K --> K4[Gợi ý đã sử dụng]
+    K --> K5[Evaluation Method]
+
+    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    linkStyle default stroke:#c8c8c8,stroke-width:1px

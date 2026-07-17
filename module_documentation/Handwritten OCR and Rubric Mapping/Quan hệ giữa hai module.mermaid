@@ -1,16 +1,37 @@
-%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "lineColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
 flowchart LR
-    A[Question Tagging Module<br/>Chạy một lần] --> B[(Approved Assessment Template)]
+    A[Question Tagging Module] --> B[(Approved Assessment Template)]
 
-    B --> C1[OCR bài học sinh 1]
-    B --> C2[OCR bài học sinh 2]
-    B --> C3[OCR bài học sinh 3]
-    B --> C4[OCR bài học sinh N]
+    B --> B1[Câu hỏi gốc]
+    B --> B2[Các ý trong barem]
+    B --> B3[Topic tag của từng ý]
+    B --> B4[Question-Rubric Mapping]
 
-    C1 --> D[(Mastery Evidence)]
-    C2 --> D
-    C3 --> D
-    C4 --> D
+    B1 --> C[Handwritten OCR<br/>and Rubric Mapping]
+    B2 --> C
+    B3 --> C
+    B4 --> C
+
+    D[Ảnh/PDF bài làm học sinh] --> C
+    E[Giảng viên chọn thủ công<br/>lớp, học sinh và câu hỏi] --> C
+    F[Datalab.to OCR API] <--> C
+    G[Qwen 8B self-host] <--> C
+    H[Teacher Review] <--> C
+
+    C --> I[(Approved Rubric Mapping)]
+    I --> I1[Rubric item ID]
+    I --> I2[Đúng / Sai / Không làm]
+    I --> I3[Vùng bằng chứng]
+    I --> I4[OCR confidence]
+    I --> I5[Mapping confidence]
+    I --> I6[Version và audit log]
+
+    I --> J[Module chấm điểm hoặc<br/>tạo mastery evidence phía sau]
+
+    K[Knowledge Graph] -. Không truy vấn trực tiếp .-> C
+    L[Core Mastery Module] -. Không cập nhật trực tiếp .-> C
 
     classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    classDef store fill:#1f1f1f,stroke:#76b7b2,color:#dff7f5,stroke-width:1.5px
+    class B,I store
     linkStyle default stroke:#c8c8c8,stroke-width:1px

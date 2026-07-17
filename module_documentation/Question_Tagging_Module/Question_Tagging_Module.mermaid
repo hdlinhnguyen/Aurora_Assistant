@@ -1,56 +1,39 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
 flowchart TD
-    A[Giáo viên tạo bài kiểm tra] --> B[Upload đề gốc DOCX/PDF]
-    A --> C[Upload barem DOCX/PDF]
-    A --> D[Nhập metadata<br/>Môn học, khối lớp, tổng điểm]
+    GV[Giáo viên] --> UI[Giao diện gắn topic thủ công]
 
-    B --> E[Document Parser]
-    C --> E
-    D --> E
+    QMS[(Question Management)] --> CTX[Đọc câu hỏi, loại câu hỏi<br/>và các ý barem]
+    KG[(Knowledge Graph)] --> TOPIC[Đọc topic cùng môn học<br/>có thể thuộc khối lớp khác]
 
-    E --> F[Trích xuất cấu trúc đề]
-    F --> F1[Câu hỏi]
-    F --> F2[Câu hỏi con]
-    F --> F3[Nội dung, hình ảnh, bảng và công thức]
+    CTX --> UI
+    TOPIC --> UI
+    UI --> TYPE{Loại câu hỏi?}
 
-    E --> G[Trích xuất cấu trúc barem]
-    G --> G1[Các ý chấm điểm]
-    G --> G2[Điểm tối đa của từng ý]
-    G --> G3[Đáp án hoặc yêu cầu cần đạt]
+    TYPE -- Trắc nghiệm --> QT[Gắn nhiều topic<br/>cho toàn bộ câu hỏi]
+    TYPE -- Tự luận --> RT[Gắn nhiều topic<br/>cho từng ý barem]
+    TYPE -- Tự luận --> QET[Gắn topic bổ sung<br/>cho toàn bộ câu hỏi]
 
-    F1 --> H[Teacher Authoring Interface]
-    F2 --> H
-    G1 --> H
-    G2 --> H
-    G3 --> H
+    QT --> VALIDATE[Kiểm tra topic thuộc<br/>cùng môn học với câu hỏi]
+    RT --> VALIDATE
+    QET --> VALIDATE
 
-    H --> I[Giáo viên kiểm tra và chỉnh sửa<br/>cấu trúc câu hỏi]
-    H --> J[Giáo viên kiểm tra và chỉnh sửa<br/>cấu trúc barem]
+    VALIDATE --> SAVE[Tagging Service<br/>lưu thay đổi có kiểm soát phiên bản]
+    SAVE -- Tag cấp câu hỏi --> QMAP[(QuestionTopicMapping<br/>tag trực tiếp cấp câu hỏi)]
+    SAVE -- Tag ý barem --> RMAP[(RubricItemTopicMapping<br/>tag của từng ý barem)]
 
-    KG[(Knowledge Graph<br/>Topic theo môn học)] --> K[Manual Topic Tagging]
+    QMAP --> AGG[Tag Aggregator]
+    RMAP --> AGG
 
-    I --> K
-    J --> K
+    AGG --> RULE{Quy tắc tổng hợp}
+    RULE -- Trắc nghiệm --> MCQ[Topic hiệu lực =<br/>tag trực tiếp của câu hỏi]
+    RULE -- Tự luận --> ESSAY[Topic hiệu lực = tag bổ sung<br/>hợp với tag của tất cả ý barem]
 
-    K --> K1[Giáo viên chọn topic<br/>cho từng câu hỏi]
-    K --> K2[Giáo viên chọn topic<br/>cho từng câu hỏi con]
-    K --> K3[Giáo viên chọn topic<br/>cho từng ý trong barem]
+    MCQ --> OUT[(Effective Question Topics)]
+    ESSAY --> OUT
+    OUT --> CONSUMER[Module chẩn đoán và<br/>các module tiêu thụ phía sau]
 
-    K1 --> L[Question Topic Mapping]
-    K2 --> L
-    K3 --> M[Rubric Topic Mapping]
+    NOTE[Không sử dụng AI<br/>Không tự thêm topic cha hoặc tiên quyết]
+    NOTE -. Quy tắc bắt buộc .-> UI
 
-    L --> N[Mapping câu hỏi với các ý barem]
-    M --> N
-
-    N --> O[Giáo viên lưu cấu hình bài kiểm tra]
-
-    O --> P[(Assessment Template)]
-
-    P --> P1[Question Structure]
-    P --> P2[Rubric Structure]
-    P --> P3[Question Topic Mappings]
-    P --> P4[Rubric Topic Mappings]
-    P --> P5[Question-Rubric Mappings]
-    P --> P6[Scoring Rules]
-
-    P --> Q[OCR Module sử dụng lại<br/>cho mọi bài làm học sinh]
+    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    linkStyle default stroke:#c8c8c8,stroke-width:1px

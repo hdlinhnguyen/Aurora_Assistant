@@ -1,0 +1,110 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "lineColor": "#c8c8c8", "tertiaryColor": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
+erDiagram
+    ASSESSMENT_TEMPLATE ||--o{ SUBMISSION : duoc_chon_cho
+    STUDENT ||--o{ SUBMISSION : nop
+    SUBMISSION ||--|{ SUBMISSION_FILE : gom
+    SUBMISSION ||--o| OCR_JOB : co_the_tao
+    OCR_JOB ||--o{ OCR_BLOCK : sinh_ra
+    SUBMISSION ||--o| MAPPING_JOB : co_the_tao
+    OCR_JOB ||--o{ MAPPING_JOB : cung_cap_du_lieu
+    MAPPING_JOB ||--o{ DRAFT_RUBRIC_MAPPING : de_xuat
+    RUBRIC_ITEM ||--o{ DRAFT_RUBRIC_MAPPING : duoc_anh_xa
+    OCR_BLOCK }o--o{ DRAFT_RUBRIC_MAPPING : lam_bang_chung
+    SUBMISSION ||--|{ APPROVED_RUBRIC_MAPPING : co_ket_qua
+    RUBRIC_ITEM ||--o{ APPROVED_RUBRIC_MAPPING : duoc_xac_nhan
+    OCR_BLOCK }o--o{ APPROVED_RUBRIC_MAPPING : bang_chung_duoc_duyet
+    SUBMISSION ||--o{ REVIEW_AUDIT_LOG : ghi_lai
+
+    SUBMISSION {
+        string submission_id PK
+        string class_id
+        string student_id FK
+        string assessment_template_id FK
+        string processing_mode
+        string status
+        int version
+    }
+
+    SUBMISSION_FILE {
+        string file_id PK
+        string submission_id FK
+        int page_number
+        string checksum
+        string storage_key
+        string upload_status
+        string image_quality_status
+    }
+
+    OCR_JOB {
+        string ocr_job_id PK
+        string submission_id FK
+        string provider_request_id
+        string status
+        int attempt_count
+        string failure_code
+    }
+
+    OCR_BLOCK {
+        string block_id PK
+        string ocr_job_id FK
+        int page_number
+        int reading_order
+        string content_type
+        string bounding_box
+        float ocr_confidence
+    }
+
+    MAPPING_JOB {
+        string mapping_job_id PK
+        string submission_id FK
+        string ocr_job_id FK
+        string model_name
+        string prompt_version
+        string status
+        string failure_code
+    }
+
+    DRAFT_RUBRIC_MAPPING {
+        string mapping_job_id FK
+        string rubric_item_id FK
+        string evidence_block_ids
+        float mapping_confidence
+    }
+
+    APPROVED_RUBRIC_MAPPING {
+        string approved_mapping_id PK
+        string submission_id FK
+        string rubric_item_id FK
+        string status
+        string evidence_block_ids
+        float ocr_confidence
+        float mapping_confidence
+        string mapping_method
+        int version
+    }
+
+    REVIEW_AUDIT_LOG {
+        string audit_id PK
+        string submission_id FK
+        string rubric_item_id FK
+        string action
+        string actor_id
+        datetime occurred_at
+    }
+
+    ASSESSMENT_TEMPLATE {
+        string assessment_template_id PK
+        string version
+    }
+
+    RUBRIC_ITEM {
+        string rubric_item_id PK
+        string question_id
+        string description
+        string topic_tags
+    }
+
+    STUDENT {
+        string student_id PK
+        string class_id
+    }
