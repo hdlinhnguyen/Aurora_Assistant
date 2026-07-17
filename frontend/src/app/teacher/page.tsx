@@ -469,6 +469,22 @@ export default function TeacherDashboard() {
       console.error("Failed to load students progress:", err);
     }
   };
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "N/A";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "N/A";
+      return d.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch (e) {
+      return "N/A";
+    }
+  };
   const formatBackendError = (errStr: string) => {
     if (!errStr) return "Lỗi không xác định";
     let cleanStr = errStr.replace(/^Máy chủ tính toán báo lỗi:\s*/, "");
@@ -893,6 +909,11 @@ export default function TeacherDashboard() {
     setQOptions(["", "", "", ""]);
     setQCorrect(0);
     setQDifficulty("medium");
+    if (nodes.length > 0) {
+      setEditingNode(nodes[0]);
+    } else {
+      setEditingNode(null);
+    }
   };
 
   const handleStartEditQuestion = (q: Question) => {
@@ -2111,6 +2132,13 @@ export default function TeacherDashboard() {
 
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={handleStartAddQuestion}
+                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+                    >
+                      ➕ Thêm câu hỏi
+                    </button>
+
+                    <button
                       onClick={handleDownloadTemplate}
                       className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
                     >
@@ -2158,12 +2186,21 @@ export default function TeacherDashboard() {
 
                           return (
                             <div key={q.id} className="p-4 border border-border rounded-2xl bg-white hover:shadow-md transition-shadow flex flex-col justify-between gap-3 shadow-sm">
-                              <div className="space-y-2">
-                                <div className="flex justify-between items-center">
-                                  <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-slate-500 font-extrabold uppercase max-w-[180px] truncate" title={matchedNode ? matchedNode.name : "Chủ đề ẩn"}>
-                                    {matchedNode ? matchedNode.name : "Chủ đề ẩn"}
-                                  </span>
-                                  <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase border ${
+                              <div className="space-y-2.5">
+                                {/* Row 1: Badges & metadata */}
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex flex-wrap gap-1.5 items-center">
+                                    <span className="px-2 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-[9px] text-indigo-700 font-extrabold uppercase">
+                                      Q-{q.id.substring(0, 8)}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-100 text-[9px] text-slate-500 font-extrabold">
+                                      {selectedSubject}
+                                    </span>
+                                    <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[9px] text-slate-600 font-black uppercase max-w-[120px] truncate" title={matchedNode ? matchedNode.name : "Chủ đề ẩn"}>
+                                      {matchedNode ? matchedNode.name : "Chủ đề ẩn"}
+                                    </span>
+                                  </div>
+                                  <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase border shrink-0 ${
                                     q.difficulty === "easy"
                                       ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                                       : q.difficulty === "hard"
@@ -2173,47 +2210,58 @@ export default function TeacherDashboard() {
                                     {q.difficulty === "easy" ? "Dễ" : q.difficulty === "hard" ? "Khó" : "T.Bình"}
                                   </span>
                                 </div>
+
+                                {/* Content */}
                                 <p className="text-xs font-bold text-slate-800 leading-relaxed line-clamp-3" title={q.content}>
                                   {q.content}
                                 </p>
-                                <div className="space-y-1">
+
+                                {/* Options */}
+                                <div className="grid grid-cols-2 gap-1.5">
                                   {opts.map((opt, oIdx) => (
                                     <div
                                       key={oIdx}
-                                      className={`p-2 rounded-xl text-[10px] font-semibold border ${
+                                      className={`p-2 rounded-xl text-[10px] font-semibold border truncate ${
                                         oIdx === q.correctOption
                                           ? "bg-emerald-50/50 border-emerald-200 text-emerald-800 font-bold"
                                           : "bg-slate-50 border-slate-100 text-slate-600"
                                       }`}
+                                      title={opt}
                                     >
-                                      <span className="font-extrabold mr-1.5">{String.fromCharCode(65 + oIdx)}.</span>
+                                      <span className="font-extrabold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
                                       {opt}
                                     </div>
                                   ))}
                                 </div>
                               </div>
                               
-                              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                                <button
-                                  onClick={() => {
-                                    setEditingNode(matchedNode || null);
-                                    handleStartEditQuestion(q);
-                                  }}
-                                  className="p-1.5 rounded-lg border border-border hover:bg-muted text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
-                                  title="Chỉnh sửa câu hỏi"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingNode(matchedNode || null);
-                                    handleDeleteQuestion(q.id);
-                                  }}
-                                  className="p-1.5 rounded-lg border border-rose-100 hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-all cursor-pointer"
-                                  title="Xóa câu hỏi"
-                                >
-                                  <Trash size={12} />
-                                </button>
+                              {/* Bottom meta & actions */}
+                              <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                                <span className="text-[8px] text-slate-400 font-bold">
+                                  Cập nhật: {formatDate((q as any).updatedAt || (q as any).createdAt)}
+                                </span>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingNode(matchedNode || null);
+                                      handleStartEditQuestion(q);
+                                    }}
+                                    className="p-1.5 rounded-lg border border-border hover:bg-muted text-slate-500 hover:text-slate-900 transition-all cursor-pointer"
+                                    title="Chỉnh sửa câu hỏi"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingNode(matchedNode || null);
+                                      handleDeleteQuestion(q.id);
+                                    }}
+                                    className="p-1.5 rounded-lg border border-rose-100 hover:bg-rose-50 text-rose-500 hover:text-rose-700 transition-all cursor-pointer"
+                                    title="Xóa câu hỏi"
+                                  >
+                                    <Trash size={12} />
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
@@ -2318,20 +2366,39 @@ export default function TeacherDashboard() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               type="number"
-                              dataKey="totalAnswers"
-                              name="Tổng lượt trả lời"
-                              unit=" câu"
-                              label={{ value: 'Tổng số câu trả lời', position: 'insideBottom', offset: -10, fontSize: 9, fontWeight: 700 }}
+                              dataKey="expectedMastery"
+                              name="Kỳ vọng"
+                              unit="%"
+                              domain={[50, 100]}
+                              label={{ value: 'Độ thông thạo Kỳ vọng (%)', position: 'insideBottom', offset: -10, fontSize: 9, fontWeight: 700 }}
                             />
                             <YAxis
                               type="number"
-                              dataKey="masteryRate"
-                              name="Tỷ lệ đúng"
+                              dataKey="actualMastery"
+                              name="Thực tế"
                               unit="%"
                               domain={[0, 100]}
-                              label={{ value: 'Tỷ lệ đúng (%)', angle: -90, position: 'insideLeft', fontSize: 9, fontWeight: 700 }}
+                              label={{ value: 'Độ thông thạo Thực tế (%)', angle: -90, position: 'insideLeft', fontSize: 9, fontWeight: 700 }}
                             />
-                            <Tooltip cursor={{ strokeDasharray: '3 3' }} formatter={(value, name) => [value, name]} />
+                            <Tooltip
+                              cursor={{ strokeDasharray: '3 3' }}
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                    <div className="bg-white p-3 border border-slate-200 rounded-xl shadow-lg text-[10px] font-bold space-y-1">
+                                      <p className="text-slate-900 font-black text-xs border-b border-slate-100 pb-1 mb-1">{data.studentName}</p>
+                                      <p className="text-indigo-600">🎯 Kỳ vọng: {data.expectedMastery?.toFixed(1)}%</p>
+                                      <p className={data.isOutlier ? "text-rose-600" : "text-emerald-600"}>
+                                        📈 Thực tế: {data.actualMastery?.toFixed(1)}%
+                                      </p>
+                                      <p className="text-slate-500 font-semibold font-mono text-[9px]">Tổng lượt làm: {data.totalAnswers} câu</p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
                             <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700 }} />
                             
                             {/* Target mastery reference line (outlier boundary) */}
@@ -2342,7 +2409,7 @@ export default function TeacherDashboard() {
                               y={(() => {
                                 const activeStudents = monitoringStats.filter(s => s.totalAnswers > 0);
                                 if (activeStudents.length === 0) return 50;
-                                return activeStudents.reduce((acc, curr) => acc + curr.masteryRate, 0) / activeStudents.length;
+                                return activeStudents.reduce((acc, curr) => acc + curr.actualMastery, 0) / activeStudents.length;
                               })()}
                               stroke="#6366f1"
                               strokeWidth={1.5}
@@ -2457,6 +2524,143 @@ export default function TeacherDashboard() {
                 Hủy tải lên
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Manual Question Bank Edit Modal Overlay */}
+      {activeTab === "question-bank" && editingQuestion !== null && (
+        <div className="fixed inset-0 bg-foreground/50 backdrop-blur-sm flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-card w-full max-w-lg border border-border shadow-2xl rounded-3xl p-6 flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
+                {editingQuestion.id ? "📝 HIỆU CHỈNH CÂU HỎI THỦ CÔNG" : "➕ THÊM CÂU HỎI VÀO NGÂN HÀNG"}
+              </h3>
+              <button
+                onClick={() => {
+                  setEditingQuestion(null);
+                  setEditingNode(null);
+                }}
+                className="text-muted-foreground hover:text-foreground text-xs font-black uppercase transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveQuestion} className="space-y-4 overflow-y-auto max-h-[500px] pr-1">
+              {/* Topic/Node select dropdown */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                  Chủ đề thuộc môn học
+                </label>
+                <select
+                  value={editingNode ? editingNode.id : ""}
+                  onChange={(e) => {
+                    const found = nodes.find(n => n.id === e.target.value);
+                    setEditingNode(found || null);
+                  }}
+                  required
+                  className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground"
+                >
+                  <option value="">-- Chọn chủ đề áp dụng --</option>
+                  {nodes.map(n => (
+                    <option key={n.id} value={n.id}>{n.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Content text-area */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                  Nội dung câu hỏi
+                </label>
+                <textarea
+                  rows={3}
+                  value={qContent}
+                  onChange={(e) => setQContent(e.target.value)}
+                  placeholder="Nhập nội dung câu hỏi trắc nghiệm..."
+                  className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-semibold text-foreground resize-none"
+                />
+              </div>
+
+              {/* Difficulty & Correct option */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Mức độ khó
+                  </label>
+                  <select
+                    value={qDifficulty}
+                    onChange={(e) => setQDifficulty(e.target.value)}
+                    className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground"
+                  >
+                    <option value="easy">Dễ (Easy)</option>
+                    <option value="medium">Trung bình (Medium)</option>
+                    <option value="hard">Khó (Hard)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Đáp án đúng
+                  </label>
+                  <select
+                    value={qCorrect}
+                    onChange={(e) => setQCorrect(parseInt(e.target.value))}
+                    className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground"
+                  >
+                    <option value={0}>Đáp án A</option>
+                    <option value={1}>Đáp án B</option>
+                    <option value={2}>Đáp án C</option>
+                    <option value={3}>Đáp án D</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Options A, B, C, D inputs */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                  Các phương án trả lời
+                </label>
+                {qOptions.map((opt, oIdx) => (
+                  <div key={oIdx} className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-400 font-mono w-5">
+                      {String.fromCharCode(65 + oIdx)}.
+                    </span>
+                    <input
+                      type="text"
+                      value={opt}
+                      onChange={(e) => {
+                        const nextOpts = [...qOptions];
+                        nextOpts[oIdx] = e.target.value;
+                        setQOptions(nextOpts);
+                      }}
+                      placeholder={`Nội dung phương án ${String.fromCharCode(65 + oIdx)}...`}
+                      className="flex-1 rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-semibold text-foreground"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 justify-end pt-3 border-t border-border mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingQuestion(null);
+                    setEditingNode(null);
+                  }}
+                  className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground text-xs font-black rounded-xl transition-all shadow-[var(--shadow-card)] cursor-pointer"
+                >
+                  Lưu câu hỏi
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
