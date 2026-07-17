@@ -97,6 +97,7 @@ export default function StudentTutorPage() {
   // New Promax Socratic Workspace States
   const [quizMode, setQuizMode] = useState<"diagnostic" | "practice" | null>(null);
   const [showPurposeModal, setShowPurposeModal] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [nodeForPurpose, setNodeForPurpose] = useState<NodeItem | null>(null);
   const [activeMainTab, setActiveMainTab] = useState<"graph" | "workspace">("graph");
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
@@ -582,12 +583,21 @@ export default function StudentTutorPage() {
     <div className="flex h-screen bg-slate-50 text-zinc-950 overflow-hidden relative">
       
       {/* Sidebar - Course & Logs */}
-      <aside className="w-80 border-r border-slate-200 bg-white flex flex-col z-10 shadow-sm">
+      <aside className={`border-r border-slate-200 bg-white flex flex-col z-10 shadow-sm transition-all duration-300 ${
+        sidebarCollapsed ? "w-0 overflow-hidden opacity-0 border-r-0 pointer-events-none" : "w-80"
+      }`}>
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-indigo-600 animate-pulse" />
             <span className="font-black text-slate-900 tracking-tight text-lg uppercase">Aurora Tutor</span>
           </div>
+          <button
+            onClick={() => setSidebarCollapsed(true)}
+            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-650 transition-colors cursor-pointer"
+            title="Thu gọn sidebar"
+          >
+            <ChevronLeft size={16} />
+          </button>
         </div>
 
         {/* Subject selection */}
@@ -824,52 +834,56 @@ export default function StudentTutorPage() {
         {/* U1 Socratic Purpose Selection Modal */}
         {showPurposeModal && nodeForPurpose && (
           <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
-            <div className="bg-white p-7 rounded-3xl shadow-2xl max-w-lg w-full border border-slate-100 flex flex-col space-y-5 animate-[scaleUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
+            <div className="bg-white p-9 rounded-[32px] shadow-2xl max-w-xl w-full border border-slate-100 flex flex-col space-y-6 animate-[scaleUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
               <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <span className="text-[9px] bg-indigo-50 text-indigo-600 font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full font-mono">
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <span className="text-[9px] bg-indigo-50 text-indigo-650 font-black uppercase tracking-widest px-3 py-1 rounded-full font-mono">
                     Không gian học tập
                   </span>
-                  <h3 className="text-sm font-black text-slate-900 leading-snug uppercase pt-1">
+                  <h3 className="text-base md:text-lg font-black text-slate-900 leading-snug uppercase pt-1 tracking-tight truncate max-w-[420px]">
                     {nodeForPurpose.name}
                   </h3>
                 </div>
                 <button
                   onClick={() => setShowPurposeModal(false)}
-                  className="h-7 w-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                  className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-650 flex items-center justify-center text-xs font-bold transition-all duration-200 active:scale-90 cursor-pointer shrink-0 ml-2"
                 >
                   ✕
                 </button>
               </div>
 
               {studentState?.needsDiagnostic && (
-                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2 text-rose-700 animate-pulse">
-                  <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                  <div className="text-[11px] font-semibold leading-relaxed">
-                    <span className="font-extrabold uppercase block mb-0.5">Yêu cầu chẩn đoán bắt buộc</span>
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-rose-800 shadow-sm animate-pulse">
+                  <AlertCircle size={18} className="mt-0.5 shrink-0 text-rose-600" />
+                  <div className="text-xs font-semibold leading-relaxed">
+                    <span className="font-black uppercase block mb-0.5 tracking-wide text-rose-700">Yêu cầu chẩn đoán bắt buộc</span>
                     Thầy/cô giáo đã gửi yêu cầu đánh giá chẩn đoán năng lực. Em vui lòng thực hiện bài kiểm tra chẩn đoán dưới đây để xác định trình độ thực tế trên cây.
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-4">
                 {/* Mode 1: Theory Socratic Chat */}
                 <button
                   onClick={() => handleStartNodeMode(nodeForPurpose, "theory")}
                   disabled={studentState?.needsDiagnostic}
-                  className={`flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all ${
+                  className={`flex items-center gap-5 p-6 rounded-3xl border-2 text-left transition-all duration-250 ${
                     studentState?.needsDiagnostic
                       ? "bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed"
-                      : "bg-white border-slate-200/80 hover:border-indigo-400 hover:bg-indigo-50/10 cursor-pointer hover:scale-[1.01]"
+                      : "bg-white border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/15 cursor-pointer hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-indigo-50/50"
                   }`}
                 >
-                  <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
-                    <BookOpen size={16} />
+                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                    studentState?.needsDiagnostic ? "bg-slate-100 text-slate-400" : "bg-indigo-50 text-indigo-600"
+                  }`}>
+                    <BookOpen size={24} />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-black text-slate-900">📖 Học lý thuyết & Thảo luận</h4>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-normal font-semibold">
-                      Tìm hiểu sâu lý thuyết và trao đổi trực tiếp với Trợ lý Socratic để tự thấu suốt kiến thức nền tảng.
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
+                      📖 Học lý thuyết & Thảo luận
+                    </h4>
+                    <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
+                      Tìm hiểu lý thuyết và trao đổi trực tiếp với Trợ lý Socratic RAG để tự thấu suốt bản chất kiến thức.
                     </p>
                   </div>
                 </button>
@@ -878,19 +892,23 @@ export default function StudentTutorPage() {
                 <button
                   onClick={() => handleStartNodeMode(nodeForPurpose, "practice")}
                   disabled={studentState?.needsDiagnostic}
-                  className={`flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all ${
+                  className={`flex items-center gap-5 p-6 rounded-3xl border-2 text-left transition-all duration-250 ${
                     studentState?.needsDiagnostic
                       ? "bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed"
-                      : "bg-white border-slate-200/80 hover:border-orange-400 hover:bg-orange-50/10 cursor-pointer hover:scale-[1.01]"
+                      : "bg-white border-slate-200 hover:border-orange-500 hover:bg-orange-50/15 cursor-pointer hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-orange-50/50"
                   }`}
                 >
-                  <div className="p-2.5 bg-orange-50 text-orange-650 rounded-xl shrink-0">
-                    <PlayCircle size={16} />
+                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                    studentState?.needsDiagnostic ? "bg-slate-100 text-slate-400" : "bg-orange-50 text-orange-600"
+                  }`}>
+                    <PlayCircle size={24} />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-black text-slate-900">📝 Luyện tập tự do</h4>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-normal font-semibold">
-                      Thực hành làm các bài toán trắc nghiệm chia theo từng cấp bậc nhận thức tại node hiện tại.
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
+                      📝 Luyện tập tự do
+                    </h4>
+                    <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
+                      Thực hành làm các bài toán trắc nghiệm chia theo từng cấp độ nhận thức tại bài học này.
                     </p>
                   </div>
                 </button>
@@ -898,23 +916,23 @@ export default function StudentTutorPage() {
                 {/* Mode 3: Diagnostic Assessment */}
                 <button
                   onClick={() => handleStartNodeMode(nodeForPurpose, "diagnostic")}
-                  className={`flex items-start gap-3.5 p-4 rounded-2xl border text-left transition-all ${
+                  className={`flex items-center gap-5 p-6 rounded-3xl border-2 text-left transition-all duration-250 ${
                     studentState?.needsDiagnostic
-                      ? "bg-rose-50/20 border-rose-400/80 hover:bg-rose-50/40 hover:scale-[1.01]"
-                      : "bg-white border-slate-200/80 hover:border-blue-400 hover:bg-blue-50/10 hover:scale-[1.01]"
+                      ? "bg-rose-50/30 border-rose-350 hover:border-rose-500 hover:bg-rose-50/15 hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-rose-50/50"
+                      : "bg-white border-slate-200 hover:border-blue-500 hover:bg-blue-50/15 hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-blue-50/50"
                   } cursor-pointer`}
                 >
-                  <div className={`p-2.5 rounded-xl shrink-0 ${
-                    studentState?.needsDiagnostic ? "bg-rose-100/50 text-rose-600" : "bg-blue-50 text-blue-600"
+                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                    studentState?.needsDiagnostic ? "bg-rose-100/60 text-rose-600" : "bg-blue-50 text-blue-600"
                   }`}>
-                    <Compass size={16} />
+                    <Compass size={24} className={studentState?.needsDiagnostic ? "animate-pulse" : ""} />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-black text-slate-900">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
                       🔍 Đánh giá năng lực chẩn đoán {studentState?.needsDiagnostic && "(Bắt buộc)"}
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-1 leading-normal font-semibold">
-                      Kiểm tra thực tế trình độ. Trả lời sai/dùng hết gợi ý sẽ tự động hạ mức để tìm ra chính xác lỗ hổng gốc rễ.
+                    <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
+                      Kiểm tra thực lực thích ứng. Hệ thống tự động hạ mức khi gặp khó khăn để dò tìm chính xác lỗ hổng nền tảng.
                     </p>
                   </div>
                 </button>
@@ -925,6 +943,15 @@ export default function StudentTutorPage() {
 
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
+            {sidebarCollapsed && (
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                className="p-2 border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1 hover:border-indigo-200 hover:bg-indigo-50/20"
+                title="Mở rộng sidebar"
+              >
+                <ChevronRight size={16} />
+              </button>
+            )}
             <div>
               <h1 className="text-xl font-black text-slate-950 flex items-center gap-2">
                 Cây kiến thức: <span className="text-indigo-600 font-black">{selectedSubject}</span>
