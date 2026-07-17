@@ -1,0 +1,57 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
+flowchart TD
+    A[Giáo viên tạo bài kiểm tra] --> B[Upload đề gốc DOCX/PDF]
+    A --> C[Upload barem DOCX/PDF]
+    A --> D[Nhập metadata<br/>Môn học, khối lớp, tổng điểm]
+
+    B --> E[Document Parser]
+    C --> E
+    D --> E
+
+    E --> F[Trích xuất cấu trúc đề]
+    F --> F1[Câu hỏi]
+    F --> F2[Câu hỏi con]
+    F --> F3[Hình ảnh, bảng biểu, công thức]
+
+    E --> G[Trích xuất cấu trúc barem]
+    G --> G1[Tiêu chí chấm điểm]
+    G --> G2[Điểm tối đa từng tiêu chí]
+    G --> G3[Đáp án hoặc yêu cầu cần đạt]
+
+    F1 --> H[Question-Rubric Mapping]
+    F2 --> H
+    G1 --> H
+    G2 --> H
+    G3 --> H
+
+    H --> I[Danh sách Question và Rubric Item]
+
+    KG[(Knowledge Graph<br/>Topic và quan hệ cha-con)] --> J[Topic Tagging Engine]
+    I --> J
+    D --> J
+
+    J --> K[Đề xuất topic cho từng câu hỏi<br/>hoặc Rubric Item]
+    K --> L{Confidence đủ cao?}
+
+    L -- Có --> M[Teacher Review]
+    L -- Không --> N[Đánh dấu cần kiểm tra thủ công]
+    N --> M
+
+    M --> O{Giáo viên approve?}
+
+    O -- Chỉnh sửa --> P[Sửa câu hỏi, barem hoặc topic]
+    P --> M
+
+    O -- Approve --> Q[Đóng băng phiên bản tagging]
+    Q --> R[(Approved Assessment Template)]
+
+    R --> R1[Question Structure]
+    R --> R2[Rubric Items]
+    R --> R3[Topic Mappings]
+    R --> R4[Scoring Rules]
+    R --> R5[Template Version]
+
+    R --> S[Được OCR Module tái sử dụng<br/>cho tất cả bài làm học sinh]
+
+    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    linkStyle default stroke:#c8c8c8,stroke-width:1px

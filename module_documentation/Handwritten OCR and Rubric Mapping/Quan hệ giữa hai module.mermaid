@@ -1,0 +1,16 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
+flowchart LR
+    A[Question Tagging Module<br/>Chạy một lần] --> B[(Approved Assessment Template)]
+
+    B --> C1[OCR bài học sinh 1]
+    B --> C2[OCR bài học sinh 2]
+    B --> C3[OCR bài học sinh 3]
+    B --> C4[OCR bài học sinh N]
+
+    C1 --> D[(Mastery Evidence)]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+
+    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    linkStyle default stroke:#c8c8c8,stroke-width:1px

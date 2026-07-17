@@ -1,0 +1,95 @@
+%%{init: {"theme": "base", "themeVariables": {"background": "#1f1f1f", "primaryColor": "#1f1f1f", "primaryTextColor": "#f3f3f3", "primaryBorderColor": "#a8a8a8", "secondaryColor": "#1f1f1f", "tertiaryColor": "#1f1f1f", "mainBkg": "#1f1f1f", "nodeBorder": "#a8a8a8", "textColor": "#f3f3f3", "lineColor": "#c8c8c8", "defaultLinkColor": "#c8c8c8", "edgeLabelBackground": "#1f1f1f", "fontFamily": "Georgia, 'Times New Roman', serif"}}}%%
+flowchart TD
+    A[Giáo viên chọn bài kiểm tra] --> B[Load Approved Assessment Template]
+
+    C[Giáo viên chụp hoặc upload<br/>bài làm viết tay đã chấm] --> D[Submission Intake]
+    E[Thông tin học sinh] --> D
+    B --> D
+
+    D --> F[Image Quality Validation]
+
+    F --> F1{Ảnh hợp lệ?}
+
+    F1 -- Không --> F2[Yêu cầu chụp lại<br/>Ảnh mờ, thiếu trang, sai chiều]
+    F2 --> C
+
+    F1 -- Có --> G[Image Preprocessing]
+
+    G --> G1[Crop và chỉnh phối cảnh]
+    G --> G2[Khử nhiễu và tăng độ rõ]
+    G --> G3[Sắp xếp thứ tự trang]
+
+    G1 --> H[Template Alignment]
+    G2 --> H
+    G3 --> H
+    B --> H
+
+    H --> I[Mapping vùng ảnh với câu hỏi]
+    I --> I1[Answer Region theo Question ID]
+
+    I1 --> J[Handwriting Recognition]
+    J --> J1[Nhận diện chữ viết tay]
+    J --> J2[Nhận diện số và biểu thức toán]
+    J --> J3[Nhận diện hình vẽ hoặc bảng nếu có]
+
+    I1 --> K[Teacher Annotation Detection]
+    K --> K1[Dấu đúng hoặc sai]
+    K --> K2[Điểm giáo viên ghi]
+    K --> K3[Gạch sửa và nhận xét]
+
+    J1 --> L[Answer Reconstruction]
+    J2 --> L
+    J3 --> L
+    K1 --> L
+    K2 --> L
+    K3 --> L
+
+    B --> M[Load Rubric Items và Topic Mapping]
+    L --> N[Rubric Mapping Engine]
+    M --> N
+
+    N --> O[Đánh giá từng Rubric Item]
+
+    O --> O1[MET]
+    O --> O2[PARTIALLY MET]
+    O --> O3[NOT MET]
+    O --> O4[NOT ATTEMPTED]
+    O --> O5[UNREADABLE]
+
+    O1 --> P[Score Consistency Check]
+    O2 --> P
+    O3 --> P
+    O4 --> P
+    O5 --> P
+
+    P --> P1[So sánh tổng điểm theo barem]
+    P --> P2[So sánh điểm giáo viên đã ghi]
+    P --> P3[Phát hiện chênh lệch điểm]
+
+    P1 --> Q[Teacher Review]
+    P2 --> Q
+    P3 --> Q
+
+    Q --> R{Giáo viên approve?}
+
+    R -- Chỉnh sửa --> S[Chỉnh trạng thái Rubric Item<br/>điểm hoặc mapping câu trả lời]
+    S --> Q
+
+    R -- Approve --> T[Approved Rubric Evaluation]
+
+    T --> U[Mastery Evidence Generator]
+    M --> U
+
+    U --> V[(Mastery Evidence Event)]
+
+    V --> V1[Student ID]
+    V --> V2[Topic ID]
+    V --> V3[Result và normalized score]
+    V --> V4[Assessment và Rubric Item]
+    V --> V5[Teacher approval]
+    V --> V6[Timestamp và evidence source]
+
+    V --> W[Core Mastery Module]
+
+    classDef default fill:#1f1f1f,stroke:#a8a8a8,color:#f3f3f3,stroke-width:1px
+    linkStyle default stroke:#c8c8c8,stroke-width:1px
