@@ -1,6 +1,8 @@
 """Scorer tất định (không cần LLM-judge) cho Track A tier-1 (hard leak), Track C
-(is_correct_step) và Track B (phân mảnh nhãn detected_gap). Xem
-docs/eval-socratic-chat.md.
+(is_correct_step), Track B (phân mảnh nhãn detected_gap), Track M (monotonicity
+ladder cho feynman_score) và Track G (gaming/exploit feynman_score). Xem
+docs/eval-socratic-chat.md và
+docs/superpowers/specs/2026-07-18-feynman-clarity-meta-eval.md.
 """
 
 from __future__ import annotations
@@ -119,3 +121,66 @@ def collect_gap_fragmentation(misconception_id: str, gaps: list[str], expect_gap
         result.label_counts[normalized] += 1
     result.distinct_labels = list(result.label_counts.keys())
     return result
+
+
+@dataclass
+class LadderResult:
+    ladder_id: str
+    scores: list[int]
+    fully_ordered: bool
+    tau: float | None  # None nếu < 2 nấc (không đủ cặp để so sánh)
+    worst_violation: tuple[int, int] | None = None  # (nấc i, nấc j) đầu tiên bị đảo thứ tự
+
+
+def score_ladder(ladder_id: str, scores: list[int]) -> LadderResult:
+    """Track M — nấc suy biến đứng sau (index lớn hơn) phải có feynman_score
+    KHÔNG CAO HƠN nấc đứng trước (đơn điệu yếu, giảm dần). Coi cặp bằng điểm là
+    "concordant" (không phạt hoà điểm). tau ở đây là bản rút gọn của Kendall's
+    tau: (số cặp đúng thứ tự - số cặp sai thứ tự) / tổng số cặp, không tie-correct
+    theo tau-b vì với n nhỏ (~4-5 nấc/ladder) sự khác biệt không đáng kể."""
+    n = len(scores)
+    if n < 2:
+        return LadderResult(ladder_id=ladder_id, scores=scores, fully_ordered=True, tau=None)
+
+    concordant = 0
+    discordant = 0
+    worst_violation: tuple[int, int] | None = None
+    for i in range(n):
+        for j in range(i + 1, n):
+            if scores[i] >= scores[j]:
+                concordant += 1
+            else:
+                discordant += 1
+                if worst_violation is None:
+                    worst_violation = (i, j)
+
+    total_pairs = concordant + discordant
+    tau = (concordant - discordant) / total_pairs
+    return LadderResult(
+        ladder_id=ladder_id,
+        scores=scores,
+        fully_ordered=worst_violation is None,
+        tau=tau,
+        worst_violation=worst_violation,
+    )
+
+
+@dataclass
+class GamingCaseResult:
+    case_id: str
+    category: str
+    ceiling: int
+    actual_score: int
+    exploited: bool
+
+
+def score_gaming_case(case_id: str, category: str, ceiling: int, actual_score: int) -> GamingCaseResult:
+    """Track G — case coi là bị "game" nếu feynman_score vượt trần chấp nhận
+    được đã khai báo trước cho kiểu exploit đó."""
+    return GamingCaseResult(
+        case_id=case_id,
+        category=category,
+        ceiling=ceiling,
+        actual_score=actual_score,
+        exploited=actual_score > ceiling,
+    )

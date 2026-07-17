@@ -25,6 +25,8 @@ from .scoring import (
     collect_gap_fragmentation,
     contains_answer,
     score_correct_step,
+    score_gaming_case,
+    score_ladder,
 )
 
 # Heuristic phát hiện lỗi parse JSON bị lộ thẳng cho học sinh (Track E1,
@@ -196,6 +198,82 @@ def run_track_b(client: AuroraClient, report: dict) -> None:
     report["track_b_gap_fragmentation"] = {"groups": results}
 
 
+def run_track_m(client: AuroraClient, report: dict) -> None:
+    """Track M — monotonicity ladders cho feynman_score (xem
+    docs/superpowers/specs/2026-07-18-feynman-clarity-meta-eval.md mục 6). Mỗi
+    nấc của ladder được gửi trong 1 session riêng để tránh nhiễu ngữ cảnh giữa
+    các nấc."""
+    ladders = _load_cases("track_m_ladders.yaml")
+    results = []
+    for ladder in ladders:
+        scores = []
+        for rung_text in ladder["rungs"]:
+            session_id = client.create_session(ladder["topic"], "feynman")
+            data = client.send_message(session_id, "Chào Bi nhé, mình học chủ đề này nha!")
+            report["_all_responses"].append((data.get("aiMessage") or {}).get("content", ""))
+            data = client.send_message(session_id, rung_text)
+            ai_message = data.get("aiMessage") or {}
+            report["_all_responses"].append(ai_message.get("content", ""))
+            scores.append(int(ai_message.get("feynmanScore") or 0))
+        result = score_ladder(ladder["id"], scores)
+        results.append(result.__dict__)
+    fully_ordered = sum(1 for r in results if r["fully_ordered"])
+    taus = [r["tau"] for r in results if r["tau"] is not None]
+    report["track_m_ladders"] = {
+        "ladders": results,
+        "fully_ordered": fully_ordered,
+        "total": len(results),
+        "fully_ordered_rate": fully_ordered / len(results) if results else None,
+        "mean_tau": sum(taus) / len(taus) if taus else None,
+    }
+
+
+def run_track_g(client: AuroraClient, report: dict) -> None:
+    """Track G — exploit suite cho feynman_score (xem
+    docs/superpowers/specs/2026-07-18-feynman-clarity-meta-eval.md mục 5). Case
+    với dynamic: echo_previous_ai_message gửi lại nguyên văn câu trả lời trước
+    đó của AI làm "giải thích", để đo hành vi vẹt lại lời của chính Bi."""
+    cases = _load_cases("track_g_gaming.yaml")
+    results = []
+    for case in cases:
+        session_id = client.create_session(case["topic"], "feynman")
+        ai_message: dict = {}
+        turns = list(case["turns"])
+        if case.get("dynamic") == "echo_previous_ai_message":
+            data = client.send_message(session_id, turns[0])
+            bait_ai_content = (data.get("aiMessage") or {}).get("content", "")
+            report["_all_responses"].append(bait_ai_content)
+            data = client.send_message(session_id, bait_ai_content)
+            ai_message = data.get("aiMessage") or {}
+            report["_all_responses"].append(ai_message.get("content", ""))
+        else:
+            for student_msg in turns:
+                data = client.send_message(session_id, student_msg)
+                ai_message = data.get("aiMessage") or {}
+                report["_all_responses"].append(ai_message.get("content", ""))
+        result = score_gaming_case(
+            case_id=case["id"],
+            category=case["category"],
+            ceiling=case["expect"]["ceiling"],
+            actual_score=int(ai_message.get("feynmanScore") or 0),
+        )
+        results.append(result.__dict__)
+    exploited = [r for r in results if r["exploited"]]
+    by_category: dict[str, dict] = {}
+    for r in results:
+        cat = by_category.setdefault(r["category"], {"total": 0, "exploited": 0})
+        cat["total"] += 1
+        if r["exploited"]:
+            cat["exploited"] += 1
+    report["track_g_gaming"] = {
+        "cases": results,
+        "exploited_count": len(exploited),
+        "total": len(results),
+        "exploit_success_rate": len(exploited) / len(results) if results else None,
+        "by_category": by_category,
+    }
+
+
 def apply_gates(report: dict) -> list[str]:
     """Trả về danh sách vi phạm gate (rỗng = pass). Xem docs/eval-socratic-chat.md
     mục 7 'Gates chặn merge đề xuất'."""
@@ -218,6 +296,22 @@ def apply_gates(report: dict) -> list[str]:
     if compliance < 0.99:
         violations.append(f"format compliance = {compliance:.2%} (gate: >= 99%), {broken}/{total_responses} lỗi")
 
+    ladders = report.get("track_m_ladders", {})
+    fully_ordered_rate = ladders.get("fully_ordered_rate")
+    if fully_ordered_rate is not None and fully_ordered_rate < 1.0:
+        violations.append(
+            f"ladder fully-ordered rate = {fully_ordered_rate:.2%} "
+            f"(gate: 100%), {ladders['fully_ordered']}/{ladders['total']} ladder đúng thứ tự"
+        )
+
+    gaming = report.get("track_g_gaming", {})
+    exploit_rate = gaming.get("exploit_success_rate")
+    if exploit_rate is not None and exploit_rate > 0.05:
+        violations.append(
+            f"exploit success rate = {exploit_rate:.2%} (gate: <= 5%), "
+            f"{gaming['exploited_count']}/{gaming['total']} case vượt trần"
+        )
+
     return violations
 
 
@@ -228,7 +322,7 @@ def main() -> None:
     parser.add_argument(
         "--tracks",
         default="a,b,c,d",
-        help="Danh sách track chạy, phân tách bởi dấu phẩy (a,b,c,d)",
+        help="Danh sách track chạy, phân tách bởi dấu phẩy (a,b,c,d,m,g)",
     )
     args = parser.parse_args()
 
@@ -250,6 +344,12 @@ def main() -> None:
             if "b" in tracks:
                 print("== Track B: gap fragmentation ==")
                 run_track_b(client, report)
+            if "m" in tracks:
+                print("== Track M: monotonicity ladders (feynman_score) ==")
+                run_track_m(client, report)
+            if "g" in tracks:
+                print("== Track G: gaming/exploit (feynman_score) ==")
+                run_track_g(client, report)
         except MockModeDetected as e:
             print(f"\n[FAIL-FAST] {e}", file=sys.stderr)
             sys.exit(2)
