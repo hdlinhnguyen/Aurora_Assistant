@@ -194,6 +194,29 @@ export default function TeacherDashboard() {
     }
     setUserName(user.name);
 
+    // Restore saved states from localStorage
+    const savedSubject = localStorage.getItem("aurora_teacher_subject");
+    const savedTab = localStorage.getItem("aurora_teacher_tab") as ActiveTab | null;
+    const savedStudent = localStorage.getItem("aurora_teacher_student");
+    const savedViewMode = localStorage.getItem("aurora_teacher_view_mode") as "tree" | "matrix" | null;
+
+    if (savedSubject !== null) {
+      setSelectedSubject(savedSubject);
+    }
+    if (savedTab) {
+      setActiveTab(savedTab);
+    }
+    if (savedStudent) {
+      try {
+        setSelectedStudent(JSON.parse(savedStudent));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (savedViewMode) {
+      setStudentViewMode(savedViewMode);
+    }
+
     loadSubjects();
     loadStudentsProgress();
   }, [router]);
@@ -347,12 +370,49 @@ export default function TeacherDashboard() {
     }
   }, [activeTab, selectedSubject]);
 
+  // Save active states to localStorage to persist reload
+  useEffect(() => {
+    if (selectedSubject !== "") {
+      localStorage.setItem("aurora_teacher_subject", selectedSubject);
+    } else {
+      localStorage.setItem("aurora_teacher_subject", "");
+    }
+  }, [selectedSubject]);
+
+  useEffect(() => {
+    localStorage.setItem("aurora_teacher_tab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      localStorage.setItem("aurora_teacher_student", JSON.stringify(selectedStudent));
+    } else {
+      localStorage.removeItem("aurora_teacher_student");
+    }
+  }, [selectedStudent]);
+
+  useEffect(() => {
+    localStorage.setItem("aurora_teacher_view_mode", studentViewMode);
+  }, [studentViewMode]);
+
   const loadSubjects = async (selectSubjectName?: string) => {
     try {
       const data = await apiFetch("/subjects");
       setSubjects(data || []);
+      const savedSub = localStorage.getItem("aurora_teacher_subject");
+      
       if (selectSubjectName && data && data.includes(selectSubjectName)) {
         setSelectedSubject(selectSubjectName);
+      } else if (savedSub !== null) {
+        if (savedSub && data && data.includes(savedSub)) {
+          setSelectedSubject(savedSub);
+        } else if (savedSub === "") {
+          setSelectedSubject("");
+        } else if (selectedSubject && data && data.includes(selectedSubject)) {
+          // Keep
+        } else if (data && data.length > 0) {
+          setSelectedSubject(data[0]);
+        }
       } else if (selectedSubject && data && data.includes(selectedSubject)) {
         // Keep currently selected
       } else if (data && data.length > 0) {
