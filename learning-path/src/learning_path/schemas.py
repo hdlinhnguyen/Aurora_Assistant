@@ -160,3 +160,49 @@ class PersonalizedLearningPath(BaseModel):
     next_review_checkpoint: datetime | None = None
     status: PathStatus = "Draft"
     version: int = 1
+
+
+InterventionKind = Literal["reteach_class", "small_group", "individual"]
+
+
+class ClassWideGap(BaseModel):
+    """Spec mục 13.1 — học sinh thiếu evidence không nằm trong mẫu số kết luận."""
+
+    topic_id: str
+    confirmed_gap_rate: float = Field(ge=0, le=1)
+    class_gap_score: float = Field(ge=0)
+    gap_student_ids: list[str] = Field(default_factory=list)
+    denominator: int = Field(ge=0)
+    recommended_intervention: InterventionKind
+
+
+class InterventionGroup(BaseModel):
+    """Spec mục 13 — nhóm theo root-cause + band + target + hình thức can thiệp."""
+
+    group_key: str
+    root_cause_topic_id: str
+    mastery_band: str
+    target_topic_id: str
+    recommended_intervention: InterventionKind
+    student_ids: list[str] = Field(default_factory=list)
+
+
+class PrioritizedStudent(BaseModel):
+    student_id: str
+    help_priority: float = Field(ge=0)
+    reason: str
+
+
+class ClassLearningInsight(BaseModel):
+    """Spec mục 13.3 — đầu ra dashboard giáo viên."""
+
+    class_id: str
+    target_topic_ids: list[str]
+    class_mastery_distribution: dict[str, int] = Field(default_factory=dict)
+    class_wide_gaps: list[ClassWideGap] = Field(default_factory=list)
+    suggested_reteach_topics: list[str] = Field(default_factory=list)
+    intervention_groups: list[InterventionGroup] = Field(default_factory=list)
+    prioritized_students: list[PrioritizedStudent] = Field(default_factory=list)
+    insufficient_evidence_students: list[str] = Field(default_factory=list)
+    path_approval_summary: dict[str, int] = Field(default_factory=dict)
+    changes_since_last_checkpoint: list[str] = Field(default_factory=list)
