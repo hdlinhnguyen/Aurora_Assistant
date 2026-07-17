@@ -777,6 +777,12 @@ func (h *TutorHandler) ChatNodeTheory(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
 	}
 
+	userIDStr, _ := c.Locals("userID").(string)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID người dùng không hợp lệ"})
+	}
+
 	var req struct {
 		Message string              `json:"message"`
 		History []map[string]string `json:"history"`
@@ -785,12 +791,65 @@ func (h *TutorHandler) ChatNodeTheory(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu không hợp lệ"})
 	}
 
-	reply, err := h.svc.ChatNodeTheory(nodeID, req.Message, req.History)
+	reply, err := h.svc.ChatNodeTheory(userID, nodeID, req.Message, req.History)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.JSON(fiber.Map{"reply": reply})
+}
+
+// ─── Guardrail Event Handlers (teacher-only) ─────────────────────────────────
+
+func requireTeacher(c fiber.Ctx) error {
+	token, ok := c.Locals("user").(*jwt.Token)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	role, ok := claims["role"].(string)
+	if !ok || role != "teacher" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên được truy cập mục này"})
+	}
+	return nil
+}
+
+// GetGuardrailEvents trả về danh sách sự kiện an toàn bị gắn cờ, mới nhất trước.
+// Query: ?severity=high|medium|low (tùy chọn), ?limit=100 (tùy chọn).
+func (h *TutorHandler) GetGuardrailEvents(c fiber.Ctx) error {
+	if err := requireTeacher(c); err != nil {
+		return err
+	}
+
+	severity := c.Query("severity")
+	limit := fiber.Query[int](c, "limit", 100)
+
+	events, err := h.svc.GetGuardrailEvents(severity, limit)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải danh sách cảnh báo an toàn"})
+	}
+
+	return c.JSON(events)
+}
+
+func (h *TutorHandler) MarkGuardrailEventHandled(c fiber.Ctx) error {
+	if err := requireTeacher(c); err != nil {
+		return err
+	}
+
+	eventID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID sự kiện không hợp lệ"})
+	}
+
+	if err := h.svc.MarkGuardrailEventHandled(eventID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể cập nhật sự kiện"})
+	}
+
+	return c.JSON(fiber.Map{"success": true})
 }
 
 func (h *TutorHandler) ParseAndBuildTree(c fiber.Ctx) error {

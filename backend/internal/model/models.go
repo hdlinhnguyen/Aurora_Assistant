@@ -124,6 +124,22 @@ type AICache struct {
 	CreatedAt time.Time      `json:"createdAt"`
 }
 
+// GuardrailEvent lưu các sự kiện bị lớp kiểm duyệt gắn cờ (input học sinh hoặc
+// safety_flag từ LLM) để giáo viên theo dõi và can thiệp — đặc biệt severity "high".
+type GuardrailEvent struct {
+	ID             uuid.UUID  `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	StudentID      uuid.UUID  `gorm:"type:uuid;not null;index" json:"studentId"`
+	Student        User       `gorm:"foreignKey:StudentID" json:"-"`
+	SessionID      *uuid.UUID `gorm:"type:uuid;index" json:"sessionId"` // nullable: chat lý thuyết không có session
+	Source         string     `gorm:"type:varchar(30);not null" json:"source"`   // "chat_input", "chat_output", "theory_chat"
+	Category       string     `gorm:"type:varchar(30);not null;index" json:"category"` // "self_harm", "abuse", "sexual", "violence", "profanity", "jailbreak", "personal_info"
+	Severity       string     `gorm:"type:varchar(10);not null;index" json:"severity"` // "high", "medium", "low"
+	ContentExcerpt string     `gorm:"type:text" json:"contentExcerpt"`
+	MatchedPattern string     `gorm:"type:varchar(255)" json:"matchedPattern"`
+	Handled        bool       `gorm:"type:boolean;default:false;index" json:"handled"`
+	CreatedAt      time.Time  `json:"createdAt"`
+}
+
 type LearningPath struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
 	StudentID uuid.UUID `gorm:"type:uuid;not null;index" json:"studentId"`
