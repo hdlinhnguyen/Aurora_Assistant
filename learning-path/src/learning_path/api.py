@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import os
 import uuid
+import json
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -62,25 +64,59 @@ class HintBody(BaseModel):
     chosen_misconception: str | None = None
 
 
+DEFAULT_MINUTES_BY_CAP = {"TH": 25, "THCS": 35, "THPT": 45}
+
+
+def fetch_dynamic_graph() -> CurriculumGraph:
+    url = os.environ.get("GO_BACKEND_GRAPH_URL", "http://localhost:8001/api/internal/graph")
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            raw = json.loads(response.read().decode('utf-8'))
+            
+        topics: dict[str, Topic] = {}
+        edges: list[PrerequisiteEdge] = []
+        for node in raw["nodes"]:
+            topics[node["id"]] = Topic(
+                topic_id=node["id"],
+                subject_id="toan",
+                grade_level=node["lop"],
+                name=node["ten"],
+                estimated_learning_time=DEFAULT_MINUTES_BY_CAP.get(node["cap"], 30),
+                content_available=not node["mo"],
+                learning_outcomes=node.get("yccd", []),
+            )
+            for prereq_id in node["tienQuyet"]:
+                edges.append(
+                    PrerequisiteEdge(prerequisite_topic_id=prereq_id, dependent_topic_id=node["id"])
+                )
+
+        return CurriculumGraph(topics, edges)
+    except Exception as e:
+        print(f"Failed to fetch dynamic graph from {url}: {e}. Falling back to static graph.json")
+        from learning_path.adapters import load_chac_goc_graph
+        from pathlib import Path
+        DEFAULT_GRAPH_JSON = Path(__file__).resolve().parents[3] / "knowledge-graph" / "data" / "graph.json"
+        return load_chac_goc_graph(DEFAULT_GRAPH_JSON)
+
+
 def create_app(
-    curriculum: CurriculumGraph, *, checkpointer: BaseCheckpointSaver | None = None
+    initial_curriculum: CurriculumGraph | None = None, *, checkpointer: BaseCheckpointSaver | None = None
 ) -> FastAPI:
     # import trễ để test không cần build pipeline khi chỉ import schemas
+    from langgraph.checkpoint.memory import InMemorySaver
     from learning_path.graph import build_pipeline
 
     app = FastAPI(title="learning-path", version="0.1.1")
-    pipeline = build_pipeline(curriculum, checkpointer=checkpointer)
-    ladder = HintLadder(curriculum)
+    checkpointer_to_use = checkpointer or InMemorySaver()
+
+    def get_curriculum() -> CurriculumGraph:
+        if initial_curriculum is not None:
+            return initial_curriculum
+        return fetch_dynamic_graph()
 
     def _config(thread_id: str) -> dict:
         return {"configurable": {"thread_id": thread_id}}
-
-    def _existing_state(thread_id: str) -> dict:
-        """Trạng thái đã checkpoint của thread; 404 nếu chưa từng tồn tại (kể cả sau restart)."""
-        snapshot = pipeline.get_state(_config(thread_id))
-        if not snapshot.values:
-            raise HTTPException(status_code=404, detail="thread_id không tồn tại")
-        return snapshot.values
 
     def _serialize(state: dict) -> dict:
         insight = state.get("class_insight")
@@ -103,6 +139,8 @@ def create_app(
     @app.post("/learning-path")
     def create_learning_path(body: CreatePathBody) -> dict:
         thread_id = uuid.uuid4().hex
+        curr = get_curriculum()
+        pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
         result = pipeline.invoke(
             {
                 "request": body.request,
@@ -117,7 +155,13 @@ def create_app(
 
     @app.post("/learning-path/{thread_id}/approve")
     def approve_learning_path(thread_id: str, body: ApproveBody) -> dict:
-        _existing_state(thread_id)
+        curr = get_curriculum()
+        pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
+        
+        snapshot = pipeline.get_state(_config(thread_id))
+        if not snapshot.values:
+            raise HTTPException(status_code=404, detail="thread_id không tồn tại")
+            
         result = pipeline.invoke(
             Command(resume={"approve": body.approve, "note": body.note}), _config(thread_id)
         )
@@ -128,7 +172,14 @@ def create_app(
         """Trigger tái lập kế hoạch của spec mục 14: evidence mới → chạy lại pipeline
         trên cùng thread (gộp evidence cũ — dedup theo evidence_id trong EvidenceStore),
         path version tăng, bản Draft mới thay bản cũ và chờ duyệt lại."""
-        current = _existing_state(thread_id)
+        curr = get_curriculum()
+        pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
+        
+        snapshot = pipeline.get_state(_config(thread_id))
+        if not snapshot.values:
+            raise HTTPException(status_code=404, detail="thread_id không tồn tại")
+            
+        current = snapshot.values
         paths = current.get("paths", {})
         next_version = max((p.version for p in paths.values()), default=0) + 1
         result = pipeline.invoke(
@@ -145,8 +196,10 @@ def create_app(
 
     @app.post("/hints")
     def request_hint(body: HintBody) -> dict:
-        if body.topic_id not in curriculum.topics:
+        curr = get_curriculum()
+        if body.topic_id not in curr.topics:
             raise HTTPException(status_code=404, detail="topic_id không tồn tại")
+        ladder = HintLadder(curr)
         hint = ladder.request_hint(
             body.topic_id,
             press_count=body.press_count,
@@ -158,7 +211,6 @@ def create_app(
 
 
 def _default_app() -> FastAPI:
-    graph_path = os.environ.get("LEARNING_PATH_GRAPH_JSON", str(DEFAULT_GRAPH_JSON))
     checkpointer: BaseCheckpointSaver | None = None
     db_path = os.environ.get("LEARNING_PATH_DB")
     if db_path:
@@ -167,12 +219,11 @@ def _default_app() -> FastAPI:
         from langgraph.checkpoint.sqlite import SqliteSaver
 
         checkpointer = SqliteSaver(sqlite3.connect(db_path, check_same_thread=False))
-    return create_app(load_chac_goc_graph(graph_path), checkpointer=checkpointer)
+    return create_app(checkpointer=checkpointer)
 
 
-# Chỉ dựng app mặc định khi chạy qua uvicorn (import module này trực tiếp);
-# create_app(curriculum) là entry point cho test và cho ai muốn graph khác.
 try:
     app = _default_app()
-except FileNotFoundError:  # môi trường không có graph.json — vẫn import được module
-    app = None  # type: ignore[assignment]
+except Exception as e:
+    print(f"Failed to initialize app: {e}")
+    app = None

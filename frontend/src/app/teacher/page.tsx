@@ -25,7 +25,9 @@ import {
   Loader2,
   Sparkles,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ListTodo,
+  Check
 } from "lucide-react";
 
 interface NodeItem {
@@ -83,7 +85,7 @@ interface Question {
   difficulty: string;
 }
 
-type ActiveTab = "students" | "graph-designer";
+type ActiveTab = "students" | "graph-designer" | "learning-path";
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -91,6 +93,14 @@ export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("students");
   const [subjects, setSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("");
+
+  // Learning Path States
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [insights, setInsights] = useState<any>(null);
+  const [draftPaths, setDraftPaths] = useState<any>(null);
+  const [selectedTargetTopics, setSelectedTargetTopics] = useState<string[]>([]);
+  const [generatingPath, setGeneratingPath] = useState(false);
+  const [approvingPath, setApprovingPath] = useState(false);
 
   // Graph Data
   const [nodes, setNodes] = useState<NodeItem[]>([]);
@@ -288,7 +298,51 @@ export default function TeacherDashboard() {
       console.error("Failed to load students progress:", err);
     }
   };
+  const handleGenerateLearningPath = async () => {
+    if (selectedTargetTopics.length === 0) {
+      alert("Vui lòng chọn ít nhất một chủ đề mục tiêu để phân tích.");
+      return;
+    }
+    setGeneratingPath(true);
+    try {
+      const res = await apiFetch("/teacher/learning-path", {
+        method: "POST",
+        body: JSON.stringify({
+          classId: "class-demo",
+          targetTopicIds: selectedTargetTopics,
+        }),
+      });
+      setActiveThreadId(res.thread_id);
+      setInsights(res.class_insight);
+      setDraftPaths(res.paths);
+    } catch (err: any) {
+      alert("Lỗi khi lập lộ trình: " + err.message);
+    } finally {
+      setGeneratingPath(false);
+    }
+  };
 
+  const handleApproveLearningPath = async () => {
+    if (!activeThreadId) return;
+    setApprovingPath(true);
+    try {
+      await apiFetch(`/teacher/learning-path/${activeThreadId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({
+          approve: true,
+          note: "Phê duyệt bởi giáo viên",
+        }),
+      });
+      alert("Đã phê duyệt và kích hoạt lộ trình học tập cho học sinh!");
+      setActiveThreadId(null);
+      setInsights(null);
+      setDraftPaths(null);
+    } catch (err: any) {
+      alert("Lỗi khi phê duyệt: " + err.message);
+    } finally {
+      setApprovingPath(false);
+    }
+  };
   const loadStudentDetailProgress = async (studentId: string) => {
     try {
       const data = (await apiFetch(
@@ -765,6 +819,19 @@ export default function TeacherDashboard() {
               >
                 <GitBranch size={16} /> Thiết kế Cây Kiến thức
               </button>
+              <button
+                onClick={() => {
+                  setActiveTab("learning-path");
+                  setSelectedStudent(null);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${
+                  activeTab === "learning-path"
+                    ? "bg-foreground border-foreground text-background shadow-md"
+                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <ListTodo size={16} /> Lập lộ trình & Giám sát
+              </button>
             </>
           ) : (
             <div className="text-center py-8 px-4 border border-dashed border-border rounded-2xl text-muted-foreground text-[10px] font-black uppercase tracking-wider">
@@ -999,9 +1066,13 @@ export default function TeacherDashboard() {
                 )}
                 <div>
                   <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground uppercase tracking-tight">
-                    {activeTab === "students" ? "Báo cáo tiến độ học tập" : "Thiết kế & Biên soạn sơ đồ cây"}
+                    {activeTab === "students" 
+                      ? "Báo cáo tiến độ học tập" 
+                      : activeTab === "graph-designer" 
+                      ? "Thiết kế & Biên soạn sơ đồ cây" 
+                      : "Lập lộ trình & Giám sát học tập"}
                   </h1>
-                  <p className="text-xs text-muted-foreground mt-1">Lọc nội dung theo chủ đề lớp học</p>
+                  <p className="text-xs text-muted-foreground mt-1">Lập lộ trình học tập cá nhân hóa & xem báo cáo lỗ hổng lớp học</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -1071,7 +1142,7 @@ export default function TeacherDashboard() {
                   </table>
                 </div>
               </div>
-            ) : (
+            ) : activeTab === "graph-designer" ? (
               // Tab 2: Graph Tree Designer Canvas (Teacher Editor)
               <div className="flex-1 flex gap-5 overflow-hidden">
                 {/* SVG canvas Editor */}
@@ -1378,6 +1449,267 @@ export default function TeacherDashboard() {
                     </div>
                   </>
                 )}
+              </div>
+            ) : (
+              // Tab 3: Learning Path & Class Insights Dashboard
+              <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6">
+                
+                {/* Step 1: Select Target Topics */}
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+                  <div>
+                    <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
+                      1. Chọn chủ đề kiểm tra mục tiêu
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Chọn các bài học bạn muốn chẩn đoán và lập lộ trình học phụ đạo cho lớp</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[160px] overflow-y-auto p-1">
+                    {nodes.map((node) => {
+                      const isChecked = selectedTargetTopics.includes(node.id);
+                      return (
+                        <button
+                          key={node.id}
+                          onClick={() => {
+                            if (isChecked) {
+                              setSelectedTargetTopics(prev => prev.filter(id => id !== node.id));
+                            } else {
+                              setSelectedTargetTopics(prev => [...prev, node.id]);
+                            }
+                          }}
+                          className={`flex items-center gap-3 p-3 rounded-2xl border text-left text-xs font-bold transition-all shadow-sm cursor-pointer ${
+                            isChecked
+                              ? "bg-foreground border-foreground text-background"
+                              : "bg-white border-border text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          <span className={`h-4 w-4 rounded-md border flex items-center justify-center ${
+                            isChecked ? "bg-background border-background text-foreground" : "border-border bg-white"
+                          }`}>
+                            {isChecked && <Check size={12} className="stroke-[3px]" />}
+                          </span>
+                          <span className="truncate">{node.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <div className="flex pt-2 justify-end">
+                    <button
+                      onClick={handleGenerateLearningPath}
+                      disabled={generatingPath || selectedTargetTopics.length === 0}
+                      className="px-6 py-3 bg-[var(--mint)] hover:brightness-95 active:scale-95 disabled:opacity-50 text-foreground font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      {generatingPath ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Đang tính toán...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={14} />
+                          Lập lộ trình & Phân tích lớp học
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Step 2: Display Results if available */}
+                {insights && (
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+                    
+                    {/* Left: Class Insights (Gaps, Intervention Groups, Priority List) */}
+                    <div className="xl:col-span-2 space-y-6">
+                      
+                      {/* Class-wide Gaps */}
+                      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+                        <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                          📢 Lỗ hổng kiến thức cả lớp ({insights.class_wide_gaps?.length || 0})
+                        </h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {insights.class_wide_gaps && insights.class_wide_gaps.map((gap: any) => {
+                            const gapNode = nodes.find(n => n.id === gap.topic_id);
+                            const topicName = gapNode ? gapNode.name : gap.topic_id;
+                            return (
+                              <div key={gap.topic_id} className="p-4 bg-muted/30 border border-border rounded-2xl space-y-2">
+                                <div className="flex justify-between items-start">
+                                  <span className="font-extrabold text-xs text-foreground max-w-[70%] truncate" title={topicName}>{topicName}</span>
+                                  <span className="text-[10px] font-black uppercase text-red-500 bg-red-50 px-2.5 py-0.5 rounded-full border border-red-100">
+                                    Hổng {(gap.confirmed_gap_rate * 100).toFixed(0)}%
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-muted-foreground flex justify-between font-bold pt-1.5 border-t border-border/40">
+                                  <span>Hình thức: {gap.recommended_intervention === 'reteach_class' ? 'Dạy lại cả lớp' : gap.recommended_intervention === 'small_group' ? 'Phụ đạo nhóm nhỏ' : 'Hỗ trợ cá nhân'}</span>
+                                  <span>Học sinh hổng: {gap.gap_student_ids?.length}/{gap.denominator}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {(!insights.class_wide_gaps || insights.class_wide_gaps.length === 0) && (
+                            <div className="col-span-2 text-center py-6 text-xs text-muted-foreground font-bold">
+                              Không phát hiện lỗ hổng nghiêm trọng nào trong lớp!
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Intervention Groups */}
+                      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+                        <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                          👥 Nhóm can thiệp phụ đạo ({insights.intervention_groups?.length || 0})
+                        </h3>
+                        
+                        <div className="space-y-3">
+                          {insights.intervention_groups && insights.intervention_groups.map((group: any, idx: number) => {
+                            const rootNode = nodes.find(n => n.id === group.root_cause_topic_id);
+                            const rootName = rootNode ? rootNode.name : group.root_cause_topic_id;
+                            
+                            const names = group.student_ids.map((sid: string) => {
+                              const p = studentsProgress.find(sp => sp.studentId === sid);
+                              return p ? p.studentName : sid;
+                            }).join(", ");
+
+                            return (
+                              <div key={idx} className="p-4 bg-muted/30 border border-border rounded-2xl flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
+                                <div className="space-y-1.5 max-w-[70%]">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-xs text-foreground">
+                                      Nhóm hổng gốc: {rootName}
+                                    </span>
+                                    <span className="text-[9px] font-black uppercase text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                                      Band {group.mastery_band}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-muted-foreground font-semibold">
+                                    <strong className="text-foreground">Thành viên:</strong> {names || "Không có"}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
+                                    {group.recommended_intervention === 'reteach_class' ? 'Dạy lại cả lớp' : group.recommended_intervention === 'small_group' ? 'Phụ đạo nhóm' : 'Hỗ trợ cá nhân'}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {(!insights.intervention_groups || insights.intervention_groups.length === 0) && (
+                            <div className="text-center py-6 text-xs text-muted-foreground font-bold">
+                              Không cần can thiệp nhóm.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Prioritized Help List */}
+                      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
+                        <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                          🚨 Ưu tiên hỗ trợ học sinh ({insights.prioritized_students?.length || 0})
+                        </h3>
+                        
+                        <div className="space-y-2.5">
+                          {insights.prioritized_students && insights.prioritized_students.map((student: any) => {
+                            const p = studentsProgress.find(sp => sp.studentId === student.student_id);
+                            const name = p ? p.studentName : student.student_id;
+                            const email = p ? p.studentEmail : "";
+                            
+                            return (
+                              <div key={student.student_id} className="p-3.5 bg-rose-50/20 border border-rose-100 rounded-2xl flex items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-extrabold text-xs text-slate-900">{name}</span>
+                                    <span className="text-[9px] text-slate-400 font-bold">{email}</span>
+                                  </div>
+                                  <p className="text-[10px] text-rose-700 font-semibold">{student.reason}</p>
+                                </div>
+                                <span className="text-[10px] font-black uppercase text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-100 font-mono">
+                                  Độ khẩn: {student.help_priority.toFixed(1)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {(!insights.prioritized_students || insights.prioritized_students.length === 0) && (
+                            <div className="text-center py-6 text-xs text-muted-foreground font-bold">
+                              Không có học sinh nào bị tụt lại cần hỗ trợ khẩn cấp.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Right: Path Approval list (Active / Draft paths per student) */}
+                    <div className="space-y-6">
+                      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex flex-col space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
+                            📝 Phê duyệt lộ trình
+                          </h3>
+                          <button
+                            onClick={handleApproveLearningPath}
+                            disabled={approvingPath}
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            {approvingPath ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                            Duyệt lộ trình cả lớp
+                          </button>
+                        </div>
+                        
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                          {draftPaths && Object.keys(draftPaths).map((sid) => {
+                            const studentPath = draftPaths[sid];
+                            const p = studentsProgress.find(sp => sp.studentId === sid);
+                            const name = p ? p.studentName : sid;
+                            
+                            return (
+                              <div key={sid} className="p-4 bg-muted/20 border border-border rounded-2xl space-y-3">
+                                <div className="flex justify-between items-center border-b border-border/40 pb-2">
+                                  <span className="font-extrabold text-xs text-foreground">{name}</span>
+                                  <span className="text-[9px] font-black uppercase text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                                    Dự thảo (Draft)
+                                  </span>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                  {studentPath.ordered_steps && studentPath.ordered_steps.map((step: any) => {
+                                    const stepNode = nodes.find(n => n.id === step.topic_id);
+                                    const topicName = stepNode ? stepNode.name : step.topic_id;
+                                    return (
+                                      <div key={step.topic_id} className="p-2.5 bg-white border border-border rounded-xl text-[10px] space-y-1">
+                                        <div className="flex justify-between font-bold text-foreground">
+                                          <span>{step.order}. {topicName}</span>
+                                          <span className="text-muted-foreground font-mono">{(step.current_mastery * 100).toFixed(0)}% → {(step.target_mastery * 100).toFixed(0)}%</span>
+                                        </div>
+                                        <p className="text-[9px] text-muted-foreground leading-relaxed">{step.inclusion_reason}</p>
+                                        <div className="flex gap-2 text-[8px] text-slate-400 font-bold">
+                                          <span>⏱️ {step.estimated_minutes}m</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  {(!studentPath.ordered_steps || studentPath.ordered_steps.length === 0) && (
+                                    <div className="text-center py-4 text-[10px] text-muted-foreground font-bold">
+                                      Không cần lộ trình bổ trợ (đã thành thạo!).
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+                
+                {!insights && (
+                  <div className="bg-card border border-border rounded-3xl p-12 text-center text-muted-foreground text-xs font-bold border-dashed flex flex-col items-center justify-center gap-2">
+                    <ListTodo size={28} className="text-muted-foreground/30 animate-pulse" />
+                    Chưa có kết quả phân tích. Hãy chọn chủ đề mục tiêu ở trên và bấm "Lập lộ trình & Phân tích lớp học".
+                  </div>
+                )}
+
               </div>
             )}
           </div>

@@ -123,4 +123,15 @@ type AICache struct {
 	CreatedAt time.Time      `json:"createdAt"`
 }
 
+type LearningPath struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	StudentID uuid.UUID `gorm:"type:uuid;not null;index" json:"studentId"`
+	ClassID   string    `gorm:"type:varchar(100);not null" json:"classId"`
+	ThreadID  string    `gorm:"type:varchar(100);not null" json:"threadId"`
+	Status    string    `gorm:"type:varchar(50);not null" json:"status"` // "Draft", "Approved", "Active"
+	StepsJSON string    `gorm:"type:text;not null" json:"stepsJson"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 

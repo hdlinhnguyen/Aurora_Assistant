@@ -2,9 +2,11 @@ package handler
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -17,6 +19,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	"backend/internal/config"
 	"backend/internal/model"
 	"backend/internal/service"
 )
@@ -987,6 +990,392 @@ func (h *TutorHandler) RenameSubject(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"status": "success", "message": "Đổi tên môn học thành công!"})
+}
+
+func (h *TutorHandler) GetInternalGraph(c fiber.Ctx) error {
+	var dbNodes []model.Node
+	if err := config.DB.Find(&dbNodes).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var dbEdges []model.Edge
+	if err := config.DB.Find(&dbEdges).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	prereqsMap := make(map[uuid.UUID][]string)
+	for _, edge := range dbEdges {
+		prereqsMap[edge.TargetID] = append(prereqsMap[edge.TargetID], edge.SourceID.String())
+	}
+
+	type NodeResponse struct {
+		ID        string   `json:"id"`
+		Ten       string   `json:"ten"`
+		Lop       int      `json:"lop"`
+		Cap       string   `json:"cap"`
+		TienQuyet []string `json:"tienQuyet"`
+		Mo        bool     `json:"mo"`
+		Yccd      []string `json:"yccd"`
+	}
+
+	var nodes []NodeResponse
+	for _, node := range dbNodes {
+		lop := 5
+		subjectLower := strings.ToLower(node.Subject)
+		if strings.Contains(subjectLower, "lớp 10") {
+			lop = 10
+		} else if strings.Contains(subjectLower, "lớp 11") {
+			lop = 11
+		} else if strings.Contains(subjectLower, "lớp 12") {
+			lop = 12
+		} else if strings.Contains(subjectLower, "lớp 1") {
+			lop = 1
+		} else if strings.Contains(subjectLower, "lớp 2") {
+			lop = 2
+		} else if strings.Contains(subjectLower, "lớp 3") {
+			lop = 3
+		} else if strings.Contains(subjectLower, "lớp 4") {
+			lop = 4
+		} else if strings.Contains(subjectLower, "lớp 5") {
+			lop = 5
+		} else if strings.Contains(subjectLower, "lớp 6") {
+			lop = 6
+		} else if strings.Contains(subjectLower, "lớp 7") {
+			lop = 7
+		} else if strings.Contains(subjectLower, "lớp 8") {
+			lop = 8
+		} else if strings.Contains(subjectLower, "lớp 9") {
+			lop = 9
+		}
+
+		capLevel := "TH"
+		if lop >= 6 && lop <= 9 {
+			capLevel = "THCS"
+		} else if lop >= 10 && lop <= 12 {
+			capLevel = "THPT"
+		}
+
+		tienQuyet := prereqsMap[node.ID]
+		if tienQuyet == nil {
+			tienQuyet = []string{}
+		}
+
+		yccd := []string{}
+		if node.Theory != "" {
+			lines := strings.Split(node.Theory, "\n")
+			for _, line := range lines {
+				trimmed := strings.TrimSpace(line)
+				if trimmed != "" {
+					yccd = append(yccd, trimmed)
+				}
+			}
+		}
+
+		nodes = append(nodes, NodeResponse{
+			ID:        node.ID.String(),
+			Ten:       node.Name,
+			Lop:       lop,
+			Cap:       capLevel,
+			TienQuyet: tienQuyet,
+			Mo:        false,
+			Yccd:      yccd,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"nodes": nodes,
+	})
+}
+
+type CreatePathBodyRequest struct {
+	ClassID                       string    `json:"class_id"`
+	StudentIDs                    []string  `json:"student_ids"`
+	TargetTopicIDs                []string  `json:"target_topic_ids"`
+	TeacherID                     string    `json:"teacher_id"`
+	TargetMasteryThreshold        float64   `json:"target_mastery_threshold"`
+	MinimumConfidenceThreshold    float64   `json:"minimum_confidence_threshold"`
+}
+
+type RawQuizEvidence struct {
+	EvidenceID    string    `json:"evidence_id"`
+	StudentID     string    `json:"student_id"`
+	SessionID     string    `json:"session_id"`
+	QuestionID    string    `json:"question_id"`
+	TopicID       string    `json:"topic_id"`
+	Score         float64   `json:"score"`
+	AttemptNumber int       `json:"attempt_number"`
+	HintsUsed     int       `json:"hints_used"`
+	GradingMethod string    `json:"grading_method"`
+	OccurredAt    string    `json:"occurred_at"`
+}
+
+type CreatePathFastAPIBody struct {
+	Request  CreatePathBodyRequest `json:"request"`
+	RawQuiz  []RawQuizEvidence     `json:"raw_quiz"`
+	RawPaper []interface{}         `json:"raw_paper"`
+	AsOf     string                `json:"as_of"`
+}
+
+func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
+	teacherIDStr := c.Locals("userID").(string)
+	
+	var req struct {
+		ClassID        string   `json:"classId"`
+		StudentIDs     []string `json:"studentIds"`
+		TargetTopicIDs []string `json:"targetTopicIds"`
+	}
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu yêu cầu không hợp lệ"})
+	}
+
+	if req.ClassID == "" {
+		req.ClassID = "class-demo"
+	}
+	
+	if len(req.StudentIDs) == 0 {
+		var studentEmails = []string{"studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn", "student@aurora.edu.vn"}
+		var ids []string
+		config.DB.Table("users").Where("email IN (?)", studentEmails).Select("id").Find(&ids)
+		req.StudentIDs = ids
+	}
+
+	var logs []model.ActivityLog
+	if err := config.DB.Where("student_id IN (?)", req.StudentIDs).Find(&logs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn lịch sử học tập"})
+	}
+
+	var rawQuiz []RawQuizEvidence
+	for _, log := range logs {
+		score := 0.0
+		if log.Action == "answer_correct" {
+			score = 1.0
+		} else if log.Action == "answer_incorrect" {
+			score = 0.0
+		} else {
+			continue
+		}
+
+		rawQuiz = append(rawQuiz, RawQuizEvidence{
+			EvidenceID:    log.ID.String(),
+			StudentID:     log.StudentID.String(),
+			SessionID:     "mock-session",
+			QuestionID:    "mock-question",
+			TopicID:       log.NodeID.String(),
+			Score:         score,
+			AttemptNumber: 1,
+			HintsUsed:     0,
+			GradingMethod: "auto",
+			OccurredAt:    log.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	fastAPIBody := CreatePathFastAPIBody{
+		Request: CreatePathBodyRequest{
+			ClassID:                    req.ClassID,
+			StudentIDs:                 req.StudentIDs,
+			TargetTopicIDs:             req.TargetTopicIDs,
+			TeacherID:                  teacherIDStr,
+			TargetMasteryThreshold:     0.80,
+			MinimumConfidenceThreshold: 0.40,
+		},
+		RawQuiz:  rawQuiz,
+		RawPaper: []interface{}{},
+		AsOf:     time.Now().Format(time.RFC3339),
+	}
+
+	jsonBytes, err := json.Marshal(fastAPIBody)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
+	}
+
+	fastAPIURL := "http://localhost:8000/learning-path"
+	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi đọc phản hồi"})
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Máy chủ tính toán báo lỗi: " + string(bodyBytes)})
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã JSON phản hồi"})
+	}
+
+	return c.JSON(result)
+}
+
+func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
+	threadID := c.Params("threadId")
+	if threadID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Thiếu threadId"})
+	}
+
+	var req struct {
+		Approve bool   `json:"approve"`
+		Note    string `json:"note"`
+	}
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu yêu cầu không hợp lệ"})
+	}
+
+	jsonBytes, err := json.Marshal(req)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
+	}
+
+	fastAPIURL := fmt.Sprintf("http://localhost:8000/learning-path/%s/approve", threadID)
+	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi đọc phản hồi"})
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Máy chủ tính toán báo lỗi: " + string(bodyBytes)})
+	}
+
+	var result struct {
+		ThreadID     string                 `json:"thread_id"`
+		Status       string                 `json:"status"`
+		Paths        map[string]interface{} `json:"paths"`
+		ClassInsight interface{}            `json:"class_insight"`
+	}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã JSON phản hồi"})
+	}
+
+	classID := "class-demo"
+
+	for studentIDStr, pathData := range result.Paths {
+		studentID, err := uuid.Parse(studentIDStr)
+		if err != nil {
+			continue
+		}
+
+		stepsBytes, _ := json.Marshal(pathData)
+
+		config.DB.Where("student_id = ? AND class_id = ?", studentID, classID).Delete(&model.LearningPath{})
+
+		newPath := model.LearningPath{
+			ID:        uuid.New(),
+			StudentID: studentID,
+			ClassID:   classID,
+			ThreadID:  threadID,
+			Status:    "Approved",
+			StepsJSON: string(stepsBytes),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		config.DB.Create(&newPath)
+	}
+
+	return c.JSON(result)
+}
+
+func (h *TutorHandler) GetStudentLearningPath(c fiber.Ctx) error {
+	userIDStr := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+
+	var path model.LearningPath
+	err = config.DB.Where("student_id = ? AND status = 'Approved'", studentID).Order("created_at desc").First(&path).Error
+	if err != nil {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+
+	var parsedPath map[string]interface{}
+	if err := json.Unmarshal([]byte(path.StepsJSON), &parsedPath); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã dữ liệu lộ trình"})
+	}
+
+	return c.JSON(parsedPath)
+}
+
+func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
+	userIDStr := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+
+	var req struct {
+		TopicID             string  `json:"topicId"`
+		PressCount          int     `json:"pressCount"`
+		ChosenMisconception *string `json:"chosenMisconception"`
+	}
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu yêu cầu không hợp lệ"})
+	}
+
+	type FastAPIHintBody struct {
+		TopicID             string  `json:"topic_id"`
+		PressCount          int     `json:"press_count"`
+		ChosenMisconception *string `json:"chosen_misconception"`
+	}
+
+	bodyPayload := FastAPIHintBody{
+		TopicID:             req.TopicID,
+		PressCount:          req.PressCount,
+		ChosenMisconception: req.ChosenMisconception,
+	}
+
+	jsonBytes, err := json.Marshal(bodyPayload)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
+	}
+
+	fastAPIURL := "http://localhost:8000/hints"
+	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ gợi ý: " + err.Error()})
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi đọc phản hồi"})
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Máy chủ gợi ý báo lỗi: " + string(bodyBytes)})
+	}
+
+	var hintResult map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &hintResult); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã JSON phản hồi"})
+	}
+
+	topicUUID, err := uuid.Parse(req.TopicID)
+	if err == nil {
+		logDetail := fmt.Sprintf("Topic: %s, Press: %d", req.TopicID, req.PressCount)
+		newLog := model.ActivityLog{
+			ID:        uuid.New(),
+			StudentID: studentID,
+			Subject:   "Toán Lớp 5",
+			NodeID:    topicUUID,
+			Action:    "request_hint",
+			Detail:    logDetail,
+			CreatedAt: time.Now(),
+		}
+		config.DB.Create(&newLog)
+	}
+
+	return c.JSON(hintResult)
 }
 
 

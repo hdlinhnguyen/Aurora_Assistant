@@ -185,6 +185,7 @@ func main() {
 	// Public Routes
 	app.Post("/api/auth/register", authHandler.Register)
 	app.Post("/api/auth/login", authHandler.Login)
+	app.Get("/api/internal/graph", tutorHandler.GetInternalGraph)
 
 	// Protected Routes
 	api := app.Group("/api", middleware.Protected(config.DB))
@@ -229,6 +230,12 @@ func main() {
 	api.Post("/subjects/:subject/start", tutorHandler.StartSubjectNode)
 	api.Post("/nodes/:nodeId/answer", tutorHandler.SubmitAnswer)
 	api.Post("/nodes/:nodeId/cant-do", tutorHandler.SubmitCantDo)
+
+	// Personalized Learning Path & Hint Routes
+	api.Post("/teacher/learning-path", tutorHandler.CreateLearningPath)
+	api.Post("/teacher/learning-path/:threadId/approve", tutorHandler.ApproveLearningPath)
+	api.Get("/student/learning-path", tutorHandler.GetStudentLearningPath)
+	api.Post("/student/hints", tutorHandler.RequestHint)
 
 	api.Get("/teacher/students-progress", tutorHandler.GetStudentsProgress)
 	api.Get("/teacher/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)

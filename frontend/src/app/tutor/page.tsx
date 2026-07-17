@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import KnowledgeTree from "../components/KnowledgeTree";
-import { BookOpen, HelpCircle, MessageSquare, Award, ArrowLeft, RefreshCw, Sparkles, Send, Play } from "lucide-react";
+import { BookOpen, HelpCircle, MessageSquare, Award, ArrowLeft, RefreshCw, Sparkles, Send, Play, ListTodo } from "lucide-react";
 
 interface NodeItem {
   id: string;
@@ -85,6 +85,13 @@ export default function StudentTutorPage() {
   // Student Logs
   const [activityLogs, setActivityLogs] = useState<LogItem[]>([]);
 
+  // Learning Path & Hints States
+  const [learningPath, setLearningPath] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"logs" | "path">("path");
+  const [hintPressCount, setHintPressCount] = useState<number>(0);
+  const [activeHint, setActiveHint] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState<boolean>(false);
+
   useEffect(() => {
     const userStr = localStorage.getItem("aurora_user");
     if (!userStr) {
@@ -102,6 +109,7 @@ export default function StudentTutorPage() {
     if (selectedSubject) {
       loadTreeData();
       loadStudentState();
+      loadLearningPath();
       setSelectedNode(null);
     }
   }, [selectedSubject]);
@@ -167,6 +175,40 @@ export default function StudentTutorPage() {
     }
   };
 
+  const loadLearningPath = async () => {
+    try {
+      const data = await apiFetch("/student/learning-path");
+      if (data && data.ordered_steps) {
+        setLearningPath(data);
+      } else {
+        setLearningPath(null);
+      }
+    } catch (err) {
+      console.error("Failed to load learning path:", err);
+    }
+  };
+
+  const handleRequestHint = async () => {
+    if (!selectedNode || hintLoading) return;
+    setHintLoading(true);
+    try {
+      const nextPressCount = hintPressCount + 1;
+      const res = await apiFetch("/student/hints", {
+        method: "POST",
+        body: JSON.stringify({
+          topicId: selectedNode.id,
+          pressCount: nextPressCount
+        })
+      });
+      setHintPressCount(nextPressCount);
+      setActiveHint(res.content || "Chưa có gợi ý nào cho cấp độ này.");
+    } catch (err: any) {
+      alert("Không thể tải gợi ý: " + err.message);
+    } finally {
+      setHintLoading(false);
+    }
+  };
+
   const handleStartNode = async (node: NodeItem) => {
     try {
       await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/start`, {
@@ -214,6 +256,8 @@ export default function StudentTutorPage() {
     setAnswerFeedback(null);
     setCantDoOptions(null);
     setDifficultyFilter(null);
+    setHintPressCount(0);
+    setActiveHint(null);
     loadQuestions(node.id);
   };
 
@@ -275,6 +319,7 @@ export default function StudentTutorPage() {
         // Update states
         loadStudentState();
         loadTreeData();
+        loadLearningPath();
       } else {
         setAnswerFeedback({ isCorrect: false, message: "❌ Rất tiếc, câu trả lời chưa chính xác. Em thử lại nhé!" });
         setShake(true);
@@ -360,25 +405,106 @@ export default function StudentTutorPage() {
           </select>
         </div>
 
-        {/* Log History */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-          <h3 className="text-[10px] font-black text-slate-400 px-2 uppercase tracking-widest">Lịch sử hoạt động của em</h3>
-          {activityLogs.length > 0 ? (
-            <div className="space-y-2">
-              {activityLogs.slice(0, 20).map((log) => (
-                <div key={log.id} className="p-3 bg-slate-50/80 border border-slate-100 rounded-xl text-[11px] leading-relaxed space-y-1">
-                  <div className="flex justify-between font-bold text-slate-700">
-                    <span className="text-indigo-600 font-black">{log.nodeName || "Bài học"}</span>
-                    <span className="text-[9px] text-slate-400">{new Date(log.createdAt).toLocaleTimeString("vi-VN")}</span>
-                  </div>
-                  <p className="text-slate-500">{log.detail}</p>
+        {/* Navigation Tabs inside Sidebar */}
+        <div className="flex border-b border-slate-100 p-2 gap-1 bg-slate-50/50">
+          <button
+            onClick={() => setActiveTab("path")}
+            className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              activeTab === "path"
+                ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
+                : "text-slate-500 hover:bg-white/40"
+            }`}
+          >
+            <ListTodo size={14} />
+            Lộ trình học
+          </button>
+          <button
+            onClick={() => setActiveTab("logs")}
+            className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              activeTab === "logs"
+                ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
+                : "text-slate-500 hover:bg-white/40"
+            }`}
+          >
+            <BookOpen size={14} />
+            Lịch sử
+          </button>
+        </div>
+
+        {/* Content Panel */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {activeTab === "logs" ? (
+            <>
+              <h3 className="text-[10px] font-black text-slate-400 px-2 uppercase tracking-widest">Lịch sử hoạt động của em</h3>
+              {activityLogs.length > 0 ? (
+                <div className="space-y-2">
+                  {activityLogs.slice(0, 20).map((log) => (
+                    <div key={log.id} className="p-3 bg-slate-50/80 border border-slate-100 rounded-xl text-[11px] leading-relaxed space-y-1">
+                      <div className="flex justify-between font-bold text-slate-700">
+                        <span className="text-indigo-600 font-black">{log.nodeName || "Bài học"}</span>
+                        <span className="text-[9px] text-slate-400">{new Date(log.createdAt).toLocaleTimeString("vi-VN")}</span>
+                      </div>
+                      <p className="text-slate-500">{log.detail}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="text-center py-8 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-xl">
+                  Chưa có nhật ký học tập nào.
+                </div>
+              )}
+            </>
           ) : (
-            <div className="text-center py-8 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-xl">
-              Chưa có nhật ký học tập nào.
-            </div>
+            <>
+              <h3 className="text-[10px] font-black text-slate-400 px-2 uppercase tracking-widest">Lộ trình của em</h3>
+              {learningPath && learningPath.ordered_steps && learningPath.ordered_steps.length > 0 ? (
+                <div className="space-y-2">
+                  {learningPath.ordered_steps.map((step: any) => {
+                    const stepNode = nodes.find(n => n.id === step.topic_id);
+                    const topicName = stepNode ? stepNode.name : step.topic_id;
+                    return (
+                      <div
+                        key={step.topic_id}
+                        onClick={() => {
+                          if (stepNode) handleNodeClick(stepNode);
+                        }}
+                        className={`p-3.5 border transition-all cursor-pointer rounded-2xl text-[11px] leading-relaxed space-y-1.5 shadow-sm hover:scale-[1.01] ${
+                          step.status === "done"
+                            ? "bg-emerald-50/30 border-emerald-100 hover:bg-emerald-50/50"
+                            : step.status === "in_progress"
+                            ? "bg-indigo-50/40 border-indigo-200 hover:bg-indigo-50/60"
+                            : "bg-white border-slate-100 hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center font-bold">
+                          <span className={`${step.status === "in_progress" ? "text-indigo-700" : "text-slate-800"} font-black`}>
+                            {step.order}. {topicName}
+                          </span>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                            step.status === "done"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : step.status === "in_progress"
+                              ? "bg-indigo-100 text-indigo-800 animate-pulse"
+                              : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {step.status === "done" ? "Xong" : step.status === "in_progress" ? "Đang học" : "Chờ học"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-normal">{step.inclusion_reason}</p>
+                        <div className="flex gap-2.5 text-[9px] text-slate-400 font-bold border-t border-slate-50 pt-1.5 font-mono">
+                          <span>⏱️ {step.estimated_minutes}m</span>
+                          <span>🎯 {(step.current_mastery * 100).toFixed(0)}% → {(step.target_mastery * 100).toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-xl">
+                  Chưa có lộ trình nào được duyệt.
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -632,7 +758,20 @@ export default function StudentTutorPage() {
                           </div>
                         )}
 
-                        <div className="flex gap-3 pt-3 border-t border-slate-100">
+                        {/* Hint Display */}
+                        {activeHint && (
+                          <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl space-y-2 animate-[fadeIn_0.3s_ease-out]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5">
+                                ✨ Gợi ý Bậc {hintPressCount}: {hintPressCount === 1 ? "Socratic Nudge" : hintPressCount === 2 ? "First-principles" : "Bottom-out (Ví dụ)"}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-semibold">(Đã giảm nhẹ trọng số BKT)</span>
+                            </div>
+                            <p className="text-xs text-slate-700 leading-relaxed font-semibold">{activeHint}</p>
+                          </div>
+                        )}
+
+                        <div className="flex gap-2.5 pt-3 border-t border-slate-100">
                           {/* Answer validation button */}
                           <button
                             onClick={handleSubmitAnswer}
@@ -642,14 +781,25 @@ export default function StudentTutorPage() {
                             {submitting ? "Đang xử lý..." : "Gửi đáp án"}
                           </button>
 
+                          {/* Request Hint button */}
+                          <button
+                            onClick={handleRequestHint}
+                            disabled={hintLoading || submitting}
+                            className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 disabled:opacity-50 font-bold text-xs px-3.5 py-3 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                            title="Yêu cầu gợi ý thích ứng"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            {hintPressCount === 0 ? "Xem gợi ý" : hintPressCount === 1 ? "Gợi ý 2" : hintPressCount === 2 ? "Gợi ý 3" : "Hết gợi ý"}
+                          </button>
+
                           {/* "Can't Do" button */}
                           <button
                             onClick={handleCantDo}
                             disabled={submitting}
-                            className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 disabled:opacity-50 font-bold text-xs px-4 py-3 rounded-xl transition-all cursor-pointer"
+                            className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 disabled:opacity-50 font-bold text-xs px-3 py-3 rounded-xl transition-all cursor-pointer"
                             title="Không làm được câu này"
                           >
-                            Không làm được
+                            Bỏ qua
                           </button>
                         </div>
 
@@ -702,6 +852,8 @@ export default function StudentTutorPage() {
                                   setSelectedOption(null);
                                   setAnswerFeedback(null);
                                   setCantDoOptions(null);
+                                  setHintPressCount(0);
+                                  setActiveHint(null);
                                 }}
                                 disabled={currentQIndex === 0}
                                 className="px-2.5 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 font-bold disabled:opacity-40 cursor-pointer"
@@ -714,6 +866,8 @@ export default function StudentTutorPage() {
                                   setSelectedOption(null);
                                   setAnswerFeedback(null);
                                   setCantDoOptions(null);
+                                  setHintPressCount(0);
+                                  setActiveHint(null);
                                 }}
                                 disabled={currentQIndex === filteredQuestions.length - 1}
                                 className="px-2.5 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 font-bold disabled:opacity-40 cursor-pointer"

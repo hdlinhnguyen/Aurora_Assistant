@@ -57,6 +57,7 @@ func ConnectDB() {
 		&model.StudentState{},
 		&model.ActivityLog{},
 		&model.AICache{},
+		&model.LearningPath{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
