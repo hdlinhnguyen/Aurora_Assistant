@@ -34,6 +34,8 @@ from learning_path.schemas import (
     LearningPathRequest,
     RawPaperEvidence,
     RawQuizEvidence,
+    Topic,
+    PrerequisiteEdge,
 )
 
 # parents[3] = repo root (api.py → learning_path → src → learning-path → root)
