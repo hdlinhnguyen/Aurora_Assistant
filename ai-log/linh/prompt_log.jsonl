@@ -1,2 +1,7 @@
 {"timestamp": "2026-07-17T21:39:01+07:00", "prompt": "trong folder ai-log, hãy tạo ra các folder mang tên các thành viên trong team mình gồm folder con tên linh, khang, duong, thai và nghiep. trong đó mỗi folder con có 2 files là .gitkeep để đảm bảo ko push lên file gì trống và file jsonl để ghi lại các câu prompt AI log trong IDE từng người làm. hãy báo cáo lại khi hoàn thành xong"}
 {"timestamp": "2026-07-17T21:40:02+07:00", "prompt": "trong lịch sử từ chiều tới giờ hãy ghi lại các câu prompt của mình vào jsonl trong folder của linh"}
+{"timestamp": "2026-07-18T00:00:05+07:00", "prompt": "trê ngit của C:\\Users\\Admin\\Documents\\Aivial\\Aurora_Assistant đã có những thay đổi gì ở các nhánh"}
+{"timestamp": "2026-07-18T00:02:21+07:00", "prompt": "tôi muốn refactor lại trc khi push lên"}
+{"timestamp": "2026-07-18T00:03:53+07:00", "prompt": "loại bỏ hoàn toàn các cấu hình Vite cũ không dùng nữa (như vite.config.ts, @tanstack/react-router, v.v.) và chuẩn hóa lại cấu hình Next.js. xem code clean chưa"}
+{"timestamp": "2026-07-18T00:08:59+07:00", "prompt": "giờ nếu pull main về sẽ xung đột gì"}
+{"timestamp": "2026-07-18T00:09:33+07:00", "prompt": "pulll về update ai log và push lên"}
