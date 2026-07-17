@@ -22,6 +22,8 @@ class Topic(BaseModel):
     name: str
     estimated_learning_time: int = Field(gt=0)  # phút
     content_available: bool = True
+    # YCCĐ nguyên văn (Thông tư 32/2018) — nền cho hint first-principles, không bịa nội dung
+    learning_outcomes: list[str] = Field(default_factory=list)
 
 
 class PrerequisiteEdge(BaseModel):

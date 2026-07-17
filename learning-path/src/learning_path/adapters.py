@@ -46,6 +46,7 @@ def load_chac_goc_graph(path: str | Path) -> CurriculumGraph:
             name=node["ten"],
             estimated_learning_time=DEFAULT_MINUTES_BY_CAP[node["cap"]],
             content_available=not node["mo"],
+            learning_outcomes=node.get("yccd", []),
         )
         for prereq_id in node["tienQuyet"]:
             edges.append(
