@@ -101,3 +101,60 @@ class StudentTopicKnowledgeState(BaseModel):
     evidence_summary: dict[str, float] = Field(default_factory=dict)
     source_breakdown: dict[str, int] = Field(default_factory=dict)
     version: int = 1
+
+
+class LearningPathRequest(BaseModel):
+    """Spec mục 8.2 — giáo viên đặt mục tiêu và ràng buộc; hệ thống tự tạo trong phạm vi đó."""
+
+    class_id: str
+    student_ids: list[str]
+    target_topic_ids: list[str]
+    teacher_id: str
+    deadline: datetime | None = None
+    estimated_minutes_per_student: int | None = None
+    required_topic_ids: list[str] = Field(default_factory=list)
+    excluded_topic_ids: list[str] = Field(default_factory=list)
+    target_mastery_threshold: float = Field(default=0.80, ge=0, le=1)
+    minimum_confidence_threshold: float = Field(default=0.40, ge=0, le=1)
+    review_checkpoint: datetime | None = None
+
+
+PathStepStatus = Literal["pending", "in_progress", "done", "content_unavailable"]
+PathStatus = Literal["Draft", "Approved", "Active", "Paused", "Completed", "Superseded"]
+
+
+class PathStep(BaseModel):
+    """Spec mục 11 — một bước học: topic + mức hiện tại/cần đạt + lý do + điều kiện hoàn thành."""
+
+    topic_id: str
+    order: int
+    current_mastery: float = Field(ge=0, le=1)
+    current_confidence: float = Field(ge=0, le=1)
+    target_mastery: float = Field(ge=0, le=1)
+    minimum_confidence: float = Field(ge=0, le=1)
+    gap_score: float = Field(ge=0)
+    estimated_minutes: int = Field(ge=0)
+    inclusion_reason: str
+    completion_condition: str
+    status: PathStepStatus = "pending"
+    teacher_locked: bool = False
+
+
+class PersonalizedLearningPath(BaseModel):
+    """Spec mục 11 + trường trả về của ngoại lệ 'không đủ thời gian' (mục 15)."""
+
+    path_id: str
+    student_id: str
+    class_id: str
+    target_topic_ids: list[str]
+    teacher_constraints: dict[str, object] = Field(default_factory=dict)
+    diagnosis_summary: str = ""
+    ordered_steps: list[PathStep] = Field(default_factory=list)
+    deferred_steps: list[PathStep] = Field(default_factory=list)
+    total_estimated_minutes: int = 0
+    minimum_required_minutes: int = 0
+    blocked_target_topics: list[str] = Field(default_factory=list)
+    generated_at: datetime
+    next_review_checkpoint: datetime | None = None
+    status: PathStatus = "Draft"
+    version: int = 1
