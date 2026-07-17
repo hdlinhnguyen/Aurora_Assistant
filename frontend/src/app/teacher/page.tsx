@@ -1873,8 +1873,18 @@ export default function TeacherDashboard() {
         <div className="fixed inset-0 bg-foreground/50 backdrop-blur-sm flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-card w-full max-w-lg border border-border shadow-2xl rounded-3xl p-6 flex flex-col gap-4">
             <div className="flex justify-between items-center border-b border-border pb-3">
-              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
-                {editingQuestion.id ? "📝 HIỆU CHỈNH CÂU HỎI THỦ CÔNG" : "➕ THÊM CÂU HỎI VÀO NGÂN HÀNG"}
+              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-1.5">
+                {editingQuestion.id ? (
+                  <>
+                    <Pencil size={14} className="text-[var(--mint)]" />
+                    <span>Hiệu chỉnh câu hỏi thủ công</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus size={14} className="text-[var(--mint)]" />
+                    <span>Thêm câu hỏi vào ngân hàng</span>
+                  </>
+                )}
               </h3>
               <button
                 onClick={() => {

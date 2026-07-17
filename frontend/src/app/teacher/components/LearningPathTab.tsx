@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ListTodo, GitFork, AlertCircle, ArrowUp, ArrowDown, Trash, ShieldAlert } from "lucide-react";
+import { ListTodo, GitFork, AlertCircle, ArrowUp, ArrowDown, Trash, ShieldAlert, Target, AlertTriangle, Users, Flame, FileText } from "lucide-react";
 
 import { NodeItem, StudentProgress } from "../page";
 
@@ -42,7 +42,8 @@ export default function LearningPathTab({
       <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
         <div>
           <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-            🎯 Bước 1: Chọn bài học mục tiêu chẩn đoán
+            <Target size={16} className="text-[var(--mint)] animate-pulse" />
+            <span>Bước 1: Chọn bài học mục tiêu chẩn đoán</span>
           </h3>
           <p className="text-[11px] text-muted-foreground mt-0.5 font-semibold">Chọn các bài học bạn muốn chẩn đoán và lập lộ trình học phụ đạo cho lớp</p>
         </div>
@@ -112,7 +113,8 @@ export default function LearningPathTab({
             {/* Class-wide Gaps */}
             <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
               <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                ⚠️ Lỗ hổng kiến thức chung toàn lớp
+                <AlertTriangle size={15} className="text-amber-500" />
+                <span>Lỗ hổng kiến thức chung toàn lớp</span>
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -139,7 +141,8 @@ export default function LearningPathTab({
             {/* Intervention Groups */}
             <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
               <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                👥 Nhóm can thiệp phụ đạo ({insights.intervention_groups?.length || 0})
+                <Users size={15} className="text-indigo-500" />
+                <span>Nhóm can thiệp phụ đạo ({insights.intervention_groups?.length || 0})</span>
               </h3>
               
               <div className="space-y-3">
@@ -183,7 +186,8 @@ export default function LearningPathTab({
             {/* Support Priority List */}
             <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
               <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                🚨 Ưu tiên hỗ trợ học sinh ({insights.prioritized_students?.length || 0})
+                <Flame size={15} className="text-rose-500 animate-bounce" />
+                <span>Ưu tiên hỗ trợ học sinh ({insights.prioritized_students?.length || 0})</span>
               </h3>
               
               <div className="space-y-2.5">
@@ -221,7 +225,8 @@ export default function LearningPathTab({
             <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4 flex flex-col max-h-[700px]">
               <div>
                 <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                  📝 Lộ trình dự thảo của lớp ({draftPaths ? Object.keys(draftPaths).length : 0})
+                  <FileText size={15} className="text-emerald-500" />
+                  <span>Lộ trình dự thảo của lớp ({draftPaths ? Object.keys(draftPaths).length : 0})</span>
                 </h3>
                 <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Nhấn duyệt để áp dụng chính thức các lộ trình này xuống tài khoản học sinh</p>
               </div>

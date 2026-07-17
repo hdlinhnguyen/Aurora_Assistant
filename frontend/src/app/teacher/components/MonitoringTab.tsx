@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Target, TrendingUp } from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -151,7 +151,7 @@ export default function MonitoringTab({
               <div className="flex items-center justify-center h-full text-xs text-muted-foreground font-semibold animate-pulse">Đang tải biểu đồ phân tán...</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 20, right: 20, bottom: 45, left: 35 }}>
+                <ScatterChart margin={{ top: 25, right: 25, bottom: 55, left: 45 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     type="number"
@@ -159,7 +159,7 @@ export default function MonitoringTab({
                     name="Kỳ vọng"
                     unit="%"
                     domain={[50, 100]}
-                    label={{ value: 'Độ thông thạo Kỳ vọng (%)', position: 'insideBottom', offset: -10, fontSize: 9, fontWeight: 700 }}
+                    label={{ value: 'Độ thông thạo Kỳ vọng (%)', position: 'insideBottom', offset: -12, fontSize: 9, fontWeight: 700 }}
                   />
                   <YAxis
                     type="number"
@@ -167,7 +167,7 @@ export default function MonitoringTab({
                     name="Thực tế"
                     unit="%"
                     domain={[0, 100]}
-                    label={{ value: 'Độ thông thạo Thực tế (%)', angle: -90, position: 'insideLeft', fontSize: 9, fontWeight: 700, dx: -25 }}
+                    label={{ value: 'Độ thông thạo Thực tế (%)', angle: -90, position: 'insideLeft', fontSize: 9, fontWeight: 700, dx: -10, dy: 45 }}
                   />
                   <Tooltip
                     cursor={{ strokeDasharray: '3 3' }}
@@ -177,9 +177,13 @@ export default function MonitoringTab({
                         return (
                           <div className="bg-white p-3 border border-slate-200 rounded-xl shadow-lg text-[10px] font-bold space-y-1">
                             <p className="text-slate-900 font-black text-xs border-b border-slate-100 pb-1 mb-1">{data.studentName}</p>
-                            <p className="text-indigo-600">🎯 Kỳ vọng: {data.expectedMastery?.toFixed(1)}%</p>
-                            <p className={data.isOutlier ? "text-rose-600" : "text-emerald-600"}>
-                              📈 Thực tế: {data.actualMastery?.toFixed(1)}%
+                            <p className="text-indigo-600 flex items-center gap-1">
+                              <Target size={11} />
+                              <span>Kỳ vọng: {data.expectedMastery?.toFixed(1)}%</span>
+                            </p>
+                            <p className={`${data.isOutlier ? "text-rose-600" : "text-emerald-600"} flex items-center gap-1`}>
+                              <TrendingUp size={11} />
+                              <span>Thực tế: {data.actualMastery?.toFixed(1)}%</span>
                             </p>
                             <p className="text-slate-500 font-semibold font-mono text-[9px]">Tổng lượt làm: {data.totalAnswers} câu</p>
                           </div>
@@ -191,7 +195,7 @@ export default function MonitoringTab({
                   <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, paddingTop: 10 }} />
 
                   {/* Target mastery reference line (outlier boundary) */}
-                  <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Ranh giới hổng kiến thức (40%)', fill: '#f59e0b', fontSize: 9, fontWeight: 700, position: 'insideStart', offset: 10 }} />
+                  <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Ranh giới hổng kiến thức (40%)', fill: '#f59e0b', fontSize: 8, fontWeight: 700, position: 'top', offset: 5 }} />
 
                   {/* Collective Average Line */}
                   <ReferenceLine
@@ -202,7 +206,7 @@ export default function MonitoringTab({
                     })()}
                     stroke="#6366f1"
                     strokeWidth={1.5}
-                    label={{ value: 'Đường trung bình lớp', fill: '#6366f1', fontSize: 9, fontWeight: 700, position: 'insideEnd', offset: 10 }}
+                    label={{ value: 'Đường trung bình lớp', fill: '#6366f1', fontSize: 8, fontWeight: 700, position: 'top', offset: 5 }}
                   />
 
                   {/* Active learning students */}
@@ -221,6 +225,24 @@ export default function MonitoringTab({
                 </ScatterChart>
               </ResponsiveContainer>
             )}
+          </div>
+          
+          {/* Custom Guide Block for Reference Lines */}
+          <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px] text-muted-foreground font-semibold">
+            <div className="flex items-start gap-2.5 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+              <div className="w-8 h-1 bg-[#6366f1] shrink-0 rounded-full mt-1.5" />
+              <div className="space-y-0.5">
+                <span className="font-black text-indigo-700 block text-xs">Đường trung bình lớp</span>
+                <span className="leading-relaxed">Thể hiện mức độ thông thạo trung bình thực tế hiện tại của cả lớp học.</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+              <div className="w-8 h-1 border-t border-dashed border-[#f59e0b] shrink-0 mt-1.5" />
+              <div className="space-y-0.5">
+                <span className="font-black text-amber-700 block text-xs">Ranh giới hổng kiến thức (40%)</span>
+                <span className="leading-relaxed">Ngưỡng cảnh báo tối thiểu. Học sinh có kết quả dưới mức này cần can thiệp sớm.</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

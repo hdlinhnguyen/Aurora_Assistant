@@ -133,17 +133,17 @@ func main() {
 		mathNode2ID := uuid.New()
 
 		// Save math nodes
-		config.DB.Create(&model.Node{ID: mathRootID, Subject: "Toán Lớp 5", Name: "Toán Lớp 5", Theory: "Chào mừng bạn đến với chương trình Toán Lớp 5! Chúng ta sẽ đi từ các phép tính phân số, số thập phân cho đến hình học nâng cao.", PosX: 400, PosY: 50, IsRoot: true, CreatedAt: time.Now(), UpdatedAt: time.Now()})
-		config.DB.Create(&model.Node{ID: mathNode1ID, Subject: "Toán Lớp 5", Name: "Phép cộng phân số", Theory: "Hai phân số chỉ cộng hoặc trừ được khi chúng có cùng mẫu số. Nếu khác mẫu, ta quy đồng mẫu số rồi thực hiện cộng tử và giữ nguyên mẫu.", PosX: 250, PosY: 180, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
-		config.DB.Create(&model.Node{ID: mathNode11ID, Subject: "Toán Lớp 5", Name: "Cộng phân số cùng mẫu", Theory: "Quy tắc: Muốn cộng hai phân số có cùng mẫu số, ta cộng hai tử số với nhau và giữ nguyên mẫu số. Ví dụ: 1/5 + 2/5 = (1+2)/5 = 3/5.", PosX: 150, PosY: 310, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
-		config.DB.Create(&model.Node{ID: mathNode12ID, Subject: "Toán Lớp 5", Name: "Cộng phân số khác mẫu", Theory: "Quy tắc: Muốn cộng hai phân số khác mẫu số, ta quy đồng mẫu số của hai phân số đó, rồi cộng hai phân số cùng mẫu vừa quy đồng. Ví dụ: 1/2 + 1/3 = 3/6 + 2/6 = 5/6.", PosX: 350, PosY: 310, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
-		config.DB.Create(&model.Node{ID: mathNode2ID, Subject: "Toán Lớp 5", Name: "Phép nhân số thập phân", Theory: "Muốn nhân một số thập phân với một số tự nhiên, ta nhân như nhân các số tự nhiên, sau đó đếm xem phần thập phân có bao nhiêu chữ số rồi dùng dấu phẩy tách ở tích bấy nhiêu chữ số.", PosX: 550, PosY: 180, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Node{ID: mathRootID, Subject: "Toán đại số", Name: "Toán đại số", Theory: "Chào mừng bạn đến với chương trình Toán đại số! Chúng ta sẽ đi từ các phép tính phân số, số thập phân cho đến các khái niệm đại số nâng cao.", PosX: 400, PosY: 50, IsRoot: true, CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Node{ID: mathNode1ID, Subject: "Toán đại số", Name: "Phép cộng phân số", Theory: "Hai phân số chỉ cộng hoặc trừ được khi chúng có cùng mẫu số. Nếu khác mẫu, ta quy đồng mẫu số rồi thực hiện cộng tử và giữ nguyên mẫu.", PosX: 250, PosY: 180, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Node{ID: mathNode11ID, Subject: "Toán đại số", Name: "Cộng phân số cùng mẫu", Theory: "Quy tắc: Muốn cộng hai phân số có cùng mẫu số, ta cộng hai tử số với nhau và giữ nguyên mẫu số. Ví dụ: 1/5 + 2/5 = (1+2)/5 = 3/5.", PosX: 150, PosY: 310, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Node{ID: mathNode12ID, Subject: "Toán đại số", Name: "Cộng phân số khác mẫu", Theory: "Quy tắc: Muốn cộng hai phân số khác mẫu số, ta quy đồng mẫu số của hai phân số đó, rồi cộng hai phân số cùng mẫu vừa quy đồng. Ví dụ: 1/2 + 1/3 = 3/6 + 2/6 = 5/6.", PosX: 350, PosY: 310, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
+		config.DB.Create(&model.Node{ID: mathNode2ID, Subject: "Toán đại số", Name: "Phép nhân số thập phân", Theory: "Muốn nhân một số thập phân với một số tự nhiên, ta nhân như nhân các số tự nhiên, sau đó đếm xem phần thập phân có bao nhiêu chữ số rồi dùng dấu phẩy tách ở tích bấy nhiêu chữ số.", PosX: 550, PosY: 180, IsRoot: false, CreatedAt: time.Now(), UpdatedAt: time.Now()})
 
 		// Save math edges
-		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán Lớp 5", SourceID: mathRootID, TargetID: mathNode1ID, CreatedAt: time.Now()})
-		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán Lớp 5", SourceID: mathNode1ID, TargetID: mathNode11ID, CreatedAt: time.Now()})
-		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán Lớp 5", SourceID: mathNode1ID, TargetID: mathNode12ID, CreatedAt: time.Now()})
-		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán Lớp 5", SourceID: mathRootID, TargetID: mathNode2ID, CreatedAt: time.Now()})
+		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán đại số", SourceID: mathRootID, TargetID: mathNode1ID, CreatedAt: time.Now()})
+		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán đại số", SourceID: mathNode1ID, TargetID: mathNode11ID, CreatedAt: time.Now()})
+		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán đại số", SourceID: mathNode1ID, TargetID: mathNode12ID, CreatedAt: time.Now()})
+		config.DB.Create(&model.Edge{ID: uuid.New(), Subject: "Toán đại số", SourceID: mathRootID, TargetID: mathNode2ID, CreatedAt: time.Now()})
 
 		// Save questions for mathNode11ID (Cộng cùng mẫu)
 		config.DB.Create(&model.Question{ID: uuid.New(), NodeID: mathNode11ID, Content: "Tính phép tính sau: 1/5 + 2/5 = ?", OptionsJSON: `["3/5", "3/10", "1/5", "2/5"]`, CorrectOption: 0, Difficulty: "easy", CreatedAt: time.Now(), UpdatedAt: time.Now()})
