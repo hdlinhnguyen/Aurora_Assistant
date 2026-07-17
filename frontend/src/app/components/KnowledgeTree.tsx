@@ -502,22 +502,34 @@ export default function KnowledgeTree({
     return status && status !== "locked";
   };
 
-  const getNodeColorClass = (node: NodeItem) => {
+  const getNodeColorClass = (node: NodeItem, isActiveOrHighlighted: boolean = false) => {
     if (mode === "teacher") {
       return "border-slate-200 bg-white text-slate-800 hover:border-[var(--mint)]/60 shadow-sm";
     }
 
-    const status = studentNodeStatus[node.id] || "locked";
+    // fallback for root nodes when state is not initialized
+    let status = studentNodeStatus[node.id];
+    if (!status && node.isRoot) {
+      status = "initial";
+    }
+    if (!status) {
+      status = "locked";
+    }
+
     switch (status) {
       case "mastered":
         return "border-emerald-400/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30 text-emerald-950 shadow-md shadow-emerald-100/40 hover:shadow-emerald-200/50 font-bold";
       case "struggle":
-        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-50/30 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold";
+        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-50/30 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold animate-pulse";
       case "learning":
         return "border-orange-400/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/30 text-orange-950 shadow-md shadow-orange-100/40 hover:shadow-orange-200/50 ring-2 ring-orange-300/60 font-bold";
       case "initial":
-        return "border-blue-400/80 bg-gradient-to-br from-blue-50 via-white to-blue-50/30 text-blue-950 shadow-md shadow-blue-100/40 hover:shadow-blue-200/50 ring-2 ring-blue-300/60 font-bold";
+        return "border-blue-400/80 bg-gradient-to-br from-blue-50 via-white to-blue-50/30 text-blue-950 shadow-md shadow-blue-100/40 hover:shadow-blue-200/50 ring-2 ring-blue-300/60 font-bold animate-pulse-subtle";
       default:
+        // locked status
+        if (isActiveOrHighlighted) {
+          return "border-slate-350 bg-white text-slate-850 shadow-md font-semibold opacity-100 cursor-pointer";
+        }
         return "border-slate-200/70 bg-slate-50/90 text-slate-400/80 opacity-60 cursor-not-allowed";
     }
   };
@@ -1010,12 +1022,12 @@ export default function KnowledgeTree({
             <g style={{ pointerEvents: "auto" }}>
               {displayNodes.map((node) => {
                 const selectable = isNodeSelectable(node);
-                const colorClass = getNodeColorClass(node);
+                const isHighlighted = highlightedNodes.has(node.id);
+                const isActiveNode = node.id === activeSelectedNodeId;
+                const colorClass = getNodeColorClass(node, isHighlighted || isActiveNode);
                 const nodeWidth = 230;
                 const nodeHeight = 85;
 
-                const isHighlighted = highlightedNodes.has(node.id);
-                const isActiveNode = node.id === activeSelectedNodeId;
                 const opacity = isFocusedView ? (isHighlighted ? 1 : 0.6) : 1;
 
                 const isCollapsed = collapsedNodes[node.id];
@@ -1041,6 +1053,12 @@ export default function KnowledgeTree({
                       <div
                         onMouseDown={(e) => handleNodeDragStart(e, node.id, node.posX, node.posY)}
                         onClick={() => {
+                          // Always select/highlight when clicked so it becomes opaque and readable
+                          if (onFocusedNodeChange) {
+                            onFocusedNodeChange(node.id);
+                          }
+                          setSelectedNodeId(node.id);
+
                           if (selectable) {
                             handleNodeClick(node);
                           } else {
@@ -1048,7 +1066,7 @@ export default function KnowledgeTree({
                           }
                         }}
                         className={`h-full w-full rounded-2xl border-2 p-3 flex flex-col justify-between items-start shadow-sm select-none transition-all duration-200 relative ${colorClass} ${
-                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-not-allowed hover:opacity-85"
+                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-pointer hover:shadow-md hover:scale-[1.01]"
                         } ${isActiveNode
                             ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] scale-[1.06] shadow-lg shadow-[var(--purple)]/20 z-10"
                             : isHighlighted
@@ -1056,7 +1074,7 @@ export default function KnowledgeTree({
                               : ""
                         }`}
                       >
-                        {/* Top Metadata Row: Status label and Action details button */}
+                        {/* Top Metadata Row: Status label */}
                         <div className="w-full flex justify-between items-center border-b border-slate-100/60 pb-1">
                           <div className="flex items-center gap-1">
                             {node.isRoot ? (
@@ -1082,24 +1100,6 @@ export default function KnowledgeTree({
                               }[status]}
                             </span>
                           </div>
-
-                          {selectable && (
-                            <button
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onShowContentClick) {
-                                  onShowContentClick(node);
-                                } else if (onNodeClick) {
-                                  onNodeClick(node);
-                                }
-                              }}
-                              className="h-5 w-5 rounded-md bg-slate-100 hover:bg-slate-200/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-sm border border-slate-255 z-20 hover:scale-105 active:scale-95"
-                              title="Xem lý thuyết và làm bài tập"
-                            >
-                              <BookOpen size={10} />
-                            </button>
-                          )}
                         </div>
 
                         {/* Title text */}
