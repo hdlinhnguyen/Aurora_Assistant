@@ -262,6 +262,17 @@ export default function StudentTutorPage() {
         content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${node.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu hiểu bản chất!`,
       },
     ]);
+
+    // Reset practice states
+    setQuestions([]);
+    setCurrentQIndex(0);
+    setSelectedOption(null);
+    setAnswerFeedback(null);
+    setCantDoOptions(null);
+    setDifficultyFilter(null);
+    setHintPressCount(0);
+    setActiveHint(null);
+    loadQuestions(node.id);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -303,20 +314,12 @@ export default function StudentTutorPage() {
       return;
     }
 
-    setSelectedNode(node);
-    handlePivotCenter(node.id);
-  };
-    
-    // Reset practice states
-    setQuestions([]);
-    setCurrentQIndex(0);
-    setSelectedOption(null);
-    setAnswerFeedback(null);
-    setCantDoOptions(null);
-    setDifficultyFilter(null);
-    setHintPressCount(0);
-    setActiveHint(null);
-    loadQuestions(node.id);
+    if (activeMainTab === "workspace") {
+      handleShowContent(node);
+    } else {
+      setSelectedNode(node);
+      handlePivotCenter(node.id);
+    }
   };
 
   const getBktScoreForNode = (nodeId: string) => {
@@ -509,6 +512,7 @@ export default function StudentTutorPage() {
     (q) => !difficultyFilter || q.difficulty === difficultyFilter
   );
 
+  // Render the student tutor workspace interface
   return (
     <div className="flex h-screen bg-slate-50 text-zinc-950 overflow-hidden relative">
       
@@ -776,7 +780,7 @@ export default function StudentTutorPage() {
               <button
                 onClick={() => {
                   if (selectedNode) {
-                    setActiveMainTab("workspace");
+                    handleShowContent(selectedNode);
                   } else {
                     alert("Vui lòng click chọn một bài học trên Sơ đồ Cây trước!");
                   }
@@ -805,6 +809,28 @@ export default function StudentTutorPage() {
           )}
         </div>
 
+        {/* Navigation Breadcrumbs History */}
+        {navHistory.length > 0 && activeMainTab === "graph" && (
+          <div className="mb-4 bg-white/80 border border-slate-200/50 px-4 py-2.5 rounded-2xl flex items-center gap-2 overflow-x-auto text-[11px] font-bold text-slate-650 shadow-sm animate-[fadeIn_0.2s_ease-out]">
+            <span className="text-[9px] uppercase tracking-wider text-slate-400 font-black font-mono shrink-0">Hành trình đã đi:</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              {navHistory.map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => handlePivotCenter(item.id)}
+                    className={`hover:text-indigo-600 hover:underline cursor-pointer transition-all ${
+                      item.id === focusedNodeId ? "text-indigo-650 font-extrabold" : "text-slate-500"
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                  {idx < navHistory.length - 1 && <span className="text-slate-300">/</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Dynamic Main Workspace Tabs Render */}
         {activeMainTab === "graph" ? (
           <div className="flex-1 relative rounded-3xl overflow-hidden shadow-sm border border-slate-200">
@@ -817,6 +843,9 @@ export default function StudentTutorPage() {
                 studentNodeStatus={nodeStatus}
                 initialNodeId={studentState?.initialLevelNodeId}
                 currentNodeId={studentState?.currentLevelNodeId}
+                focusedNodeId={focusedNodeId}
+                onFocusedNodeChange={handlePivotCenter}
+                onShowContentClick={handleShowContent}
                 onNodeClick={handleNodeClick}
                 onRefresh={() => {
                   loadTreeData();
@@ -835,29 +864,46 @@ export default function StudentTutorPage() {
             <div className="flex-1 flex gap-6 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
               
               {/* Left Column: Socratic RAG Theory Chat */}
-              <div className="w-[45%] bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm">
+              <div style={{ width: `${leftWidth}%` }} className="bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm shrink-0">
                 <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
-                  <div className="space-y-0.5">
-                    <span className="text-[9px] bg-indigo-50 text-indigo-700 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono flex items-center gap-1.5 w-fit">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <span className="text-[9px] bg-[var(--mint)]/15 text-[var(--mint)] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono flex items-center gap-1.5 w-fit">
                       {selectedNode.isRoot ? <Compass size={10} /> : <BookOpen size={10} />}
                       {selectedNode.isRoot ? "Nút Gốc môn học" : "Chủ đề học tập"}
                     </span>
                     <h2 className="text-base font-black text-slate-900 leading-tight truncate max-w-[280px]">
                       {selectedNode.name}
                     </h2>
+                    {navHistory.length > 1 && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1.5 overflow-x-auto whitespace-nowrap scrollbar-thin select-none max-w-full">
+                        {navHistory.map((item, idx) => (
+                          <div key={item.id} className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => handleShowContent(item)}
+                              className={`hover:text-indigo-650 hover:underline cursor-pointer transition-all ${
+                                item.id === selectedNode.id ? "text-indigo-600 font-extrabold" : "text-slate-450"
+                              }`}
+                            >
+                              {item.name}
+                            </button>
+                            {idx < navHistory.length - 1 && <span className="text-slate-300">/</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => setActiveMainTab("graph")}
-                    className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50/50 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1"
+                    className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50/50 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1 shrink-0 ml-2"
                   >
                     <ArrowLeft size={10} /> Bản đồ cây
                   </button>
                 </div>
 
                 {/* Extracted Theory Block */}
-                <div className="space-y-2 mb-4 bg-slate-50/60 border border-slate-200/40 p-4 rounded-2xl shadow-inner">
+                <div className="space-y-2 mb-4 bg-slate-50/60 border border-slate-200/40 p-4 rounded-2xl shadow-inner border-l-4 border-l-[var(--mint)]">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">Tóm tắt nội dung chính</h3>
-                  <div className="text-xs text-slate-700 leading-relaxed font-bold max-h-[120px] overflow-y-auto pr-2">
+                  <div className="text-sm text-slate-800 leading-relaxed font-bold max-h-[180px] overflow-y-auto pr-2">
                     {selectedNode.theory || "Nội dung lý thuyết đang được cập nhật..."}
                   </div>
                 </div>
@@ -869,7 +915,7 @@ export default function StudentTutorPage() {
                     <h4 className="text-xs font-black text-slate-800">Trợ lý Socratic giải thích (RAG Chat)</h4>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/30 space-y-3 mb-4 text-xs font-semibold">
+                  <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/30 space-y-3 mb-4 text-sm font-medium">
                     {theoryChat.map((msg, idx) => (
                       <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border transition-all ${
@@ -898,7 +944,7 @@ export default function StudentTutorPage() {
                       placeholder="Hỏi thầy Socratic về bài học này..."
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      className="flex-1 bg-transparent text-xs px-2.5 py-2 text-zinc-950 focus:outline-none font-semibold"
+                      className="flex-1 bg-transparent text-sm px-2.5 py-2 text-zinc-950 focus:outline-none font-semibold"
                     />
                     <button
                       type="submit"
@@ -911,6 +957,19 @@ export default function StudentTutorPage() {
                 </div>
               </div>
 
+              {/* Horizontal Resizer Slider Handle */}
+              <div
+                onMouseDown={handleMouseDown}
+                className="w-1.5 hover:w-2 bg-slate-200/50 hover:bg-indigo-400/80 cursor-col-resize self-stretch transition-all duration-150 rounded-full flex items-center justify-center relative group select-none shrink-0 mx-0.5"
+                title="Kéo giãn chiều rộng không gian"
+              >
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity">
+                  <span className="h-1 w-1 bg-slate-500 rounded-full" />
+                  <span className="h-1 w-1 bg-slate-500 rounded-full" />
+                  <span className="h-1 w-1 bg-slate-500 rounded-full" />
+                </div>
+              </div>
+
               {/* Right Column: BKT Gauge, Questions & Socratic Inline Helper */}
               <div className="flex-1 bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm overflow-y-auto">
                 
@@ -920,53 +979,81 @@ export default function StudentTutorPage() {
                   const masteryPercent = Math.round(bkt.mastery * 100);
                   const confidencePercent = Math.round(bkt.confidence * 100);
                   return (
-                    <div className="flex gap-6 items-center justify-around bg-slate-900/95 border border-slate-800 text-white p-5 rounded-[24px] shadow-lg shadow-slate-900/10 relative overflow-hidden mb-6">
-                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent pointer-events-none" />
-
-                      {/* Circle 1: Mastery */}
-                      <div className="flex flex-col items-center gap-2 relative">
-                        <svg className="w-20 h-20 transform -rotate-90">
-                          <circle cx="40" cy="40" r="32" className="stroke-slate-800" strokeWidth="5" fill="transparent" />
-                          <circle
-                            cx="40"
-                            cy="40"
-                            r="32"
-                            className="stroke-indigo-400 transition-all duration-500 ease-out"
-                            strokeWidth="5.5"
-                            fill="transparent"
-                            strokeDasharray="201"
-                            strokeDashoffset={201 - (201 * bkt.mastery)}
-                            strokeLinecap="round"
-                            style={{ filter: "drop-shadow(0 0 5px rgba(129, 140, 248, 0.8))" }}
-                          />
-                        </svg>
-                        <div className="absolute top-[22px] text-center w-full">
-                          <span className="text-sm font-black text-indigo-300">{masteryPercent}%</span>
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      {/* Card 1: Mastery */}
+                      <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
+                        {/* Tooltip */}
+                        <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform translate-y-1 group-hover:translate-y-0">
+                          <div className="font-extrabold mb-1 text-[var(--mint)] flex items-center gap-1">
+                            <Compass size={11} /> Độ thông thạo
+                          </div>
+                          Được tính từ tỷ lệ trả lời đúng và mức độ hiểu sâu kiến thức. Khi đạt trên 85%, em đã thông suốt chủ đề này!
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono">Độ thông thạo</span>
+
+                        <div className="relative w-24 h-14 flex justify-center mb-1">
+                          <svg className="w-24 h-14" viewBox="0 0 80 40">
+                            <path
+                              d="M 10 40 A 30 30 0 0 1 70 40"
+                              fill="transparent"
+                              className="stroke-slate-100"
+                              strokeWidth="5.5"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M 10 40 A 30 30 0 0 1 70 40"
+                              fill="transparent"
+                              className="stroke-[var(--mint)] transition-all duration-500 ease-out"
+                              strokeWidth="5.5"
+                              strokeLinecap="round"
+                              strokeDasharray="94.2"
+                              strokeDashoffset={94.2 - (94.2 * bkt.mastery)}
+                            />
+                          </svg>
+                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+                            <span className="text-sm font-black text-slate-800">{masteryPercent}%</span>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
+                          Độ thông thạo <HelpCircle size={10} className="text-slate-355" />
+                        </span>
                       </div>
 
-                      {/* Circle 2: Confidence */}
-                      <div className="flex flex-col items-center gap-2 relative">
-                        <svg className="w-20 h-20 transform -rotate-90">
-                          <circle cx="40" cy="40" r="32" className="stroke-slate-800" strokeWidth="5" fill="transparent" />
-                          <circle
-                            cx="40"
-                            cy="40"
-                            r="32"
-                            className="stroke-emerald-400 transition-all duration-500 ease-out"
-                            strokeWidth="5.5"
-                            fill="transparent"
-                            strokeDasharray="201"
-                            strokeDashoffset={201 - (201 * bkt.confidence)}
-                            strokeLinecap="round"
-                            style={{ filter: "drop-shadow(0 0 5px rgba(52, 211, 153, 0.8))" }}
-                          />
-                        </svg>
-                        <div className="absolute top-[22px] text-center w-full">
-                          <span className="text-sm font-black text-emerald-300">{confidencePercent}%</span>
+                      {/* Card 2: Confidence */}
+                      <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
+                        {/* Tooltip */}
+                        <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform translate-y-1 group-hover:translate-y-0">
+                          <div className="font-extrabold mb-1 text-[var(--purple)] flex items-center gap-1">
+                            <Award size={11} /> Độ tự tin (BKT)
+                          </div>
+                          Chỉ số ước lượng bằng thuật toán Bayesian Knowledge Tracing. Đánh giá xác suất em thực sự nắm vững kiến thức, loại bỏ yếu tố may rủi.
                         </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono">Độ tự tin (BKT)</span>
+
+                        <div className="relative w-24 h-14 flex justify-center mb-1">
+                          <svg className="w-24 h-14" viewBox="0 0 80 40">
+                            <path
+                              d="M 10 40 A 30 30 0 0 1 70 40"
+                              fill="transparent"
+                              className="stroke-slate-100"
+                              strokeWidth="5.5"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M 10 40 A 30 30 0 0 1 70 40"
+                              fill="transparent"
+                              className="stroke-[var(--purple)] transition-all duration-500 ease-out"
+                              strokeWidth="5.5"
+                              strokeLinecap="round"
+                              strokeDasharray="94.2"
+                              strokeDashoffset={94.2 - (94.2 * bkt.confidence)}
+                            />
+                          </svg>
+                          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
+                            <span className="text-sm font-black text-slate-800">{confidencePercent}%</span>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
+                          Độ tự tin <HelpCircle size={10} className="text-slate-355" />
+                        </span>
                       </div>
                     </div>
                   );
