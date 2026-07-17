@@ -687,7 +687,7 @@ func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	studentIdStr := c.Params("studentId")
 	if role != "teacher" {
 		userIDStr, _ := c.Locals("userID").(string)
-		if userIDStr != studentIdStr {
+		if !strings.EqualFold(userIDStr, studentIdStr) {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem chi tiết tiến trình"})
 		}
 	}
