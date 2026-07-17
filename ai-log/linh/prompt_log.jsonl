@@ -1,0 +1,2 @@
+{"timestamp": "2026-07-17T21:39:01+07:00", "prompt": "trong folder ai-log, hãy tạo ra các folder mang tên các thành viên trong team mình gồm folder con tên linh, khang, duong, thai và nghiep. trong đó mỗi folder con có 2 files là .gitkeep để đảm bảo ko push lên file gì trống và file jsonl để ghi lại các câu prompt AI log trong IDE từng người làm. hãy báo cáo lại khi hoàn thành xong"}
+{"timestamp": "2026-07-17T21:40:02+07:00", "prompt": "trong lịch sử từ chiều tới giờ hãy ghi lại các câu prompt của mình vào jsonl trong folder của linh"}
