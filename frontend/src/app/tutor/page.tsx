@@ -982,8 +982,8 @@ export default function StudentTutorPage() {
                     <div className="grid grid-cols-2 gap-4 mb-6">
                       {/* Card 1: Mastery */}
                       <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
-                        {/* Tooltip */}
-                        <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform translate-y-1 group-hover:translate-y-0">
+                        {/* Tooltip - below card */}
+                        <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
                           <div className="font-extrabold mb-1 text-[var(--mint)] flex items-center gap-1">
                             <Compass size={11} /> Độ thông thạo
                           </div>
@@ -1020,8 +1020,8 @@ export default function StudentTutorPage() {
 
                       {/* Card 2: Confidence */}
                       <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
-                        {/* Tooltip */}
-                        <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform translate-y-1 group-hover:translate-y-0">
+                        {/* Tooltip - below card */}
+                        <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
                           <div className="font-extrabold mb-1 text-[var(--purple)] flex items-center gap-1">
                             <Award size={11} /> Độ tự tin (BKT)
                           </div>
@@ -1074,16 +1074,18 @@ export default function StudentTutorPage() {
 
                     return (
                       <div className={`space-y-6 transition-all ${shake ? "animate-shake" : ""}`}>
-                        {/* Difficulty labels */}
+                        {/* Difficulty labels - Vietnamese taxonomy */}
                         <div className="flex justify-between items-center border-b border-slate-100 pb-3">
                           <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
                             currentQ.difficulty === "easy"
-                              ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                              ? "bg-sky-50 border-sky-200 text-sky-700"
+                              : currentQ.difficulty === "medium"
+                              ? "bg-amber-50 border-amber-200 text-amber-700"
                               : currentQ.difficulty === "hard"
-                              ? "bg-rose-50 border-rose-200 text-rose-700"
-                              : "bg-amber-50 border-amber-200 text-amber-700"
+                              ? "bg-orange-50 border-orange-200 text-orange-700"
+                              : "bg-rose-50 border-rose-200 text-rose-700"
                           }`}>
-                            Độ khó: {currentQ.difficulty}
+                            {{ easy: "Nhận biết", medium: "Thông hiểu", hard: "Vận dụng", very_hard: "Vận dụng cao" }[currentQ.difficulty] || currentQ.difficulty}
                           </span>
                           
                           {difficultyFilter && (
@@ -1199,7 +1201,7 @@ export default function StudentTutorPage() {
                                   onClick={handleChooseEasier}
                                   className="w-full bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 p-3.5 rounded-xl text-xs font-black shadow-sm transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer animate-[fadeIn_0.2s_ease-out]"
                                 >
-                                  👉 Làm câu hỏi cấp độ dễ hơn (giảm độ khó)
+                                  👉 Chuyển sang câu hỏi cấp Nhận biết (dễ hơn)
                                 </button>
                               )}
                               
