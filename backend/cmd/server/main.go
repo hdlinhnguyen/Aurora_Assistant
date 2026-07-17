@@ -244,6 +244,10 @@ func main() {
 	api.Get("/student/learning-path", tutorHandler.GetStudentLearningPath)
 	api.Post("/student/hints", tutorHandler.RequestHint)
 
+	// Guardrail: cảnh báo an toàn nội dung cho giáo viên
+	api.Get("/teacher/guardrail-events", tutorHandler.GetGuardrailEvents)
+	api.Put("/teacher/guardrail-events/:id/handled", tutorHandler.MarkGuardrailEventHandled)
+
 	api.Get("/teacher/students-progress", tutorHandler.GetStudentsProgress)
 	api.Get("/teacher/monitoring/:subject", tutorHandler.GetMonitoringData)
 	api.Get("/teacher/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)

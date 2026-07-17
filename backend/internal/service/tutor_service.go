@@ -69,7 +69,11 @@ type TutorService interface {
 	GetMonitoringData(subject string) ([]StudentStat, error)
 
 	// Socratic RAG Chat
-	ChatNodeTheory(nodeID uuid.UUID, message string, history []map[string]string) (string, error)
+	ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string) (string, error)
+
+	// Guardrail
+	GetGuardrailEvents(severity string, limit int) ([]GuardrailEventView, error)
+	MarkGuardrailEventHandled(eventID uuid.UUID) error
 	ParseAndBuildTree(subject string, fileContent string) error
 	ParseChunk(chunk string) (ParsedGraph, error)
 	SaveTree(subject string, graph ParsedGraph) error
@@ -179,14 +183,51 @@ func (s *tutorService) SendMessage(sessionID uuid.UUID, senderID uuid.UUID, cont
 		return nil, nil, err
 	}
 
+	// ── Guardrail lớp 1: kiểm tra input TRƯỚC khi gọi LLM ──
+	// Tin nhắn học sinh vẫn được lưu (giáo viên cần thấy trong Inspect Drawer),
+	// nhưng không gửi sang LLM; trả lời bằng kịch bản an toàn và ghi sự kiện.
+	if verdict := CheckStudentInput(content); verdict != nil {
+		s.logGuardrailEvent(senderID, &sessionID, "chat_input", verdict, content)
+		safeMsg := &model.Message{
+			ID:            uuid.New(),
+			SessionID:     sessionID,
+			Sender:        "ai",
+			Content:       SafeResponse(verdict.Category, session.Mode),
+			DetectedGap:   "",
+			IsCorrectStep: true, // sự cố an toàn không phải tín hiệu đánh giá kiến thức
+			FeynmanScore:  0,
+			CreatedAt:     time.Now(),
+		}
+		if err := s.db.Create(safeMsg).Error; err != nil {
+			return studentMsg, nil, err
+		}
+		return studentMsg, safeMsg, nil
+	}
+
 	var history []model.Message
 	s.db.Where("session_id = ?", sessionID).Order("created_at asc").Find(&history)
 
-	aiText, detectedGap, isCorrectStep, feynmanScore, err := s.aiSvc.GenerateResponse(history, session.Topic, session.Mode)
+	aiText, detectedGap, isCorrectStep, feynmanScore, safetyFlag, err := s.aiSvc.GenerateResponse(history, session.Topic, session.Mode)
 	if err != nil {
 		aiText = "Xin lỗi em, thầy gặp chút sự cố mạng khi tải câu hỏi tiếp theo. Em hãy thử gửi lại tin nhắn nhé."
 		isCorrectStep = true
 		feynmanScore = 0
+		safetyFlag = ""
+	}
+
+	// ── Guardrail lớp 2: LLM tự gắn cờ trường hợp regex bỏ sót ──
+	// Ghi sự kiện cho giáo viên; giữ nguyên response_message vì LLM đã được
+	// hướng dẫn tự trả lời an toàn đúng nhân vật, nhưng loại tín hiệu đánh giá
+	// (gap/score) để không làm nhiễu thống kê.
+	if verdict := MapSafetyFlag(safetyFlag); verdict != nil {
+		s.logGuardrailEvent(senderID, &sessionID, "chat_output", verdict, content)
+		detectedGap = ""
+		isCorrectStep = true
+		feynmanScore = 0
+		if verdict.Severity == "high" {
+			// Khủng hoảng: dùng kịch bản chuẩn thay vì để LLM tùy biến
+			aiText = SafeResponse(verdict.Category, session.Mode)
+		}
 	}
 
 	aiMsg := &model.Message{
@@ -682,12 +723,76 @@ func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject st
 	}, nil
 }
 
-func (s *tutorService) ChatNodeTheory(nodeID uuid.UUID, message string, history []map[string]string) (string, error) {
+func (s *tutorService) ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string) (string, error) {
 	var node model.Node
 	if err := s.db.Where("id = ?", nodeID).First(&node).Error; err != nil {
 		return "", err
 	}
+
+	// Guardrail: kiểm tra input trước khi gọi LLM (xem guardrail_service.go)
+	if verdict := CheckStudentInput(message); verdict != nil {
+		s.logGuardrailEvent(studentID, nil, "theory_chat", verdict, message)
+		return SafeResponse(verdict.Category, "socratic"), nil
+	}
+
 	return s.aiSvc.GenerateRAGResponse(node.Theory, history, message)
+}
+
+// ─── Guardrail Events ────────────────────────────────────────────────────────
+
+// GuardrailEventView là bản ghi sự kiện kèm tên học sinh cho dashboard giáo viên.
+type GuardrailEventView struct {
+	ID             uuid.UUID  `json:"id"`
+	StudentID      uuid.UUID  `json:"studentId"`
+	StudentName    string     `json:"studentName"`
+	StudentEmail   string     `json:"studentEmail"`
+	SessionID      *uuid.UUID `json:"sessionId"`
+	Source         string     `json:"source"`
+	Category       string     `json:"category"`
+	Severity       string     `json:"severity"`
+	ContentExcerpt string     `json:"contentExcerpt"`
+	Handled        bool       `json:"handled"`
+	CreatedAt      time.Time  `json:"createdAt"`
+}
+
+func (s *tutorService) logGuardrailEvent(studentID uuid.UUID, sessionID *uuid.UUID, source string, v *GuardrailVerdict, content string) {
+	event := &model.GuardrailEvent{
+		ID:             uuid.New(),
+		StudentID:      studentID,
+		SessionID:      sessionID,
+		Source:         source,
+		Category:       v.Category,
+		Severity:       v.Severity,
+		ContentExcerpt: ExcerptForLog(content),
+		MatchedPattern: v.Matched,
+		CreatedAt:      time.Now(),
+	}
+	if err := s.db.Create(event).Error; err != nil {
+		// Không chặn luồng chat vì lỗi ghi log — chỉ in cảnh báo server
+		fmt.Printf("[GUARDRAIL WARNING] Không thể lưu guardrail event: %v\n", err)
+	}
+}
+
+func (s *tutorService) GetGuardrailEvents(severity string, limit int) ([]GuardrailEventView, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	q := s.db.Table("guardrail_events").
+		Select("guardrail_events.id, guardrail_events.student_id, users.name as student_name, users.email as student_email, guardrail_events.session_id, guardrail_events.source, guardrail_events.category, guardrail_events.severity, guardrail_events.content_excerpt, guardrail_events.handled, guardrail_events.created_at").
+		Joins("join users on users.id = guardrail_events.student_id").
+		Order("guardrail_events.created_at desc").
+		Limit(limit)
+	if severity != "" {
+		q = q.Where("guardrail_events.severity = ?", severity)
+	}
+
+	var events []GuardrailEventView
+	err := q.Scan(&events).Error
+	return events, err
+}
+
+func (s *tutorService) MarkGuardrailEventHandled(eventID uuid.UUID) error {
+	return s.db.Model(&model.GuardrailEvent{}).Where("id = ?", eventID).Update("handled", true).Error
 }
 
 func (s *tutorService) GetSubjects() ([]string, error) {
