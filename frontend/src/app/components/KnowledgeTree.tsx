@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, MouseEvent } from "react";
 import { apiFetch } from "@/lib/api";
-import { Plus, Trash, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo2, Redo2, Layers, LayoutGrid } from "lucide-react";
 
 interface NodeItem {
   id: string;
@@ -767,9 +766,9 @@ export default function KnowledgeTree({
           >
             <button
               onClick={() => handleDeleteEdge(edge.id)}
-              className="h-6 w-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-md hover:bg-rose-600 transition-colors cursor-pointer"
+              className="h-6 w-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-md hover:bg-rose-600 transition-colors cursor-pointer text-[10px] font-bold"
             >
-              <Trash size={10} />
+              ✕
             </button>
           </foreignObject>
         )}
@@ -786,35 +785,35 @@ export default function KnowledgeTree({
           <div className="flex bg-muted border border-border rounded-xl p-0.5 shadow-sm items-center">
             <button
               onClick={handleZoomIn}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer font-bold text-xs"
               title="Phóng to"
             >
-              <ZoomIn size={15} />
+              🔍⁺
             </button>
             <button
               onClick={handleZoomOut}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer font-bold text-xs"
               title="Thu nhỏ"
             >
-              <ZoomOut size={15} />
+              🔍⁻
             </button>
             <button
               onClick={handleResetZoom}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all text-[11px] font-black cursor-pointer"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all text-[11px] font-black cursor-pointer font-bold"
               title="Căn giữa"
             >
               1:1
             </button>
             <button
               onClick={() => setShowGroups(!showGroups)}
-              className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer text-xs ${
                 showGroups
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-card hover:text-foreground"
               }`}
               title={showGroups ? "Ẩn nhóm chủ đề" : "Hiện nhóm chủ đề"}
             >
-              <Layers size={15} />
+              🗂️
             </button>
           </div>
 
@@ -824,25 +823,25 @@ export default function KnowledgeTree({
                 onClick={handleUndo}
                 disabled={historyIndex <= 0}
                 title="Hoàn tác (Ctrl+Z)"
-                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer font-bold text-xs ${
                   historyIndex > 0
                     ? "hover:bg-card text-foreground"
                     : "text-muted-foreground/30 cursor-not-allowed"
                 }`}
               >
-                <Undo2 size={15} />
+                ↩️
               </button>
               <button
                 onClick={handleRedo}
                 disabled={historyIndex >= history.length - 1}
                 title="Làm lại (Ctrl+Y)"
-                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer font-bold text-xs ${
                   historyIndex < history.length - 1
                     ? "hover:bg-card text-foreground"
                     : "text-muted-foreground/30 cursor-not-allowed"
                 }`}
               >
-                <Redo2 size={15} />
+                ↪️
               </button>
             </div>
           )}
@@ -854,7 +853,7 @@ export default function KnowledgeTree({
                 className="h-8 px-3 rounded-xl bg-[var(--mint)] text-foreground flex items-center gap-1.5 text-xs font-bold shadow-sm hover:brightness-95 active:scale-95 transition-all cursor-pointer"
                 title="Thêm nút kiến thức mới"
               >
-                <Plus size={13} /> Thêm Node
+                ➕ Thêm Node
               </button>
               <button
                 onClick={() => {
@@ -868,14 +867,14 @@ export default function KnowledgeTree({
                 }`}
                 title="Tạo liên kết tiên quyết một chiều"
               >
-                <Link2 size={13} /> {isLinkingMode ? "Hủy Nối" : "Nối Node"}
+                🔗 {isLinkingMode ? "Hủy Nối" : "Nối Node"}
               </button>
               <button
                 onClick={handleAutoLayout}
                 className="h-8 px-3 rounded-xl border border-border bg-card text-foreground hover:bg-muted flex items-center gap-1.5 text-xs font-bold shadow-sm hover:brightness-95 active:scale-95 transition-all cursor-pointer"
                 title="Tự động sắp xếp cây theo cấu trúc"
               >
-                <LayoutGrid size={13} /> Sắp xếp
+                📊 Sắp xếp
               </button>
             </div>
           )}
@@ -999,7 +998,7 @@ export default function KnowledgeTree({
                         className="overflow-visible"
                       >
                         <div className="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-foreground bg-card border border-border px-2.5 py-1.5 rounded-xl shadow-sm select-none">
-                          <Folder size={11} className="text-[var(--mint)]" />
+                          <span className="select-none text-[10px]">📁</span>
                           <span>{box.name}</span>
                         </div>
                       </foreignObject>
@@ -1069,10 +1068,10 @@ export default function KnowledgeTree({
                                 onNodeClick(node);
                               }
                             }}
-                            className="absolute top-1 right-1 h-5.5 w-5.5 rounded-lg bg-card/60 backdrop-blur-sm hover:bg-card text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-sm border border-border/80 z-20 hover:scale-105 active:scale-95"
+                            className="absolute top-1 right-1 h-5.5 w-5.5 rounded-lg bg-card/60 backdrop-blur-sm hover:bg-card text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-sm border border-border/80 z-20 hover:scale-105 active:scale-95 text-[9px] font-bold"
                             title="Xem lý thuyết và làm bài tập"
                           >
-                            <BookOpen size={10} />
+                            📖
                           </button>
                         )}
 
@@ -1132,9 +1131,9 @@ export default function KnowledgeTree({
                             title={isCollapsed ? "Mở rộng nhánh kiến thức con" : "Thu gọn nhánh kiến thức con"}
                           >
                             {isCollapsed ? (
-                              <PlusCircle size={12} className="text-[var(--mint)]" />
+                              <span className="text-[10px] text-[var(--mint)] font-bold select-none">➕</span>
                             ) : (
-                              <MinusCircle size={12} className="text-muted-foreground" />
+                              <span className="text-[10px] text-muted-foreground font-bold select-none">➖</span>
                             )}
                           </button>
                         )}

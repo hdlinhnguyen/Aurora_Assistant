@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import KnowledgeTree from "../components/KnowledgeTree";
-import { BookOpen, HelpCircle, MessageSquare, Award, ArrowLeft, RefreshCw, Sparkles, Send, Play, ListTodo } from "lucide-react";
 
 interface NodeItem {
   id: string;
@@ -462,7 +461,7 @@ export default function StudentTutorPage() {
   );
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-zinc-950 overflow-hidden relative">
+    <div className="flex h-screen bg-slate-50 text-zinc-950 overflow-hidden relative">
       
       {/* Sidebar - Course & Logs */}
       <aside className="w-80 border-r border-slate-200 bg-white flex flex-col z-10 shadow-sm">
@@ -499,7 +498,7 @@ export default function StudentTutorPage() {
                 : "text-slate-500 hover:bg-white/40"
             }`}
           >
-            <ListTodo size={14} />
+            <span>📋</span>
             Lộ trình học
           </button>
           <button
@@ -510,7 +509,7 @@ export default function StudentTutorPage() {
                 : "text-slate-500 hover:bg-white/40"
             }`}
           >
-            <BookOpen size={14} />
+            <span>📖</span>
             Lịch sử
           </button>
         </div>
@@ -668,8 +667,8 @@ export default function StudentTutorPage() {
         {showAutoRouteModal && nextRecommendedNode && (
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
             <div className="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100 flex flex-col items-center text-center space-y-5 animate-[scaleUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
-              <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-500 shadow-md animate-bounce">
-                <Sparkles className="w-8 h-8 text-emerald-600" />
+              <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-2xl shadow-md animate-bounce select-none">
+                🎉
               </div>
               <div className="space-y-1.5">
                 <h3 className="text-base font-black text-slate-950 uppercase tracking-tight">Chúc mừng em thông thạo bài học!</h3>
@@ -713,13 +712,13 @@ export default function StudentTutorPage() {
               <p className="text-xs text-slate-400 mt-0.5">Chọn một bài học trên cây để mở Không gian Học tập Socratic của riêng em.</p>
             </div>
             
-            <div className="flex gap-1.5 bg-slate-200/60 p-1 rounded-2xl border border-slate-200 ml-4 shadow-inner">
+            <div className="flex items-center gap-2 bg-slate-100 border border-slate-200/80 p-1 rounded-2xl ml-4 shadow-sm">
               <button
                 onClick={() => setActiveMainTab("graph")}
-                className={`px-4 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
                   activeMainTab === "graph"
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-350/40"
+                    ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
+                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
                 }`}
               >
                 🌐 Sơ đồ Cây
@@ -732,19 +731,19 @@ export default function StudentTutorPage() {
                     alert("Vui lòng click chọn một bài học trên Sơ đồ Cây trước!");
                   }
                 }}
-                className={`px-4 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
                   activeMainTab === "workspace"
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-350/40"
+                    ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
+                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
                 }`}
               >
-                ✨ Không gian Học tập
-                {selectedNode && (
-                  <span className="bg-indigo-500 text-white px-1.5 py-0.5 rounded-lg text-[9px] animate-pulse font-mono font-bold">
-                    {selectedNode.name}
-                  </span>
-                )}
+                ⚡ Không gian Học tập
               </button>
+              {selectedNode && (
+                <span className="text-[10px] text-slate-400 font-extrabold px-3 border-l border-slate-200 max-w-[160px] truncate animate-[fadeIn_0.2s_ease-out]">
+                  📍 {selectedNode.name}
+                </span>
+              )}
             </div>
           </div>
 
@@ -790,11 +789,11 @@ export default function StudentTutorPage() {
             <div className="flex-1 flex gap-6 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
               
               {/* Left Column: Socratic RAG Theory Chat */}
-              <div className="w-[45%] bg-white border border-slate-200 rounded-3xl p-5 flex flex-col shadow-sm">
+              <div className="w-[45%] bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm">
                 <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
                   <div className="space-y-0.5">
-                    <span className="text-[9px] bg-indigo-100 text-indigo-800 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
-                      {selectedNode.isRoot ? "Nút Gốc môn học" : "Chủ đề học tập"}
+                    <span className="text-[9px] bg-indigo-50 text-indigo-700 font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono">
+                      {selectedNode.isRoot ? "📌 Nút Gốc môn học" : "📖 Chủ đề học tập"}
                     </span>
                     <h2 className="text-base font-black text-slate-900 leading-tight truncate max-w-[280px]">
                       {selectedNode.name}
@@ -802,14 +801,14 @@ export default function StudentTutorPage() {
                   </div>
                   <button
                     onClick={() => setActiveMainTab("graph")}
-                    className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50 active:scale-95 transition-all shadow-sm cursor-pointer font-bold"
+                    className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50/50 active:scale-95 transition-all shadow-sm cursor-pointer"
                   >
-                    &larr; Sơ đồ cây
+                    👈 Bản đồ cây
                   </button>
                 </div>
 
                 {/* Extracted Theory Block */}
-                <div className="space-y-2 mb-4 bg-slate-50 border border-slate-200/50 p-4 rounded-2xl shadow-inner">
+                <div className="space-y-2 mb-4 bg-slate-50/60 border border-slate-200/40 p-4 rounded-2xl shadow-inner">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">Tóm tắt nội dung chính</h3>
                   <div className="text-xs text-slate-700 leading-relaxed font-bold max-h-[120px] overflow-y-auto pr-2">
                     {selectedNode.theory || "Nội dung lý thuyết đang được cập nhật..."}
@@ -819,14 +818,14 @@ export default function StudentTutorPage() {
                 {/* Socratic RAG Chatbot */}
                 <div className="flex-1 border-t border-slate-100 pt-4 flex flex-col overflow-hidden">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="h-6 w-6 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600"><MessageSquare size={12} /></span>
+                    <span className="text-xs">💬</span>
                     <h4 className="text-xs font-black text-slate-800">Trợ lý Socratic giải thích (RAG Chat)</h4>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/50 space-y-3 mb-4 text-xs font-semibold">
+                  <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/30 space-y-3 mb-4 text-xs font-semibold">
                     {theoryChat.map((msg, idx) => (
                       <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${
+                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border transition-all ${
                           msg.sender === "student"
                             ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
                             : "bg-white border-slate-200 text-slate-800 rounded-bl-none"
@@ -846,27 +845,27 @@ export default function StudentTutorPage() {
                     <div ref={chatEndRef} />
                   </div>
 
-                  <form onSubmit={handleSendChat} className="flex gap-2">
+                  <form onSubmit={handleSendChat} className="relative flex items-center border border-slate-250/70 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-50 bg-slate-50 focus-within:bg-white rounded-2xl transition-all duration-200 p-1.5 shadow-sm">
                     <input
                       type="text"
                       placeholder="Hỏi thầy Socratic về bài học này..."
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      className="flex-1 rounded-xl bg-slate-50 border border-slate-200 text-xs px-4 py-3 text-zinc-950 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all font-semibold"
+                      className="flex-1 bg-transparent text-xs px-2.5 py-2 text-zinc-950 focus:outline-none font-semibold"
                     />
                     <button
                       type="submit"
                       disabled={chatLoading}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 font-bold px-4 rounded-xl shadow-md transition-all flex items-center justify-center cursor-pointer"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
                     >
-                      <Send size={14} />
+                      ➔
                     </button>
                   </form>
                 </div>
               </div>
 
               {/* Right Column: BKT Gauge, Questions & Socratic Inline Helper */}
-              <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-5 flex flex-col shadow-sm overflow-y-auto">
+              <div className="flex-1 bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm overflow-y-auto">
                 
                 {/* 1. BKT Circular Progress Gauge */}
                 {(() => {
@@ -874,23 +873,24 @@ export default function StudentTutorPage() {
                   const masteryPercent = Math.round(bkt.mastery * 100);
                   const confidencePercent = Math.round(bkt.confidence * 100);
                   return (
-                    <div className="flex gap-6 items-center justify-around bg-slate-950 text-white p-5 rounded-3xl shadow-xl shadow-slate-950/15 relative overflow-hidden mb-6">
+                    <div className="flex gap-6 items-center justify-around bg-slate-900/95 border border-slate-800 text-white p-5 rounded-[24px] shadow-lg shadow-slate-900/10 relative overflow-hidden mb-6">
                       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-transparent to-transparent pointer-events-none" />
 
                       {/* Circle 1: Mastery */}
                       <div className="flex flex-col items-center gap-2 relative">
                         <svg className="w-20 h-20 transform -rotate-90">
-                          <circle cx="40" cy="40" r="32" className="stroke-slate-800" strokeWidth="6" fill="transparent" />
+                          <circle cx="40" cy="40" r="32" className="stroke-slate-800" strokeWidth="5" fill="transparent" />
                           <circle
                             cx="40"
                             cy="40"
                             r="32"
                             className="stroke-indigo-400 transition-all duration-500 ease-out"
-                            strokeWidth="6"
+                            strokeWidth="5.5"
                             fill="transparent"
                             strokeDasharray="201"
                             strokeDashoffset={201 - (201 * bkt.mastery)}
                             strokeLinecap="round"
+                            style={{ filter: "drop-shadow(0 0 5px rgba(129, 140, 248, 0.8))" }}
                           />
                         </svg>
                         <div className="absolute top-[22px] text-center w-full">
@@ -902,17 +902,18 @@ export default function StudentTutorPage() {
                       {/* Circle 2: Confidence */}
                       <div className="flex flex-col items-center gap-2 relative">
                         <svg className="w-20 h-20 transform -rotate-90">
-                          <circle cx="40" cy="40" r="32" className="stroke-slate-800" strokeWidth="6" fill="transparent" />
+                          <circle cx="40" cy="40" r="32" className="stroke-slate-800" strokeWidth="5" fill="transparent" />
                           <circle
                             cx="40"
                             cy="40"
                             r="32"
                             className="stroke-emerald-400 transition-all duration-500 ease-out"
-                            strokeWidth="6"
+                            strokeWidth="5.5"
                             fill="transparent"
                             strokeDasharray="201"
                             strokeDashoffset={201 - (201 * bkt.confidence)}
                             strokeLinecap="round"
+                            style={{ filter: "drop-shadow(0 0 5px rgba(52, 211, 153, 0.8))" }}
                           />
                         </svg>
                         <div className="absolute top-[22px] text-center w-full">
@@ -975,17 +976,25 @@ export default function StudentTutorPage() {
                         <div className="grid grid-cols-1 gap-2.5">
                           {options.map((opt, idx) => {
                             const isSelected = selectedOption === idx;
+                            const letters = ["A", "B", "C", "D"];
                             return (
                               <button
                                 key={idx}
                                 onClick={() => setSelectedOption(idx)}
-                                className={`w-full text-left p-4 rounded-2xl border text-xs leading-relaxed transition-all shadow-sm cursor-pointer font-bold ${
+                                className={`w-full text-left p-3.5 rounded-2xl border text-xs leading-relaxed transition-all duration-250 hover:scale-[1.005] flex items-center gap-3.5 cursor-pointer font-bold ${
                                   isSelected
-                                    ? "bg-slate-900 border-slate-950 text-white font-bold shadow-md scale-[1.01]"
-                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                                    ? "bg-indigo-50/50 border-indigo-600 text-indigo-950 font-extrabold ring-4 ring-indigo-100 shadow-sm"
+                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50/50 hover:border-slate-350"
                                 }`}
                               >
-                                {opt}
+                                <span className={`h-7 w-7 rounded-xl flex items-center justify-center font-black text-xs transition-all shadow-sm ${
+                                  isSelected
+                                    ? "bg-indigo-600 text-white"
+                                    : "bg-slate-100 text-slate-400"
+                                }`}>
+                                  {letters[idx] || (idx + 1)}
+                                </span>
+                                <span className="flex-1 font-extrabold">{opt}</span>
                               </button>
                             );
                           })}
@@ -993,7 +1002,7 @@ export default function StudentTutorPage() {
 
                         {/* Feedback Banner */}
                         {answerFeedback && (
-                          <div className={`p-4 rounded-2xl text-center text-xs font-bold border shadow-sm ${
+                          <div className={`p-4 rounded-2xl text-center text-xs font-bold border shadow-sm animate-[fadeIn_0.2s_ease-out] ${
                             answerFeedback.isCorrect
                               ? "bg-emerald-50 border-emerald-200 text-emerald-800"
                               : "bg-rose-50 border-rose-200 text-rose-800"
@@ -1004,14 +1013,14 @@ export default function StudentTutorPage() {
 
                         {/* Hint Display */}
                         {activeHint && (
-                          <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-2 animate-[fadeIn_0.3s_ease-out]">
+                          <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-2 animate-[fadeIn_0.3s_ease-out]">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5 font-mono">
                                 ✨ Gợi ý Bậc {hintPressCount}: {hintPressCount === 1 ? "Socratic Nudge" : hintPressCount === 2 ? "First-principles" : "Bottom-out (Ví dụ)"}
                               </span>
                               <span className="text-[9px] text-slate-400 font-semibold font-mono">(Trọng số BKT đã giảm)</span>
                             </div>
-                            <p className="text-xs text-slate-700 leading-relaxed font-bold">{activeHint}</p>
+                            <p className="text-xs text-slate-750 leading-relaxed font-extrabold">{activeHint}</p>
                           </div>
                         )}
 
@@ -1020,24 +1029,24 @@ export default function StudentTutorPage() {
                           <button
                             onClick={handleSubmitAnswer}
                             disabled={selectedOption === null || submitting}
-                            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-50 font-bold text-xs py-3.5 rounded-2xl shadow-md transition-all cursor-pointer text-center"
+                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-650 hover:from-indigo-700 hover:to-purple-700 text-white disabled:from-slate-200 disabled:to-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed font-extrabold text-xs py-3.5 rounded-2xl shadow-md shadow-indigo-100 disabled:shadow-none hover:shadow-lg hover:shadow-indigo-250 transition-all duration-200 active:scale-[0.98] cursor-pointer text-center"
                           >
-                            {submitting ? "Đang xử lý..." : "Gửi đáp án"}
+                            {submitting ? "Đang gửi..." : "Gửi đáp án"}
                           </button>
 
                           <button
                             onClick={handleRequestHint}
                             disabled={hintLoading || submitting}
-                            className="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 disabled:opacity-50 font-black text-xs px-4 py-3.5 rounded-2xl transition-all cursor-pointer flex items-center gap-1"
+                            className="bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-50 font-black text-xs px-4.5 py-3.5 rounded-2xl transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5 duration-200"
                           >
-                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>✨</span>
                             {hintPressCount === 0 ? "Xem gợi ý" : hintPressCount === 1 ? "Gợi ý 2" : hintPressCount === 2 ? "Gợi ý 3" : "Hết gợi ý"}
                           </button>
 
                           <button
                             onClick={handleCantDo}
                             disabled={submitting}
-                            className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 disabled:opacity-50 font-bold text-xs px-4.5 py-3.5 rounded-2xl transition-all cursor-pointer"
+                            className="bg-white border border-slate-200 hover:border-rose-300 hover:text-rose-600 text-slate-500 disabled:opacity-50 font-bold text-xs px-5 py-3.5 rounded-2xl transition-all hover:shadow-sm cursor-pointer duration-200"
                           >
                             Bỏ qua
                           </button>
@@ -1119,16 +1128,14 @@ export default function StudentTutorPage() {
                         )}
 
                         {/* 3. Inline Socratic Question RAG Chatbot Helper */}
-                        <div className="pt-6 border-t border-slate-200 space-y-3 bg-indigo-50/20 p-4 rounded-3xl border border-indigo-100/60 shadow-inner mt-4">
+                        <div className="pt-6 border-t border-slate-200 space-y-3 bg-indigo-50/20 p-4 rounded-[24px] border border-indigo-100/60 shadow-inner mt-4">
                           <div className="flex items-center gap-2">
-                            <span className="h-6 w-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-inner">
-                              <MessageSquare size={11} />
-                            </span>
-                            <h4 className="text-xs font-black text-slate-800">Cần trợ giúp? Trò chuyện Socratic về câu hỏi này</h4>
+                            <span className="text-xs">💬</span>
+                            <h4 className="text-xs font-black text-slate-850">Cần trợ giúp? Trò chuyện Socratic về câu hỏi này</h4>
                           </div>
 
                           {/* Question Chat logs */}
-                          <div className="max-h-[220px] overflow-y-auto border border-slate-100 rounded-2xl p-3 bg-white space-y-2 text-[11px] font-semibold">
+                          <div className="max-h-[220px] overflow-y-auto border border-slate-100/80 rounded-2xl p-3 bg-white space-y-2 text-[11px] font-semibold">
                             {qChat.length === 0 ? (
                               <div className="text-center py-4 text-slate-400 font-semibold">
                                 Chưa có hội thoại. Nhập câu hỏi bên dưới để bắt đầu thảo luận Socratic với AI về bài tập này nhé!
@@ -1136,10 +1143,10 @@ export default function StudentTutorPage() {
                             ) : (
                               qChat.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                                  <div className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm ${
+                                  <div className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm transition-all ${
                                     msg.sender === "student"
                                       ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
-                                      : "bg-indigo-50 border-indigo-100 text-indigo-950 rounded-bl-none"
+                                      : "bg-indigo-50/70 border-indigo-100 text-indigo-950 rounded-bl-none"
                                   }`}>
                                     {msg.content}
                                   </div>
@@ -1148,29 +1155,29 @@ export default function StudentTutorPage() {
                             )}
                             {questionChatLoading && (
                               <div className="flex justify-start animate-pulse">
-                                <div className="bg-indigo-50 border border-indigo-100 text-indigo-400 rounded-2xl rounded-bl-none px-3.5 py-1.5 flex items-center gap-1">
-                                  <span className="h-1 w-1 bg-indigo-400 rounded-full animate-bounce" />
-                                  <span className="h-1 w-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                                <div className="bg-indigo-50/70 border border-indigo-100 text-indigo-400 rounded-2xl rounded-bl-none px-3.5 py-1.5 flex items-center gap-1">
+                                  <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce" />
+                                  <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce [animation-delay:0.2s]" />
                                 </div>
                               </div>
                             )}
                           </div>
 
                           {/* Question Chat Input form */}
-                          <form onSubmit={(e) => handleSendQuestionChat(e, currentQ.id)} className="flex gap-2">
+                          <form onSubmit={(e) => handleSendQuestionChat(e, currentQ.id)} className="relative flex items-center border border-slate-250/70 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-50 bg-white rounded-2xl transition-all duration-200 p-1.5 shadow-sm">
                             <input
                               type="text"
                               placeholder="Hỏi AI về câu hỏi này..."
                               value={questionChatInput}
                               onChange={(e) => setQuestionChatInput(e.target.value)}
-                              className="flex-1 rounded-xl bg-white border border-slate-200 text-xs px-3.5 py-2.5 text-zinc-950 focus:outline-none focus:border-indigo-500 transition-all font-semibold shadow-sm"
+                              className="flex-1 bg-transparent text-xs px-2.5 py-2 text-zinc-950 focus:outline-none font-semibold"
                             />
                             <button
                               type="submit"
                               disabled={questionChatLoading || !questionChatInput.trim()}
-                              className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 font-bold px-4 rounded-xl shadow-md transition-all flex items-center justify-center cursor-pointer"
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
                             >
-                              <Send size={12} />
+                              ➔
                             </button>
                           </form>
                         </div>
@@ -1179,7 +1186,7 @@ export default function StudentTutorPage() {
                   })()
                 ) : (
                   <div className="text-center py-16 text-slate-400 text-xs font-bold border border-dashed border-slate-200 rounded-2xl flex flex-col items-center gap-2">
-                    <Sparkles size={24} className="text-indigo-400" />
+                    <span className="text-2xl select-none mb-1">📝</span>
                     Chưa có câu hỏi trắc nghiệm nào cho bài học này.
                   </div>
                 )}
@@ -1187,7 +1194,7 @@ export default function StudentTutorPage() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-3 p-10 bg-white border border-slate-200 rounded-3xl shadow-sm">
-              <Sparkles size={40} className="text-indigo-400 animate-pulse" />
+              <span className="text-4xl select-none animate-pulse mb-1">💡</span>
               <p className="text-sm font-bold text-slate-700">Chưa có bài học nào được chọn</p>
               <p className="text-xs text-slate-400 max-w-sm text-center leading-relaxed">
                 Em hãy quay lại tab <strong>🌐 Sơ đồ Cây</strong> và bấm chọn một chủ đề học tập để bắt đầu không gian học tập Socratic nhé!

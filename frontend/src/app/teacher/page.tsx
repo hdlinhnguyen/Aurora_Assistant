@@ -5,29 +5,9 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import KnowledgeTree from "../components/KnowledgeTree";
 import { 
-  Users, 
-  GitBranch, 
-  Eye, 
-  ArrowLeft, 
-  Plus, 
-  Trash, 
-  Pencil,
   FileText, 
   CheckCircle, 
-  AlertTriangle, 
-  Calendar, 
-  Mail, 
-  User, 
-  BookOpen, 
-  GraduationCap,
-  HelpCircle,
-  Upload,
-  Loader2,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  ListTodo,
-  Check
+  AlertTriangle 
 } from "lucide-react";
 
 interface NodeItem {
@@ -803,10 +783,10 @@ export default function TeacherDashboard() {
           </div>
           <button
             onClick={() => setIsSidebarCollapsed(true)}
-            className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer active:scale-95"
+            className="p-1.5 hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer active:scale-95 text-xs font-bold"
             title="Thu gọn sidebar"
           >
-            <ChevronLeft size={16} />
+            ◀
           </button>
         </div>
 
@@ -818,9 +798,9 @@ export default function TeacherDashboard() {
               <button
                 onClick={() => setSelectedSubject("")}
                 title="Quay lại bảng chọn môn học"
-                className="text-[10px] font-black text-[var(--mint)] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-[10px] font-black text-[var(--mint)] hover:underline flex items-center gap-1 cursor-pointer font-bold"
               >
-                <GraduationCap size={13} /> Bảng môn học
+                🏫 Bảng môn học
               </button>
             </div>
             <select
@@ -852,7 +832,7 @@ export default function TeacherDashboard() {
                     : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                <Users size={16} /> Báo cáo Tiến độ Học sinh
+                <span>👥</span> Báo cáo Tiến độ Học sinh
               </button>
               <button
                 onClick={() => {
@@ -865,7 +845,7 @@ export default function TeacherDashboard() {
                     : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                <GitBranch size={16} /> Thiết kế Cây Kiến thức
+                <span>🌳</span> Thiết kế Cây Kiến thức
               </button>
               <button
                 onClick={() => {
@@ -878,7 +858,7 @@ export default function TeacherDashboard() {
                     : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                <ListTodo size={16} /> Lập lộ trình & Giám sát
+                <span>📋</span> Lập lộ trình & Giám sát
               </button>
             </>
           ) : (
@@ -916,10 +896,10 @@ export default function TeacherDashboard() {
             {isSidebarCollapsed && (
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
-                className="absolute top-6 left-6 p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all z-20"
+                className="absolute top-6 left-6 p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all z-20 text-xs font-bold"
                 title="Mở rộng sidebar"
               >
-                <ChevronRight size={16} />
+                ▶
               </button>
             )}
             <div className="text-center mb-10">
@@ -942,8 +922,8 @@ export default function TeacherDashboard() {
                   className="group relative bg-card border border-border hover:border-[var(--mint)] rounded-3xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[160px] cursor-pointer hover:-translate-y-1"
                 >
                   <div className="flex items-start justify-between">
-                    <div className="p-3 bg-muted rounded-2xl text-[var(--mint)] group-hover:bg-[var(--mint)]/10 transition-colors">
-                      <BookOpen size={24} />
+                    <div className="p-3 bg-muted rounded-2xl text-[var(--mint)] group-hover:bg-[var(--mint)]/10 transition-colors text-xl font-bold select-none">
+                      📖
                     </div>
                     <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
@@ -952,9 +932,9 @@ export default function TeacherDashboard() {
                           handleRenameSubjectFor(sub);
                         }}
                         title="Đổi tên môn học"
-                        className="p-1.5 hover:bg-border rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        className="p-1.5 hover:bg-border rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer text-[10px] font-bold"
                       >
-                        <Pencil size={12} />
+                        ✏️
                       </button>
                       <button
                         onClick={(e) => {
@@ -962,9 +942,9 @@ export default function TeacherDashboard() {
                           handleDeleteSubjectFor(sub);
                         }}
                         title="Xóa môn học"
-                        className="p-1.5 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                        className="p-1.5 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-500 transition-colors cursor-pointer text-[10px] font-bold"
                       >
-                        <Trash size={12} />
+                        🗑️
                       </button>
                     </div>
                   </div>
@@ -985,8 +965,8 @@ export default function TeacherDashboard() {
                 onClick={handleCreateSubject}
                 className="group border border-dashed border-border hover:border-[var(--mint)] bg-card/40 hover:bg-card rounded-3xl p-6 transition-all duration-300 flex flex-col justify-center items-center text-center min-h-[160px] cursor-pointer hover:-translate-y-1"
               >
-                <div className="p-3 bg-muted group-hover:bg-[var(--mint)]/10 text-muted-foreground group-hover:text-[var(--mint)] rounded-full transition-colors mb-3">
-                  <Plus size={24} />
+                <div className="p-3 bg-muted group-hover:bg-[var(--mint)]/10 text-muted-foreground group-hover:text-[var(--mint)] rounded-full transition-colors mb-3 text-xl font-bold select-none">
+                  ➕
                 </div>
                 <span className="text-sm font-extrabold text-foreground group-hover:text-[var(--mint)] transition-colors">
                   Tạo môn học mới
@@ -1006,25 +986,25 @@ export default function TeacherDashboard() {
                 {isSidebarCollapsed && (
                   <button
                     onClick={() => setIsSidebarCollapsed(false)}
-                    className="p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1"
+                    className="p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1 text-xs font-bold"
                     title="Mở rộng sidebar"
                   >
-                    <ChevronRight size={16} />
+                    ▶
                   </button>
                 )}
                 <button
                   onClick={handleBackToStudents}
-                  className="p-2 bg-card border border-border rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-all shadow-sm cursor-pointer"
+                  className="p-2 bg-card border border-border rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-all shadow-sm cursor-pointer font-bold text-xs"
                 >
-                  <ArrowLeft size={16} />
+                  ◀ Quay lại
                 </button>
                 <div>
                   <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground">
                     Bản đồ tiến trình của: <span className="text-[var(--mint)] font-black">{selectedStudent.studentName}</span>
                   </h1>
                   <div className="flex gap-4 mt-0.5 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Mail size={12} /> {selectedStudent.studentEmail}</span>
-                    <span className="flex items-center gap-1"><Calendar size={12} /> Môn học: {selectedStudent.subject}</span>
+                    <span className="flex items-center gap-1 font-semibold">📧 {selectedStudent.studentEmail}</span>
+                    <span className="flex items-center gap-1 font-semibold">📚 Môn học: {selectedStudent.subject}</span>
                   </div>
                 </div>
               </div>
@@ -1106,10 +1086,10 @@ export default function TeacherDashboard() {
                 {isSidebarCollapsed && (
                   <button
                     onClick={() => setIsSidebarCollapsed(false)}
-                    className="p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1"
+                    className="p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1 text-xs font-bold"
                     title="Mở rộng sidebar"
                   >
-                    <ChevronRight size={16} />
+                    ▶
                   </button>
                 )}
                 <div>
@@ -1127,7 +1107,7 @@ export default function TeacherDashboard() {
                 {activeTab === "graph-designer" && (
                   <div className="flex items-center gap-2">
                     <label className="px-4 py-2 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground rounded-xl text-xs font-black transition-all shadow-[var(--shadow-card)] flex items-center gap-1.5 cursor-pointer">
-                      <Upload size={14} /> Dựng cây từ tài liệu
+                      📤 Dựng cây từ tài liệu
                       <input
                         type="file"
                         accept=".md,.txt,.pdf,.docx"
@@ -1161,7 +1141,7 @@ export default function TeacherDashboard() {
                       {studentsProgress.filter(p => p.subject === selectedSubject).map((progress, idx) => (
                         <tr key={idx} className="hover:bg-muted/50 transition-colors">
                           <td className="py-4 px-4 font-black text-foreground flex items-center gap-2">
-                            <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground"><User size={12} /></span>
+                            <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground select-none">👤</span>
                             {progress.studentName}
                           </td>
                           <td className="py-4 px-4 text-muted-foreground">{progress.studentEmail}</td>
@@ -1174,7 +1154,7 @@ export default function TeacherDashboard() {
                               onClick={() => handleInspectStudent(progress)}
                               className="px-3.5 py-1.5 bg-foreground hover:opacity-90 text-background rounded-xl text-[10px] font-black tracking-wide uppercase transition-all shadow-sm cursor-pointer flex items-center gap-1 mx-auto"
                             >
-                              <Eye size={12} /> Xem hành trình
+                              👀 Xem hành trình
                             </button>
                           </td>
                         </tr>
@@ -1262,7 +1242,7 @@ export default function TeacherDashboard() {
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        <BookOpen size={14} /> Lý thuyết
+                        <span>📖</span> Lý thuyết
                       </button>
                       <button
                         onClick={() => setNodeEditorTab("questions")}
@@ -1272,7 +1252,7 @@ export default function TeacherDashboard() {
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        <HelpCircle size={14} /> Câu hỏi
+                        <span>❓</span> Câu hỏi
                       </button>
                       <button
                         onClick={() => setNodeEditorTab("history")}
@@ -1282,7 +1262,7 @@ export default function TeacherDashboard() {
                             : "border-transparent text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        <Sparkles size={14} /> Lộ trình
+                        <span>⚡</span> Lộ trình
                       </button>
                     </div>
 
@@ -1302,7 +1282,7 @@ export default function TeacherDashboard() {
                           </div>
 
                           <div className="space-y-2 bg-muted/80 border border-border p-4 rounded-2xl">
-                            <label className="text-[10px] font-black text-[var(--mint)] uppercase tracking-widest flex items-center gap-1"><Upload size={12} /> Upload Tài liệu nhúng (RAG)</label>
+                            <label className="text-[10px] font-black text-[var(--mint)] uppercase tracking-widest flex items-center gap-1">📤 Upload Tài liệu nhúng (RAG)</label>
                             <p className="text-[10px] text-muted-foreground leading-normal">Hỗ trợ các file tài liệu dạng văn bản (.txt, .pdf, .docx, .md). Nội dung sẽ tự động được trích xuất và nhúng cho chatbot học sinh hỏi đáp.</p>
                             <input
                               type="file"
@@ -1332,9 +1312,9 @@ export default function TeacherDashboard() {
                             {!editingQuestion && (
                               <button
                                 onClick={handleStartAddQuestion}
-                                className="text-[var(--mint)] hover:brightness-90 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                className="text-[var(--mint)] hover:brightness-90 text-xs font-bold flex items-center gap-1 cursor-pointer font-bold"
                               >
-                                <Plus size={14} /> Thêm câu hỏi
+                                ➕ Thêm câu hỏi
                               </button>
                             )}
                           </div>
@@ -1440,9 +1420,9 @@ export default function TeacherDashboard() {
                                       </button>
                                       <button
                                         onClick={() => handleDeleteQuestion(q.id)}
-                                        className="px-2.5 border border-destructive/20 hover:bg-destructive/10 text-destructive rounded-lg transition-colors cursor-pointer"
+                                        className="px-2.5 border border-destructive/20 hover:bg-destructive/10 text-destructive rounded-lg transition-colors cursor-pointer text-[10px] font-bold"
                                       >
-                                        <Trash size={12} />
+                                        🗑️
                                       </button>
                                     </div>
                                   </div>
@@ -1530,10 +1510,10 @@ export default function TeacherDashboard() {
                               : "bg-white border-border text-foreground hover:bg-muted"
                           }`}
                         >
-                          <span className={`h-4 w-4 rounded-md border flex items-center justify-center ${
+                          <span className={`h-4 w-4 rounded-md border flex items-center justify-center font-bold text-[9px] ${
                             isChecked ? "bg-background border-background text-foreground" : "border-border bg-white"
                           }`}>
-                            {isChecked && <Check size={12} className="stroke-[3px]" />}
+                            {isChecked && "✓"}
                           </span>
                           <span className="truncate">{node.name}</span>
                         </button>
@@ -1545,16 +1525,16 @@ export default function TeacherDashboard() {
                     <button
                       onClick={handleGenerateLearningPath}
                       disabled={generatingPath || selectedTargetTopics.length === 0}
-                      className="px-6 py-3 bg-[var(--mint)] hover:brightness-95 active:scale-95 disabled:opacity-50 text-foreground font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                      className="px-6 py-3 bg-[var(--mint)] hover:brightness-95 active:scale-95 disabled:opacity-50 text-foreground font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 font-bold"
                     >
                       {generatingPath ? (
                         <>
-                          <Loader2 size={14} className="animate-spin" />
+                          <span className="animate-spin select-none">🔄</span>
                           Đang tính toán...
                         </>
                       ) : (
                         <>
-                          <Sparkles size={14} />
+                          <span>⚡</span>
                           Lập lộ trình & Phân tích lớp học
                         </>
                       )}
@@ -1696,9 +1676,9 @@ export default function TeacherDashboard() {
                           <button
                             onClick={handleApproveLearningPath}
                             disabled={approvingPath}
-                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1"
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1 font-bold"
                           >
-                            {approvingPath ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                            {approvingPath ? <span className="animate-spin select-none">🔄</span> : "✓"}
                             Duyệt lộ trình cả lớp
                           </button>
                         </div>
@@ -1780,7 +1760,7 @@ export default function TeacherDashboard() {
                 
                 {!insights && (
                   <div className="bg-card border border-border rounded-3xl p-12 text-center text-muted-foreground text-xs font-bold border-dashed flex flex-col items-center justify-center gap-2">
-                    <ListTodo size={28} className="text-muted-foreground/30 animate-pulse" />
+                    <span className="text-3xl select-none mb-1 animate-pulse">📋</span>
                     Chưa có kết quả phân tích. Hãy chọn chủ đề mục tiêu ở trên và bấm "Lập lộ trình & Phân tích lớp học".
                   </div>
                 )}
@@ -1794,7 +1774,7 @@ export default function TeacherDashboard() {
       {loading && (
         <div className="fixed inset-0 bg-foreground/60 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-card p-8 rounded-3xl border border-border shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center">
-            <Loader2 className="h-10 w-10 text-[var(--mint)] animate-spin" />
+            <span className="text-3xl animate-spin select-none">🔄</span>
             <div className="space-y-1">
               <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">Đang xử lý</h3>
               <p className="text-xs text-muted-foreground font-semibold leading-relaxed">
