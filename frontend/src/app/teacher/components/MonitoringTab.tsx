@@ -88,7 +88,7 @@ export default function MonitoringTab({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div data-tour="concept-gaps" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Mastery distribution Pie chart */}
         <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4 flex flex-col">
           <div>
@@ -195,7 +195,7 @@ export default function MonitoringTab({
                   <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, paddingTop: 10 }} />
 
                   {/* Target mastery reference line (outlier boundary) */}
-                  <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Ranh giới hổng kiến thức (40%)', fill: '#f59e0b', fontSize: 8, fontWeight: 700, position: 'top', offset: 5 }} />
+                  <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="3 3" />
 
                   {/* Collective Average Line */}
                   <ReferenceLine
@@ -206,7 +206,6 @@ export default function MonitoringTab({
                     })()}
                     stroke="#6366f1"
                     strokeWidth={1.5}
-                    label={{ value: 'Đường trung bình lớp', fill: '#6366f1', fontSize: 8, fontWeight: 700, position: 'top', offset: 5 }}
                   />
 
                   {/* Active learning students */}

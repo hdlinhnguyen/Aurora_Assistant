@@ -1097,8 +1097,10 @@ func (h *TutorHandler) DeleteSubject(c fiber.Ctx) error {
 	if err != nil {
 		subject = subjectRaw
 	}
+	log.Printf("[DEBUG DeleteSubject Handler] raw=%q decoded=%q", subjectRaw, subject)
 
 	if err := h.svc.DeleteSubject(subject); err != nil {
+		log.Printf("[DEBUG DeleteSubject Handler] ERROR: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -1583,5 +1585,198 @@ func (h *TutorHandler) AdaptiveDowngrade(c fiber.Ctx) error {
 	return c.JSON(res)
 }
 
+// ──────────────────────────────────────────────
+// ImportMasterBank – POST /api/import/master-bank
+// Receives master_bank.json body, imports TN4 questions
+// with sig-based dedup and auto-node creation.
+// ──────────────────────────────────────────────
 
+type masterBankPayload struct {
+	Meta struct {
+		Mon string `json:"mon"`
+		Lop int    `json:"lop"`
+		Ky  string `json:"ky"`
+	} `json:"meta"`
+	Questions []masterBankQuestion `json:"questions"`
+}
 
+type masterBankQuestion struct {
+	ID        string            `json:"id"`
+	Sig       string            `json:"sig"`
+	LoaiCau   string            `json:"loaiCau"`
+	MucDo     string            `json:"mucDo"`
+	MucDoSo   int               `json:"mucDoSo"`
+	ChuDe     string            `json:"chuDe"`
+	NodeGraph *string           `json:"nodeGraph"` // nullable
+	DeBai     string            `json:"deBai"`
+	PhuongAn  map[string]string `json:"phuongAn"`
+	DapAn     string            `json:"dapAn"`
+}
+
+func (h *TutorHandler) ImportMasterBank(c fiber.Ctx) error {
+	var payload masterBankPayload
+	if err := c.Bind().JSON(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "JSON không hợp lệ: " + err.Error()})
+	}
+
+	if len(payload.Questions) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Không có câu hỏi nào trong file"})
+	}
+
+	// Determine subject name from meta
+	subject := fmt.Sprintf("%s Lớp %d", payload.Meta.Mon, payload.Meta.Lop)
+
+	// 1. Load all nodes for this subject, indexed by stableKey
+	var allNodes []model.Node
+	config.DB.Where("subject = ?", subject).Find(&allNodes)
+	nodeByKey := make(map[string]uuid.UUID)
+	for _, n := range allNodes {
+		if n.StableKey != "" {
+			nodeByKey[n.StableKey] = n.ID
+		}
+	}
+
+	// 2. Prepare a fallback node "Hình học tổng hợp" for null nodeGraph questions
+	var fallbackNodeID uuid.UUID
+	fallbackNeeded := false
+	for _, q := range payload.Questions {
+		if q.LoaiCau == "TN4" && (q.NodeGraph == nil || *q.NodeGraph == "") {
+			fallbackNeeded = true
+			break
+		}
+	}
+	if fallbackNeeded {
+		// Check if fallback node already exists
+		var existing model.Node
+		result := config.DB.Where("subject = ? AND name = ?", subject, "Hình học tổng hợp").First(&existing)
+		if result.Error == nil {
+			fallbackNodeID = existing.ID
+		} else {
+			// Create fallback node
+			fallbackNodeID = uuid.New()
+			fallbackNode := model.Node{
+				ID:        fallbackNodeID,
+				Subject:   subject,
+				Name:      "Hình học tổng hợp",
+				Theory:    "Node tổng hợp chứa các câu hỏi hình học chưa được phân loại vào node cụ thể.",
+				TopicGroup: "Hình học",
+				PosX:      600,
+				PosY:      400,
+				IsRoot:    false,
+				StableKey: "l7-hinh-hoc-tong-hop",
+				Status:    "active",
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+			config.DB.Create(&fallbackNode)
+		}
+		nodeByKey["__fallback__"] = fallbackNodeID
+	}
+
+	// 3. Collect existing sigs in DB to skip duplicates
+	var existingSigs []string
+	config.DB.Model(&model.Question{}).Where("sig IS NOT NULL AND sig != ''").Pluck("sig", &existingSigs)
+	sigSet := make(map[string]bool)
+	for _, s := range existingSigs {
+		sigSet[s] = true
+	}
+
+	// 4. Process questions
+	imported := 0
+	skipped := 0
+	skippedNonTN4 := 0
+	skippedNoNode := 0
+	errors := []string{}
+
+	for _, q := range payload.Questions {
+		// Skip non-TN4
+		if q.LoaiCau != "TN4" {
+			skippedNonTN4++
+			continue
+		}
+
+		// Skip if sig already in DB
+		if q.Sig != "" && sigSet[q.Sig] {
+			skipped++
+			continue
+		}
+
+		// Find target node
+		var targetNodeID uuid.UUID
+		if q.NodeGraph != nil && *q.NodeGraph != "" {
+			if nid, ok := nodeByKey[*q.NodeGraph]; ok {
+				targetNodeID = nid
+			} else {
+				// stableKey not found in existing nodes — use fallback
+				targetNodeID = nodeByKey["__fallback__"]
+			}
+		} else {
+			// null nodeGraph → use fallback
+			if fid, ok := nodeByKey["__fallback__"]; ok {
+				targetNodeID = fid
+			} else {
+				skippedNoNode++
+				continue
+			}
+		}
+
+		// Map difficulty: mucDoSo 1→easy, 2→medium, 3→hard, 4→hard
+		difficulty := "medium"
+		switch q.MucDoSo {
+		case 1:
+			difficulty = "easy"
+		case 2:
+			difficulty = "medium"
+		case 3, 4:
+			difficulty = "hard"
+		}
+
+		// Build options JSON array and find correct index
+		if q.PhuongAn == nil || len(q.PhuongAn) == 0 {
+			skipped++
+			continue
+		}
+		keys := []string{"A", "B", "C", "D"}
+		options := make([]string, 0, 4)
+		correctIdx := 0
+		for i, k := range keys {
+			if v, ok := q.PhuongAn[k]; ok {
+				options = append(options, v)
+				if k == q.DapAn {
+					correctIdx = i
+				}
+			}
+		}
+
+		optionsBytes, _ := json.Marshal(options)
+
+		newQ := model.Question{
+			ID:            uuid.New(),
+			NodeID:        targetNodeID,
+			Content:       q.DeBai,
+			OptionsJSON:   string(optionsBytes),
+			CorrectOption: correctIdx,
+			Difficulty:    difficulty,
+			Sig:           q.Sig,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+
+		if err := config.DB.Create(&newQ).Error; err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %s", q.ID, err.Error()))
+			continue
+		}
+		sigSet[q.Sig] = true
+		imported++
+	}
+
+	return c.JSON(fiber.Map{
+		"status":        "success",
+		"imported":      imported,
+		"skippedDedup":  skipped,
+		"skippedNonTN4": skippedNonTN4,
+		"skippedNoNode": skippedNoNode,
+		"errors":        errors,
+		"subject":       subject,
+	})
+}

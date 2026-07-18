@@ -6,6 +6,8 @@ import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle, Key, Lock, X, Zap, Target, Clock, RefreshCw } from "lucide-react";
 import KnowledgeTree from "../components/KnowledgeTree";
+import GuidedTour from "../components/GuidedTour";
+import QuickRoleSwitcher from "../components/QuickRoleSwitcher";
 import StudentMasteryDashboard from "./components/StudentMasteryDashboard";
 import { TopicMastery } from "@/lib/mastery";
 
@@ -15,6 +17,7 @@ interface NodeItem {
   subject: string;
   name: string;
   theory: string;
+  topicGroup?: string;
   posX: number;
   posY: number;
   isRoot: boolean;
@@ -244,7 +247,17 @@ export default function StudentTutorPage() {
         .catch(() => setMasteryByTopic({}));
       
       const savedNodeStr = localStorage.getItem("aurora_student_selected_node");
-      if (savedNodeStr) {
+      if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
+        const mockNode = { id: "mock-node-1-1", subject: "Môn học Trải nghiệm (Demo)", name: "Cộng phân số cùng mẫu", theory: "Quy tắc: Muốn cộng hai phân số có cùng mẫu số, ta cộng hai tử số với nhau và giữ nguyên mẫu số. Ví dụ: 1/5 + 2/5 = (1+2)/5 = 3/5.", topicGroup: "Đại số", posX: 150, posY: 310, isRoot: false };
+        setSelectedNode(mockNode);
+        setActiveMainTab("workspace");
+        loadQuestions("mock-node-1-1");
+        setTheoryChat([
+          { sender: "ai", content: "Chào Bi! Thầy có câu hỏi nhé: Muốn cộng hai phân số cùng mẫu số ta làm thế nào?" },
+          { sender: "student", content: "Dạ ta cộng tử với tử, giữ nguyên mẫu ạ." },
+          { sender: "ai", content: "Chính xác! Vậy thử áp dụng tính $1/5 + 2/5$ xem bằng bao nhiêu nhé?" }
+        ]);
+      } else if (savedNodeStr) {
         try {
           const parsedNode = JSON.parse(savedNodeStr);
           if (parsedNode.subject === selectedSubject) {
@@ -292,12 +305,21 @@ export default function StudentTutorPage() {
   const loadSubjects = async () => {
     try {
       const data = await apiFetch("/subjects");
-      setSubjects(data || []);
+      let finalSubjects = data || [];
+      const tourActive = localStorage.getItem("aurora_tour_active") === "true";
+      if (tourActive) {
+        if (!finalSubjects.includes("Môn học Trải nghiệm (Demo)")) {
+          finalSubjects = ["Môn học Trải nghiệm (Demo)", ...finalSubjects];
+        }
+      }
+      setSubjects(finalSubjects);
       const savedSub = localStorage.getItem("aurora_student_subject");
-      if (savedSub && data && data.includes(savedSub)) {
+      if (tourActive && !selectedSubject) {
+        setSelectedSubject("Môn học Trải nghiệm (Demo)");
+      } else if (savedSub && finalSubjects.includes(savedSub)) {
         setSelectedSubject(savedSub);
-      } else if (data && data.length > 0) {
-        setSelectedSubject(data[0]);
+      } else if (finalSubjects.length > 0) {
+        setSelectedSubject(finalSubjects[0]);
       }
     } catch (err) {
       console.error("Failed to load subjects:", err);
@@ -305,6 +327,18 @@ export default function StudentTutorPage() {
   };
 
   const loadTreeData = async () => {
+    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
+      setNodes([
+        { id: "mock-node-root", subject: "Môn học Trải nghiệm (Demo)", name: "Toán đại số lớp 7", theory: "Lý thuyết chung về Toán đại số", topicGroup: "Đại số", posX: 400, posY: 50, isRoot: true },
+        { id: "mock-node-1", subject: "Môn học Trải nghiệm (Demo)", name: "Phép cộng phân số", theory: "Cộng hai phân số khác mẫu.", topicGroup: "Đại số", posX: 250, posY: 180, isRoot: false },
+        { id: "mock-node-1-1", subject: "Môn học Trải nghiệm (Demo)", name: "Cộng phân số cùng mẫu", theory: "Quy tắc: Muốn cộng hai phân số có cùng mẫu số, ta cộng hai tử số với nhau và giữ nguyên mẫu số. Ví dụ: 1/5 + 2/5 = (1+2)/5 = 3/5.", topicGroup: "Đại số", posX: 150, posY: 310, isRoot: false }
+      ]);
+      setEdges([
+        { id: "mock-edge-1", subject: "Môn học Trải nghiệm (Demo)", sourceId: "mock-node-root", targetId: "mock-node-1" },
+        { id: "mock-edge-2", subject: "Môn học Trải nghiệm (Demo)", sourceId: "mock-node-1", targetId: "mock-node-1-1" }
+      ]);
+      return;
+    }
     try {
       const data = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/tree`);
       setNodes(data.nodes || []);
@@ -315,6 +349,24 @@ export default function StudentTutorPage() {
   };
 
   const loadStudentState = async () => {
+    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
+      setStudentState({
+        id: "mock-state-id",
+        studentId: "mock-student-id",
+        subject: "Môn học Trải nghiệm (Demo)",
+        currentLevelNodeId: "mock-node-1-1",
+        needsDiagnostic: false
+      } as any);
+      setActivityLogs([
+        { id: "mock-log-1", studentId: "1", subject: "Môn học Trải nghiệm (Demo)", nodeId: "mock-node-1-1", action: "click_node", detail: "Chọn node Cộng phân số cùng mẫu", createdAt: new Date().toISOString() }
+      ] as any);
+      setNodeStatus({
+        "mock-node-root": "mastered",
+        "mock-node-1": "learning",
+        "mock-node-1-1": "initial"
+      });
+      return;
+    }
     try {
       const state = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/state`);
       setStudentState(state);
@@ -530,6 +582,19 @@ export default function StudentTutorPage() {
   };
 
   const loadQuestions = async (nodeId: string) => {
+    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
+      setQuestions([
+        {
+          id: "mock-q-1",
+          nodeId: "mock-node-1-1",
+          content: "Tính phép cộng phân số sau: 2/7 + 3/7 = ?",
+          optionsJson: JSON.stringify(["5/7", "5/14", "6/7", "1/7"]),
+          correctOption: 0,
+          difficulty: "easy"
+        }
+      ]);
+      return;
+    }
     try {
       const data = await apiFetch(`/nodes/${nodeId}/questions`);
       setQuestions(data || []);
@@ -1124,11 +1189,11 @@ export default function StudentTutorPage() {
               <div className="space-y-2">
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">Chào mừng em đến với Aurora Tutor</h2>
                 <p className="text-sm text-slate-500 font-semibold max-w-lg mx-auto leading-relaxed">
-                  Hãy chọn một môn học dưới đây hoặc nhập mã lớp học từ thầy cô để xem Sơ đồ Cây Tri thức Socratic.
+                  Hãy chọn một môn học dưới đây để bắt đầu xem Sơ đồ Cây Tri thức Socratic.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 max-w-lg mx-auto">
                 {subjects.map((subj) => (
                   <button
                     key={subj}
@@ -1137,7 +1202,7 @@ export default function StudentTutorPage() {
                       localStorage.setItem("aurora_student_subject", subj);
                       setActiveMainTab("graph");
                     }}
-                    className="p-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 hover:from-indigo-50 hover:to-indigo-100/50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95"
+                    className="p-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 hover:from-indigo-50 hover:to-indigo-100/50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95 w-full"
                   >
                     <div className="flex justify-between items-start">
                       <div className="p-2.5 bg-white border border-slate-100 text-indigo-600 rounded-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
@@ -1153,44 +1218,6 @@ export default function StudentTutorPage() {
                     </div>
                   </button>
                 ))}
-
-                {/* Quick Mock Tree Import Card */}
-                <button
-                  onClick={handleImportMockTree}
-                  className="p-5 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm group-hover:scale-110 transition-transform">
-                      <Zap size={22} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-indigo-200 text-indigo-900 rounded-full">
-                      Mẫu Test Nhanh
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition-colors">⚡ Nạp Cây Mẫu Trải Nghiệm</h3>
-                    <p className="text-xs text-slate-500 font-semibold mt-0.5">Tải ngay cây tri thức mẫu Toán học 10 đầy đủ để test nhanh ➔</p>
-                  </div>
-                </button>
-
-                {/* Join Class Code Card */}
-                <button
-                  onClick={() => setShowJoinModal(true)}
-                  className="p-5 bg-white hover:bg-slate-50 border border-dashed border-indigo-300 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                      <Key size={22} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full">
-                      Mã lớp học
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition-colors">🔑 Tham gia lớp mới bằng mã code</h3>
-                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Nhập mã lớp được giáo viên cấp (MATH-101...) ➔</p>
-                  </div>
-                </button>
               </div>
             </div>
           </div>
@@ -1245,6 +1272,7 @@ export default function StudentTutorPage() {
                     Không gian Học tập
                   </button>
                 </div>
+                <QuickRoleSwitcher />
               </div>
 
               {/* Legend */}
@@ -1385,7 +1413,7 @@ export default function StudentTutorPage() {
                 </div>
 
                 {/* Socratic RAG Chatbot */}
-                <div className="flex-1 border-t border-slate-100 pt-4 flex flex-col overflow-hidden">
+                <div data-tour="socratic-chat" className="flex-1 border-t border-slate-100 pt-4 flex flex-col overflow-hidden">
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare size={13} className="text-indigo-600" />
                     <h4 className="text-xs font-black text-slate-800">Trợ lý Socratic giải thích (RAG Chat)</h4>
@@ -1448,7 +1476,7 @@ export default function StudentTutorPage() {
               </div>
 
               {/* Right Column: BKT Gauge, Questions & Socratic Inline Helper */}
-              <div className="flex-1 bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm overflow-y-auto">
+              <div data-tour="feynman-notebook" className="flex-1 bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm overflow-y-auto">
                 
                 {/* 1. Conditional Progress Header: Gauge for Practice, Test Card for Diagnostic */}
                 {quizMode === "diagnostic" ? (
@@ -1956,6 +1984,7 @@ export default function StudentTutorPage() {
           </div>
         </div>
       )}
+      <GuidedTour />
     </div>
   );
 }

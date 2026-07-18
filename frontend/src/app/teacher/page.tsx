@@ -20,12 +20,15 @@ import {
   ReferenceLine
 } from "recharts";
 import KnowledgeTree from "../components/KnowledgeTree";
+import GuidedTour from "../components/GuidedTour";
+import QuickRoleSwitcher from "../components/QuickRoleSwitcher";
 import QuestionBankTab from "./components/QuestionBankTab";
 import QuestionTaggingPanel from "./components/QuestionTaggingPanel";
 import MonitoringTab from "./components/MonitoringTab";
 import LearningPathTab from "./components/LearningPathTab";
 import StudentsProgressTab from "./components/StudentsProgressTab";
 import StudentMasteryMatrix from "./components/StudentMasteryMatrix";
+import StudentMgmtTab from "./components/StudentMgmtTab";
 import StudentMasteryProfile from "./components/StudentMasteryProfile";
 import StudentActivityFeed from "./components/StudentActivityFeed";
 import ExamBuilderTab from "./components/ExamBuilderTab";
@@ -145,12 +148,12 @@ interface RubricDraft {
   points: string;
 }
 
-type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "exam-builder" | "exam-scoring";
+type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "student-mgmt" | "exam-builder" | "exam-scoring";
 
 export default function TeacherDashboard() {
   const router = useRouter();
   const [userName, setUserName] = useState("Giáo viên");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("students");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("graph-designer");
   const [subjects, setSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("");
 
@@ -257,9 +260,42 @@ export default function TeacherDashboard() {
     if (savedSubject !== null) {
       setSelectedSubject(savedSubject);
     }
-    if (savedTab) {
-      setActiveTab(savedTab);
+    const isTourActive = localStorage.getItem("aurora_tour_active") === "true";
+    const savedStepIdxStr = localStorage.getItem("aurora_tour_step");
+    let initialTab = savedTab || "student-mgmt";
+    
+    if (isTourActive && savedStepIdxStr) {
+      const stepIdx = parseInt(savedStepIdxStr, 10);
+      const tourMode = localStorage.getItem("aurora_tour_mode") || "both";
+      
+      const tourSteps = [
+        { id: "welcome" },
+        { id: "socratic-chat" },
+        { id: "feynman-notebook" },
+        { id: "role-switcher" },
+        { id: "concept-gaps" },
+        { id: "inspect-drawer" },
+        { id: "finish" }
+      ];
+      
+      const activeSteps = tourSteps.filter((step, idx) => {
+        if (idx === 0 || idx === tourSteps.length - 1) return true;
+        if (tourMode === "student") return step.id === "socratic-chat" || step.id === "role-switcher";
+        if (tourMode === "teacher") return step.id === "concept-gaps" || step.id === "inspect-drawer" || step.id === "role-switcher";
+        return true;
+      });
+      
+      const currentStep = activeSteps[stepIdx];
+      if (currentStep) {
+        if (currentStep.id === "concept-gaps") {
+          initialTab = "monitoring";
+        } else if (currentStep.id === "inspect-drawer") {
+          initialTab = "students";
+        }
+      }
     }
+    
+    setActiveTab(initialTab);
     if (savedStudent) {
       try {
         setSelectedStudent(JSON.parse(savedStudent));
@@ -274,6 +310,17 @@ export default function TeacherDashboard() {
     loadSubjects();
     loadStudentsProgress();
   }, [router]);
+
+  useEffect(() => {
+    const handleSwitchTab = (e: Event) => {
+      const customEvent = e as CustomEvent<ActiveTab>;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+    window.addEventListener("aurora-tour-switch-tab", handleSwitchTab);
+    return () => window.removeEventListener("aurora-tour-switch-tab", handleSwitchTab);
+  }, []);
 
   const loadSubjectQuestions = async () => {
     if (!selectedSubject) return;
@@ -393,7 +440,54 @@ export default function TeacherDashboard() {
     reader.readAsBinaryString(file);
   };
 
+  const handleMasterBankImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setLoadingMessage("Đang đọc và import Master Bank JSON...");
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        const json = JSON.parse(text);
+
+        const res = await apiFetch("/import/master-bank", {
+          method: "POST",
+          body: JSON.stringify(json),
+        });
+
+        toast.success(
+          `Import Master Bank thành công: ${res.imported} câu đã nhập!`,
+          {
+            description: [
+              res.skippedDedup > 0 ? `${res.skippedDedup} câu trùng sig (bỏ qua)` : "",
+              res.skippedNonTN4 > 0 ? `${res.skippedNonTN4} câu TuLuan/DungSai (bỏ qua)` : "",
+              res.skippedNoNode > 0 ? `${res.skippedNoNode} câu thiếu node (bỏ qua)` : "",
+            ].filter(Boolean).join(". ") || undefined,
+          }
+        );
+
+        loadSubjectQuestions();
+      } catch (err: any) {
+        toast.error("Lỗi khi import Master Bank: " + err.message);
+      } finally {
+        setLoading(false);
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const loadMonitoringData = async () => {
+    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
+      setMonitoringStats([
+        { studentId: "mock-student-1", studentName: "Nguyễn Văn Bi (Demo)", studentEmail: "bi@aurora.edu.vn", expectedMastery: 80, actualMastery: 45, totalAnswers: 15, correctAnswers: 11, isOutlier: true }
+      ]);
+      setLoadingMonitoring(false);
+      return;
+    }
     if (!selectedSubject) return;
     setLoadingMonitoring(true);
     try {
@@ -407,6 +501,10 @@ export default function TeacherDashboard() {
   };
 
   const checkClassInterventions = async (subject: string) => {
+    if (subject === "Môn học Trải nghiệm (Demo)") {
+      setHasInterventions(true);
+      return;
+    }
     try {
       const data = await apiFetch(`/teacher/classes/intervention-groups/${encodeURIComponent(subject)}`);
       if (data && data.groups && data.groups.length > 0) {
@@ -468,25 +566,34 @@ export default function TeacherDashboard() {
   const loadSubjects = async (selectSubjectName?: string) => {
     try {
       const data = await apiFetch("/subjects");
-      setSubjects(data || []);
+      let finalSubjects = data || [];
+      const tourActive = localStorage.getItem("aurora_tour_active") === "true";
+      if (tourActive) {
+        if (!finalSubjects.includes("Môn học Trải nghiệm (Demo)")) {
+          finalSubjects = ["Môn học Trải nghiệm (Demo)", ...finalSubjects];
+        }
+      }
+      setSubjects(finalSubjects);
       const savedSub = localStorage.getItem("aurora_teacher_subject");
       
-      if (selectSubjectName && data && data.includes(selectSubjectName)) {
+      if (tourActive && !selectedSubject) {
+        setSelectedSubject("Môn học Trải nghiệm (Demo)");
+      } else if (selectSubjectName && finalSubjects.includes(selectSubjectName)) {
         setSelectedSubject(selectSubjectName);
       } else if (savedSub !== null) {
-        if (savedSub && data && data.includes(savedSub)) {
+        if (savedSub && finalSubjects.includes(savedSub)) {
           setSelectedSubject(savedSub);
         } else if (savedSub === "") {
           setSelectedSubject("");
-        } else if (selectedSubject && data && data.includes(selectedSubject)) {
+        } else if (selectedSubject && finalSubjects.includes(selectedSubject)) {
           // Keep
-        } else if (data && data.length > 0) {
-          setSelectedSubject(data[0]);
+        } else if (finalSubjects.length > 0) {
+          setSelectedSubject(finalSubjects[0]);
         }
-      } else if (selectedSubject && data && data.includes(selectedSubject)) {
+      } else if (selectedSubject && finalSubjects.includes(selectedSubject)) {
         // Keep currently selected
-      } else if (data && data.length > 0) {
-        setSelectedSubject(data[0]);
+      } else if (finalSubjects.length > 0) {
+        setSelectedSubject(finalSubjects[0]);
       } else {
         setSelectedSubject("");
       }
@@ -650,6 +757,20 @@ export default function TeacherDashboard() {
   };
 
   const loadTreeData = async () => {
+    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
+      const mockNodes = [
+        { id: "mock-node-root", subject: "Môn học Trải nghiệm (Demo)", name: "Toán đại số lớp 7", theory: "Lý thuyết chung về Toán đại số", topicGroup: "Đại số", posX: 400, posY: 50, isRoot: true },
+        { id: "mock-node-1", subject: "Môn học Trải nghiệm (Demo)", name: "Phép cộng phân số", theory: "Cộng hai phân số khác mẫu.", topicGroup: "Đại số", posX: 250, posY: 180, isRoot: false },
+        { id: "mock-node-1-1", subject: "Môn học Trải nghiệm (Demo)", name: "Cộng phân số cùng mẫu", theory: "Quy tắc: Muốn cộng hai phân số có cùng mẫu số, ta cộng hai tử số với nhau và giữ nguyên mẫu số. Ví dụ: 1/5 + 2/5 = (1+2)/5 = 3/5.", topicGroup: "Đại số", posX: 150, posY: 310, isRoot: false }
+      ];
+      setNodes(mockNodes);
+      setEdges([
+        { id: "mock-edge-1", subject: "Môn học Trải nghiệm (Demo)", sourceId: "mock-node-root", targetId: "mock-node-1" },
+        { id: "mock-edge-2", subject: "Môn học Trải nghiệm (Demo)", sourceId: "mock-node-1", targetId: "mock-node-1-1" }
+      ]);
+      setFocusedNodeId("mock-node-root");
+      return;
+    }
     setLoading(true);
     try {
       const data = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/tree`);
@@ -670,6 +791,13 @@ export default function TeacherDashboard() {
   };
 
   const loadStudentsProgress = async () => {
+    const tourActive = localStorage.getItem("aurora_tour_active") === "true";
+    if (tourActive) {
+      setStudentsProgress([
+        { studentId: "mock-student-1", studentName: "Nguyễn Văn Bi (Demo)", email: "bi@aurora.edu.vn", activeSubject: "Môn học Trải nghiệm (Demo)", lastActive: new Date().toISOString() }
+      ] as any);
+      return;
+    }
     try {
       const data = await apiFetch("/teacher/students-progress");
       setStudentsProgress(data || []);
@@ -1416,23 +1544,26 @@ export default function TeacherDashboard() {
         </div>
 
         {/* Subject Selection inside Sidebar */}
-        {selectedSubject && (
+        {subjects.length > 0 && (
           <div className="p-5 border-b border-border bg-muted/40 space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Môn Học</label>
-              <button
-                onClick={() => setSelectedSubject("")}
-                title="Quay lại bảng chọn môn học"
-                className="text-[10px] font-black text-[var(--mint)] hover:underline flex items-center gap-1 cursor-pointer font-bold"
-              >
-                <GraduationCap size={13} /> Bảng môn học
-              </button>
+              {selectedSubject && (
+                <button
+                  onClick={() => setSelectedSubject("")}
+                  title="Quay lại bảng chọn môn học"
+                  className="text-[10px] font-black text-[var(--mint)] hover:underline flex items-center gap-1 cursor-pointer font-bold"
+                >
+                  <GraduationCap size={13} /> Bảng môn học
+                </button>
+              )}
             </div>
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
               className="w-full rounded-xl bg-card border border-border px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground shadow-sm"
             >
+              <option value="">-- Chọn môn học --</option>
               {subjects.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -1445,7 +1576,37 @@ export default function TeacherDashboard() {
         {/* Tab Selection */}
         <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
           <button
-            onClick={() => setActiveTab("exam-builder")}
+            onClick={() => {
+              setSelectedSubject("");
+              setActiveTab("graph-designer");
+              setSelectedStudent(null);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${!selectedSubject && activeTab === "graph-designer"
+                ? "bg-foreground border-foreground text-background shadow-md"
+                : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <BookOpen size={16} /> Quản lý Môn học
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("student-mgmt");
+              setSelectedStudent(null);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "student-mgmt"
+                ? "bg-foreground border-foreground text-background shadow-md"
+                : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <Users size={16} /> 0. Quản lý Lớp & Học sinh
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("exam-builder");
+              setSelectedStudent(null);
+            }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "exam-builder"
                 ? "bg-foreground border-foreground text-background shadow-md"
                 : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1453,8 +1614,12 @@ export default function TeacherDashboard() {
           >
             <FilePenLine size={16} /> Tạo đề kiểm tra
           </button>
+
           <button
-            onClick={() => setActiveTab("exam-scoring")}
+            onClick={() => {
+              setActiveTab("exam-scoring");
+              setSelectedStudent(null);
+            }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "exam-scoring"
                 ? "bg-foreground border-foreground text-background shadow-md"
                 : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -1462,6 +1627,8 @@ export default function TeacherDashboard() {
           >
             <ClipboardCheck size={16} /> Chấm bài kiểm tra
           </button>
+
+          <div className="border-t border-border/60 my-2" />
           {selectedSubject ? (
             <>
               <button
@@ -1560,7 +1727,10 @@ export default function TeacherDashboard() {
 
       {/* Main Panel Workspace */}
       <main className="flex-1 flex flex-col p-6 overflow-hidden bg-background relative">
-        {!selectedSubject && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
+        <div className="absolute top-4 right-6 z-30">
+          <QuickRoleSwitcher />
+        </div>
+        {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
           // Subject Selection Screen Dashboard
           <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">
             {isSidebarCollapsed && (
@@ -1870,7 +2040,9 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Split logic between Teacher tabs */}
-            {activeTab === "exam-builder" ? (
+            {activeTab === "student-mgmt" ? (
+              <StudentMgmtTab />
+            ) : activeTab === "exam-builder" ? (
               <ExamBuilderTab subjects={subjects} />
             ) : activeTab === "exam-scoring" ? (
               <ExamScoringTab />
@@ -2429,6 +2601,7 @@ export default function TeacherDashboard() {
                 handleStartAddQuestion={handleStartAddQuestion}
                 handleDownloadTemplate={handleDownloadTemplate}
                 handleExcelImport={handleExcelImport}
+                handleMasterBankImport={handleMasterBankImport}
                 handleStartEditQuestion={handleStartEditQuestion}
                 handleDeleteQuestion={handleDeleteQuestion}
                 handleTagQuestion={(question) => setTaggingQuestionId(question.id)}
@@ -3178,6 +3351,7 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
+      <GuidedTour />
     </div>
   );
 }
