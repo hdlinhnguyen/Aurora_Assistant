@@ -182,6 +182,7 @@ export default function TeacherDashboard() {
   const [qDifficulty, setQDifficulty] = useState("medium");
   const [qDistractors, setQDistractors] = useState<Record<string, string>>({});
   const [pendingDiff, setPendingDiff] = useState<{ newNodes: any[]; suggestedEdges: any[] } | null>(null);
+  const [hasInterventions, setHasInterventions] = useState(false);
 
   useEffect(() => {
     const userStr = localStorage.getItem("aurora_user");
@@ -352,6 +353,19 @@ export default function TeacherDashboard() {
     }
   };
 
+  const checkClassInterventions = async (subject: string) => {
+    try {
+      const data = await apiFetch(`/teacher/classes/intervention-groups/${encodeURIComponent(subject)}`);
+      if (data && data.groups && data.groups.length > 0) {
+        setHasInterventions(true);
+      } else {
+        setHasInterventions(false);
+      }
+    } catch {
+      setHasInterventions(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedSubject) {
       loadTreeData();
@@ -360,6 +374,7 @@ export default function TeacherDashboard() {
       }
       loadSubjectQuestions();
       loadMonitoringData();
+      checkClassInterventions(selectedSubject);
     }
   }, [selectedSubject]);
 
@@ -1236,18 +1251,6 @@ export default function TeacherDashboard() {
             <>
               <button
                 onClick={() => {
-                  setActiveTab("students");
-                  setSelectedStudent(null);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "students"
-                    ? "bg-foreground border-foreground text-background shadow-md"
-                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-              >
-                <Users size={16} /> Báo cáo Tiến độ Học sinh
-              </button>
-              <button
-                onClick={() => {
                   setActiveTab("graph-designer");
                   setSelectedStudent(null);
                 }}
@@ -1256,19 +1259,7 @@ export default function TeacherDashboard() {
                     : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
               >
-                <GitBranch size={16} /> Thiết kế Cây Kiến thức
-              </button>
-              <button
-                onClick={() => {
-                  setActiveTab("learning-path");
-                  setSelectedStudent(null);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "learning-path"
-                    ? "bg-foreground border-foreground text-background shadow-md"
-                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-              >
-                <ListTodo size={16} /> Lập lộ trình cá nhân
+                <GitBranch size={16} /> 1. Thiết kế Cây Kiến thức
               </button>
               <button
                 onClick={() => {
@@ -1280,7 +1271,37 @@ export default function TeacherDashboard() {
                     : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
               >
-                <Database size={16} /> Ngân hàng Câu hỏi
+                <Database size={16} /> 2. Ngân hàng Câu hỏi
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("students");
+                  setSelectedStudent(null);
+                }}
+                className={`relative w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "students"
+                    ? "bg-foreground border-foreground text-background shadow-md"
+                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+              >
+                <Users size={16} /> 3. Báo cáo Tiến độ Học sinh
+                {hasInterventions && activeTab !== "students" && (
+                  <span className="absolute right-3 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("learning-path");
+                  setSelectedStudent(null);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "learning-path"
+                    ? "bg-foreground border-foreground text-background shadow-md"
+                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+              >
+                <ListTodo size={16} /> 4. Lập lộ trình cá nhân
               </button>
               <button
                 onClick={() => {
@@ -1292,7 +1313,7 @@ export default function TeacherDashboard() {
                     : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
               >
-                <TrendingUp size={16} /> Giám sát Lớp học
+                <TrendingUp size={16} /> 5. Giám sát Lớp học
               </button>
             </>
           ) : (
@@ -1596,9 +1617,13 @@ export default function TeacherDashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                {activeTab === "graph-designer" && (
+                 {activeTab === "graph-designer" && (
                   <div className="flex items-center gap-2">
-                    <label className="px-4 py-2 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground rounded-xl text-xs font-black transition-all shadow-[var(--shadow-card)] flex items-center gap-1.5 cursor-pointer">
+                    <label className={`px-4 py-2 text-foreground rounded-xl text-xs font-black transition-all shadow-[var(--shadow-card)] flex items-center gap-1.5 cursor-pointer ${
+                      nodes.length === 0
+                        ? "bg-[var(--mint)] animate-pulse-glow border border-[var(--mint)]"
+                        : "bg-[var(--mint)] hover:brightness-95 active:scale-95"
+                    }`}>
                       <Upload size={14} /> Dựng cây từ tài liệu
                       <input
                         type="file"
@@ -1637,8 +1662,14 @@ export default function TeacherDashboard() {
                       onRefresh={loadTreeData}
                     />
                   ) : (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
-                      Đang tải sơ đồ...
+                    <div className="flex flex-col items-center justify-center h-full text-center p-8 max-w-md mx-auto">
+                      <div className="p-4 bg-[var(--mint)]/10 text-[var(--mint)] rounded-full mb-4 animate-bounce">
+                        <Sparkles size={32} />
+                      </div>
+                      <h3 className="text-sm font-black text-foreground uppercase tracking-wider">Sơ đồ cây môn học đang trống</h3>
+                      <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                        Hãy tải lên file tài liệu (PDF, Word, TXT) bằng nút <strong className="text-foreground">"Dựng cây từ tài liệu"</strong> nhấp nháy phía trên để AI tự động phân tích và tạo cây kiến thức chuẩn sư phạm!
+                      </p>
                     </div>
                   )}
                 </div>
