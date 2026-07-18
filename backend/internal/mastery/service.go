@@ -19,6 +19,8 @@ type StateStore interface {
 	GetHistory(context.Context, uuid.UUID, uuid.UUID, string) ([]HistoryPoint, error)
 }
 
+const initialMasteryProbability = 0.30
+
 type Service struct {
 	db             *gorm.DB
 	store          StateStore
@@ -49,7 +51,30 @@ func NewService(db *gorm.DB, store StateStore, calculator Calculator, options ..
 }
 
 func (s *Service) GetProfile(ctx context.Context, studentID uuid.UUID, subject string) (Profile, error) {
-	return s.store.GetProfile(ctx, studentID, subject)
+	profile, err := s.store.GetProfile(ctx, studentID, subject)
+	if err != nil {
+		return Profile{}, err
+	}
+	topicIDs, err := s.subjectTopics(ctx, studentID, subject)
+	if err != nil {
+		return Profile{}, err
+	}
+	if profile.Topics == nil {
+		profile.Topics = map[string]TopicState{}
+	}
+	profile.StudentID = studentID
+	profile.Subject = subject
+	calculatedAt := profile.CalculatedAt
+	if calculatedAt.IsZero() {
+		calculatedAt = time.Now().UTC()
+		profile.CalculatedAt = calculatedAt
+	}
+	for _, topicID := range topicIDs {
+		if _, exists := profile.Topics[topicID.String()]; !exists {
+			profile.Topics[topicID.String()] = priorTopicState(studentID, topicID, calculatedAt)
+		}
+	}
+	return profile, nil
 }
 
 func (s *Service) GetHistory(ctx context.Context, studentID, topicID uuid.UUID, historyRange string) ([]HistoryPoint, error) {
@@ -92,26 +117,23 @@ func (s *Service) RecalculateStudent(ctx context.Context, studentID uuid.UUID, s
 	}
 	versions := nextVersions(current.Topics)
 	states := make([]TopicState, 0, len(result.States))
+	profile := Profile{StudentID: studentID, Subject: subject, CalculatedAt: now, Topics: map[string]TopicState{}}
 	for topicKey, payload := range result.States {
 		topicID, err := uuid.Parse(topicKey)
 		if err != nil {
 			return Profile{}, fmt.Errorf("invalid topic id %q: %w", topicKey, err)
 		}
-		if payload.EvidenceCount == 0 {
-			continue
-		}
 		state, err := payloadToState(payload, studentID, topicID, versions[topicKey])
 		if err != nil {
 			return Profile{}, err
 		}
-		states = append(states, state)
+		profile.Topics[topicKey] = state
+		if state.EvidenceCount > 0 {
+			states = append(states, state)
+		}
 	}
 	if err := s.store.UpsertStates(ctx, states); err != nil {
 		return Profile{}, err
-	}
-	profile := Profile{StudentID: studentID, Subject: subject, CalculatedAt: now, Topics: map[string]TopicState{}}
-	for _, state := range states {
-		profile.Topics[state.TopicID.String()] = state
 	}
 	s.publishDecision(ctx, studentID, subject, current, states, now)
 	return profile, nil
@@ -186,6 +208,23 @@ func payloadToState(payload TopicStatePayload, studentID, topicID uuid.UUID, ver
 		return TopicState{}, err
 	}
 	return state, nil
+}
+
+func priorTopicState(studentID, topicID uuid.UUID, calculatedAt time.Time) TopicState {
+	return TopicState{
+		StudentID:          studentID,
+		TopicID:            topicID,
+		MasteryProbability: initialMasteryProbability,
+		ConfidenceScore:    0,
+		Consistency:        1,
+		EvidenceCount:      0,
+		EffectiveEvidence:  0,
+		Status:             StatusUnknown,
+		EvidenceSummary:    map[string]float64{},
+		SourceBreakdown:    map[string]int{},
+		Version:            1,
+		CalculatedAt:       calculatedAt,
+	}
 }
 
 func (s *Service) loadSubjectTopics(ctx context.Context, _ uuid.UUID, subject string) ([]uuid.UUID, error) {
