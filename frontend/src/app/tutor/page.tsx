@@ -389,6 +389,7 @@ export default function TutorHubPage() {
         totalScore: res.totalScore,
         maxScore: res.maxScore,
       });
+      setActiveExam(null);
       toast.success("Nộp bài thi thành công!");
     } catch (err: any) {
       toast.error("Lỗi khi nộp bài thi: " + (err.message || err));
@@ -412,6 +413,7 @@ export default function TutorHubPage() {
       if (res.isFinished) {
         toast.success("Hoàn thành bài đánh giá chẩn đoán!");
         setExamFinishedScore({ totalScore: "Hoàn thành", maxScore: "Chẩn đoán", summaries: res.summaries || [] });
+        setActiveExam(null);
       } else if (res.nextQuestion) {
         setExamQuestions((prev) => [...prev, res.nextQuestion]);
         setExamQIndex((idx) => idx + 1);

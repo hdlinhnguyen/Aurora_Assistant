@@ -40,17 +40,38 @@ type SubmitExamRequest struct {
 }
 
 func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
+	userIDStr, ok := c.Locals("userID").(string)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+
 	subject := c.Query("subject")
 	if subject == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Vui lòng cung cấp môn học"})
 	}
 
-	var exams []model.Exam
-	if err := h.db.Where("subject = ? AND status = ?", subject, "preparing_exam").Order("created_at desc").Find(&exams).Error; err != nil {
+	// 1. Tải danh sách đề thi lớp học (không phải đề chẩn đoán thích ứng)
+	var classExams []model.Exam
+	if err := h.db.Where("subject = ? AND status = ? AND title NOT LIKE ?", subject, "preparing_exam", "Đánh giá chẩn đoán thích ứng%").Order("created_at desc").Find(&classExams).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải danh sách đề thi: " + err.Error()})
 	}
 
-	if len(exams) == 0 {
+	// 2. Tìm hoặc tự động sinh đề chẩn đoán thích ứng riêng của học sinh này
+	var studentAdaptiveExam model.Exam
+	hasAdaptive := true
+	if err := h.db.Where("subject = ? AND status = ? AND title LIKE ? AND created_by = ?", subject, "preparing_exam", "Đánh giá chẩn đoán thích ứng%", userID).First(&studentAdaptiveExam).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			hasAdaptive = false
+		} else {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn đề chẩn đoán: " + err.Error()})
+		}
+	}
+
+	if !hasAdaptive {
 		// Tự động sinh đề chẩn đoán mẫu và chọn câu hỏi xuất phát từ Hub Node đầu tiên
 		var firstQ model.Question
 		var rootNode model.Node
@@ -70,13 +91,6 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 		}
 
 		if err == nil {
-			var creator model.User
-			if err := h.db.Where("role = ?", "teacher").First(&creator).Error; err != nil {
-				if err := h.db.Where("role = ?", "admin").First(&creator).Error; err != nil {
-					creator.ID = uuid.Nil
-				}
-			}
-
 			newExam := model.Exam{
 				ID:              uuid.New(),
 				Title:           "Đánh giá chẩn đoán thích ứng - " + subject,
@@ -84,7 +98,7 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 				GradeLevel:      "Cả lớp",
 				DurationMinutes: 45,
 				Status:          "preparing_exam",
-				CreatedBy:       creator.ID,
+				CreatedBy:       userID, // Gắn với sinh viên hiện tại
 				CreatedAt:       time.Now(),
 				UpdatedAt:       time.Now(),
 			}
@@ -113,10 +127,18 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 			})
 
 			if errTx == nil {
-				exams = append(exams, newExam)
+				studentAdaptiveExam = newExam
+				hasAdaptive = true
 			}
 		}
 	}
+
+	// 3. Kết hợp kết quả đề thi
+	var exams []model.Exam
+	if hasAdaptive {
+		exams = append(exams, studentAdaptiveExam)
+	}
+	exams = append(exams, classExams...)
 
 	return c.JSON(exams)
 }
@@ -732,7 +754,7 @@ func (h *StudentExamHandler) ResetDiagnostic(c fiber.Ctx) error {
 
 	// 2. Find and delete adaptive exams for this subject
 	var exams []model.Exam
-	h.db.Where("subject = ? AND title LIKE ?", subject, "Đánh giá chẩn đoán thích ứng%").Find(&exams)
+	h.db.Where("subject = ? AND title LIKE ? AND created_by = ?", subject, "Đánh giá chẩn đoán thích ứng%", userID).Find(&exams)
 	for _, ex := range exams {
 		// Delete ExamQuestions
 		h.db.Where("exam_id = ?", ex.ID).Delete(&model.ExamQuestion{})
