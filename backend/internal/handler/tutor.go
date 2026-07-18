@@ -901,7 +901,7 @@ func (h *TutorHandler) ChatNodeTheory(c fiber.Ctx) error {
 	nodeIdStr := c.Params("nodeId")
 	nodeID, err := uuid.Parse(nodeIdStr)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
+		return c.Status(fiber.StatusLengthRequired).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
 	}
 
 	userIDStr, _ := c.Locals("userID").(string)
@@ -911,14 +911,15 @@ func (h *TutorHandler) ChatNodeTheory(c fiber.Ctx) error {
 	}
 
 	var req struct {
-		Message string              `json:"message"`
-		History []map[string]string `json:"history"`
+		Message      string              `json:"message"`
+		History      []map[string]string `json:"history"`
+		QuestionText string              `json:"questionText"`
 	}
 	if err := c.Bind().JSON(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu không hợp lệ"})
 	}
 
-	reply, err := h.svc.ChatNodeTheory(userID, nodeID, req.Message, req.History)
+	reply, err := h.svc.ChatNodeTheory(userID, nodeID, req.Message, req.History, req.QuestionText)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

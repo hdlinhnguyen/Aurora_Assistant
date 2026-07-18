@@ -33,6 +33,7 @@ import {
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 import { useCharacter, characterMeta } from "../components/character-context";
 import Character, { type CharKind } from "../components/Character";
+import { SafeHtml } from "@/components/ui/safe-html";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
@@ -990,14 +991,14 @@ export default function TutorHubPage() {
                   {chat.map((m, i) =>
                     m.sender === "ai" ? (
                       <div key={i} style={{ display: "flex", maxWidth: "82%" }}>
-                        <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#3a3f4d", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                          {m.text}
+                        <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#3a3f4d", lineHeight: 1.6 }}>
+                          <SafeHtml text={m.text} variant="tutor" />
                         </div>
                       </div>
                     ) : (
                       <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
                         <div style={{ background: "#16161F", color: "#fff", borderRadius: 16, borderBottomRightRadius: 5, padding: "11px 15px", fontSize: 13.5, lineHeight: 1.55, maxWidth: "78%" }}>
-                          {m.text}
+                          <SafeHtml text={m.text} variant="tutor" />
                         </div>
                       </div>
                     ),

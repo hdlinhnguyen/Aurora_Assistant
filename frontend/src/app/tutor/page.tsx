@@ -116,7 +116,8 @@ export default function TutorHubPage() {
 
   // ---- quiz / ui ----
   const [screen, setScreen] = useState<"lesson" | "complete">("lesson");
-  const [activeTab, setActiveTab] = useState<"theory" | "practice" | "chat" | "exams" | "graph">("graph");
+  const [activeTab, setActiveTab] = useState<"review" | "exams" | "graph">("graph");
+  const [reviewLeftSubTab, setReviewLeftSubTab] = useState<"practice" | "theory">("practice");
   const [qIndex, setQIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
@@ -500,7 +501,7 @@ export default function TutorHubPage() {
         }
       } else {
         toast.warning("⚠️ Em đã ở Nút gốc nền tảng của bài học. Hãy đọc lại lý thuyết nhé!");
-        setActiveTab("theory");
+        setReviewLeftSubTab("theory");
       }
     } catch (err: any) {
       console.error("Lỗi hạ cấp thích ứng:", err);
@@ -518,7 +519,7 @@ export default function TutorHubPage() {
     setChat([
       {
         sender: "ai",
-        text: `Chào ${studentName}! Có gì chưa rõ ở bài "${lessonName || "này"}" cứ hỏi ${COMPANION.name} nhé — ${COMPANION.name} sẽ gợi mở để em tự nghĩ ra! ${COMPANION.mascot}`,
+        text: `Chào ${studentName}! Có gì chưa rõ ở bài "${lessonName || "này"}" cứ hỏi ${COMPANION.name} nhé, ${COMPANION.name} sẽ gợi mở để em tự nghĩ ra!`,
       },
     ]);
     setChatMascotState("waving");
@@ -556,7 +557,8 @@ export default function TutorHubPage() {
   function selectStep(step: RoadmapStep) {
     if (step.id === currentStepId) return;
     setCurrentStepId(step.id);
-    setActiveTab("practice");
+    setActiveTab("review");
+    setReviewLeftSubTab("practice");
     resetChat(step.name);
     loadQuestions(step.id);
   }
@@ -618,7 +620,8 @@ export default function TutorHubPage() {
 
   function restart() {
     setScreen("lesson");
-    setActiveTab("theory");
+    setActiveTab("review");
+    setReviewLeftSubTab("theory");
     setQIndex(0);
     setSelected(null);
     setAnswered(false);
@@ -673,7 +676,7 @@ export default function TutorHubPage() {
     setChatMascotState("thinking");
     setChatMascotSpeech("Nova đang suy nghĩ và phân tích câu hỏi của em nha... 🤔💭");
     try {
-      const res = await chatTheory(currentStepId, val, history);
+      const res = await chatTheory(currentStepId, val, history, q?.q);
       setChat((c) => [...c, { sender: "ai", text: res.reply }]);
       setChatMascotState("review");
       setChatMascotSpeech("Nova đã gợi ý xong! Em đọc kỹ và thử suy nghĩ xem sao nhé 💡");
@@ -683,6 +686,37 @@ export default function TutorHubPage() {
       setChatMascotSpeech("Lỗi kết nối chút xíu, em thử nhắn lại câu hỏi giúp Nova nha 😅");
     } finally {
       setChatSending(false);
+    }
+  }
+
+  async function triggerReviewSocraticHint() {
+    if (answered || hintLoading || !currentStepId || !q) return;
+    setHintLoading(true);
+    const nextPress = hintPress + 1;
+    setHintPress(nextPress);
+    
+    setChat((c) => [...c, { sender: "student", text: `Nova ơi, gợi ý cho mình Câu ${qIndex + 1} với! 💡` }]);
+    setChatSending(true);
+    setChatMascotState("thinking");
+    setChatMascotSpeech("Nova đang xem qua câu hỏi và chuẩn bị gợi ý Socratic cho em nhé... 🤔");
+    
+    try {
+      const res = await requestHint(currentStepId, nextPress, currentNode?.name, q.q);
+      
+      setChat((c) => [...c, { sender: "ai", text: res.text || "Em hãy nhớ lại lý thuyết bài học và thử suy nghĩ xem!" }]);
+      setChatMascotState("review");
+      setChatMascotSpeech("Nova đã gợi ý xong! Em xem gợi ý trong phần chat bên phải nhé! 💡");
+      
+      if (res.exhausted && res.escalation) {
+        const cantDoRes = await submitCantDo(currentStepId);
+        setCantDoOptions(cantDoRes);
+      }
+    } catch {
+      setChat((c) => [...c, { sender: "ai", text: `Gợi ý đang tạm nghỉ. Em thử suy nghĩ theo lý thuyết bài "${currentNode?.name}" nhé!` }]);
+      setChatMascotState("failed");
+    } finally {
+      setChatSending(false);
+      setHintLoading(false);
     }
   }
 
@@ -1033,15 +1067,15 @@ export default function TutorHubPage() {
                 <div onClick={() => setActiveTab("graph")} style={activeTab === "graph" ? tabOn : tabOff}>
                   <Network size={15} /> Sơ đồ năng lực
                 </div>
-                <div onClick={() => setActiveTab("theory")} style={activeTab === "theory" ? tabOn : tabOff}>
-                  <BookOpen size={15} /> Học lý thuyết
-                </div>
-                <div onClick={() => setActiveTab("practice")} style={activeTab === "practice" ? tabOn : tabOff}>
-                  <PenTool size={15} /> Luyện tập{" "}
+                <div onClick={() => {
+                  setActiveTab("review");
+                  setReviewLeftSubTab("practice");
+                }} style={activeTab === "review" ? tabOn : tabOff}>
+                  <PenTool size={15} /> Ôn tập chuyên đề{" "}
                   <span
                     style={{
-                      background: activeTab === "practice" ? "rgba(255,255,255,.22)" : "#EFE9FD",
-                      color: activeTab === "practice" ? "#fff" : "#7C46E8",
+                      background: activeTab === "review" ? "rgba(255,255,255,.22)" : "#EFE9FD",
+                      color: activeTab === "review" ? "#fff" : "#7C46E8",
                       fontSize: 11,
                       padding: "1px 8px",
                       borderRadius: 999,
@@ -1050,9 +1084,6 @@ export default function TutorHubPage() {
                   >
                     {qTotal}
                   </span>
-                </div>
-                <div onClick={() => setActiveTab("chat")} style={activeTab === "chat" ? tabOn : tabOff}>
-                  <MessageSquare size={15} /> Hỏi thầy AI
                 </div>
               </>
             ) : (
@@ -1124,494 +1155,588 @@ export default function TutorHubPage() {
             </div>
           )}
 
-          {/* ===== THEORY PANEL ===== */}
-          {activeTab === "theory" && (
-            <div className="ah-panel" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
-              <div style={{ flex: 1.2, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 24, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
-                <div style={{ ...POPPINS, fontWeight: 700, fontSize: 17, marginBottom: 12 }}>Ý tưởng chính 🍰</div>
-                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: "#4b5060", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
-                  {currentNode?.theory?.trim() || "Nội dung lý thuyết cho bài này đang được cập nhật. Em có thể sang tab Luyện tập hoặc hỏi thầy AI nhé!"}
-                </p>
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                  <div
-                    onClick={() => setActiveTab("practice")}
-                    style={{
-                      ...POPPINS,
-                      flex: 1,
-                      background: "linear-gradient(135deg,#8B5CF6,#7C46E8)",
-                      color: "#fff",
-                      borderRadius: 14,
-                      padding: 14,
-                      textAlign: "center",
-                      fontWeight: 800,
-                      fontSize: 15,
-                      cursor: "pointer",
-                      boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)",
-                    }}
-                  >
-                    Mình hiểu rồi → Luyện tập
-                  </div>
-                  <div
-                    onClick={() => setActiveTab("chat")}
-                    style={{ background: "#fff", border: "1px solid #eef1f4", color: "#5b6072", borderRadius: 14, padding: "14px 18px", fontWeight: 700, fontSize: 15, cursor: "pointer" }}
-                  >
-                    💬
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ width: 264, background: "linear-gradient(160deg,#faf7ff,#f2eefb)", border: "1px solid #ece5fb", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
-                  <div style={{ height: 44, width: 44, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
-                    <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 36, height: 36, objectFit: "contain" }} />
-                  </div>
-                  <div>
-                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{COMPANION.name}</div>
-                    <div style={{ fontSize: 11, color: "#7C46E8", fontWeight: 600 }}>● đang lắng nghe</div>
-                  </div>
-                </div>
-                <div style={{ background: "#fff", border: "1px solid #f0eafc", borderRadius: 15, borderTopLeftRadius: 5, padding: 13, fontSize: 13, color: "#4b5060", lineHeight: 1.6 }}>
-                  Có chỗ nào trong bài "{currentNode?.name ?? "này"}" chưa rõ không? Hỏi mình, mình sẽ gợi ý từng bước nhé! 🤔
-                </div>
-                <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9, paddingTop: 16 }}>
-                  <div
-                    onClick={() => {
-                      setActiveTab("chat");
-                      sendMessage("Em chưa hiểu chỗ này ạ");
-                    }}
-                    style={{ background: "#fff", border: "1px solid #ece5fb", borderRadius: 12, padding: "10px 13px", fontSize: 12.5, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
-                  >
-                    Em chưa hiểu chỗ này
-                  </div>
-                  <div
-                    onClick={() => {
-                      setActiveTab("chat");
-                      sendMessage("Cho em một ví dụ khác");
-                    }}
-                    style={{ background: "#fff", border: "1px solid #ece5fb", borderRadius: 12, padding: "10px 13px", fontSize: 12.5, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
-                  >
-                    Cho em một ví dụ khác
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ===== PRACTICE PANEL ===== */}
-          {activeTab === "practice" && (
+          {/* ===== ÔN TẬP CHUYÊN ĐỀ (REVIEW STUDIO) PANEL ===== */}
+          {activeTab === "review" && (
             <div
               className="ah-panel"
-              style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: "24px 26px", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 820 }}
+              style={{
+                background: "#ffffff",
+                border: "1px solid #eef1f4",
+                borderRadius: 28,
+                padding: "26px 28px",
+                boxShadow: "0 20px 50px -25px rgba(124, 70, 232, 0.09)",
+                display: "flex",
+                gap: 24,
+                alignItems: "stretch",
+                flexWrap: "wrap",
+                width: "100%",
+                minHeight: 600
+              }}
             >
-              {qLoading ? (
-                <div style={{ textAlign: "center", color: "#9aa1b0", padding: "40px 0", ...POPPINS, fontWeight: 700 }}>Đang tải câu hỏi…</div>
-              ) : !q ? (
-                <div style={{ textAlign: "center", color: "#9aa1b0", padding: "40px 0" }}>
-                  <div style={{ fontSize: 30, marginBottom: 8 }}>📭</div>
-                  <div style={{ ...POPPINS, fontWeight: 700 }}>Bài này chưa có câu hỏi luyện tập.</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>Em thử học lý thuyết hoặc hỏi thầy AI nhé!</div>
+              
+              {/* Left Column (58% width) - Practice & Theory */}
+              <div style={{ flex: "1.2 1 500px", minWidth: 320, display: "flex", flexDirection: "column", gap: 16 }}>
+                
+                {/* Sub-tabs to toggle between Quiz and Theory */}
+                <div style={{ display: "flex", gap: 8, background: "#f4f6f9", padding: 6, borderRadius: 14, width: "fit-content", border: "1px solid #eef1f4" }}>
+                  <button
+                    onClick={() => setReviewLeftSubTab("practice")}
+                    style={{
+                      ...POPPINS,
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "8px 16px",
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      background: reviewLeftSubTab === "practice" ? "#fff" : "transparent",
+                      color: reviewLeftSubTab === "practice" ? "#7C46E8" : "#5b6072",
+                      boxShadow: reviewLeftSubTab === "practice" ? "0 4px 10px -4px rgba(124,70,232,0.2)" : "none",
+                    }}
+                  >
+                    📝 Luyện tập
+                  </button>
+                  <button
+                    onClick={() => setReviewLeftSubTab("theory")}
+                    style={{
+                      ...POPPINS,
+                      border: "none",
+                      borderRadius: 10,
+                      padding: "8px 16px",
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      background: reviewLeftSubTab === "theory" ? "#fff" : "transparent",
+                      color: reviewLeftSubTab === "theory" ? "#7C46E8" : "#5b6072",
+                      boxShadow: reviewLeftSubTab === "theory" ? "0 4px 10px -4px rgba(124,70,232,0.2)" : "none",
+                    }}
+                  >
+                    📖 Tóm tắt lý thuyết
+                  </button>
                 </div>
-              ) : (
-                <>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span style={{ ...POPPINS, fontSize: 11, fontWeight: 800, padding: "5px 13px", borderRadius: 999, textTransform: "uppercase", letterSpacing: ".04em", ...DIFF_STYLE[q.tag] }}>
-                        {q.tag}
-                      </span>
-                      {difficultyFilter && (
-                        <button
-                          onClick={() => setDifficultyFilter(null)}
-                          style={{
-                            ...POPPINS,
-                            borderRadius: 99,
-                            padding: "4px 10px",
-                            fontSize: 10,
-                            fontWeight: 850,
-                            background: "#faf7ff",
-                            border: "1px solid #ece5fb",
-                            color: "#7C46E8",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Xem tất cả ✕
-                        </button>
-                      )}
-                    </span>
-                    <span style={{ fontSize: 12, color: "#9aa1b0", fontWeight: 700 }}>
-                      Câu {qIndex + 1} / {qTotal}
-                    </span>
-                  </div>
 
-                  {traversalStack.length > 1 && (
-                    <div style={{ marginBottom: 16, background: "linear-gradient(135deg, #1e1b4b, #312e81)", borderRadius: 14, padding: "12px 16px", border: "1px solid #6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, color: "#a5b4fc" }}>
-                        <span style={{ fontSize: 16 }}>📍</span>
-                        <span>Đang lùi Cây Tri thức về Nút Cha tiên quyết: <strong style={{ color: "#fbbf24" }}>"{currentNode?.name}"</strong></span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const orig = traversalStack[0];
-                          if (orig) {
-                            setCurrentStepId(orig.id);
-                            setTraversalStack([]);
-                            setBridgeText(null);
-                            loadQuestions(orig.id);
-                          }
-                        }}
-                        style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#cbd5e1", borderRadius: 8, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontWeight: 700 }}
-                      >
-                        Về bài gốc ({traversalStack[0]?.name}) ↩
-                      </button>
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.5, marginBottom: 18 }}>{q.q}</div>
-
-                  {q.opts.map((text, i) => {
-                    const letter = ["A", "B", "C", "D", "E", "F"][i] ?? "?";
-                    const isSel = selected === i;
-                    let optStyle: CSSProperties = {
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 13,
-                      borderRadius: 14,
-                      padding: "13px 15px",
-                      fontSize: 14,
-                      fontWeight: 600,
-                      marginBottom: 10,
-                      cursor: answered ? "default" : "pointer",
-                      transition: "all .15s",
-                    };
-                    let badgeStyle: CSSProperties = { height: 28, width: 28, borderRadius: 9, display: "grid", placeItems: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 };
-                    let mark = "";
-                    if (answered) {
-                      if (i === q.correct) {
-                        optStyle = { ...optStyle, border: "2px solid #14D9C0", background: "#F0FCF8", color: "#0d7a6c", fontWeight: 800 };
-                        badgeStyle = { ...badgeStyle, background: "#14D9C0", color: "#fff" };
-                        mark = "✅";
-                      } else if (isSel) {
-                        optStyle = { ...optStyle, border: "2px solid #F43F5E", background: "#FEF2F4", color: "#9f1239", fontWeight: 800 };
-                        badgeStyle = { ...badgeStyle, background: "#F43F5E", color: "#fff" };
-                        mark = "❌";
-                      } else {
-                        optStyle = { ...optStyle, opacity: 0.6, border: "1px solid #eef1f4" };
-                        badgeStyle = { ...badgeStyle, background: "#f4f6f9", color: "#b3b9c4" };
-                      }
-                    } else if (isSel) {
-                      optStyle = { ...optStyle, border: "2px solid #7C46E8", background: "#faf7ff", color: "#5b2fc0", fontWeight: 800, boxShadow: "0 0 0 4px #EFE9FD" };
-                      badgeStyle = { ...badgeStyle, background: "#7C46E8", color: "#fff" };
-                    } else {
-                      optStyle = { ...optStyle, border: "1px solid #eef1f4", color: "#4b5060", background: "#fff" };
-                      badgeStyle = { ...badgeStyle, background: "#f4f6f9", color: "#9aa1b0" };
-                    }
-                    return (
-                      <div key={i} onClick={() => selectOpt(i)} style={optStyle}>
-                        <span style={badgeStyle}>{letter}</span>
-                        <span style={{ flex: 1 }}>{text}</span>
-                        <span style={{ fontSize: 16 }}>{mark}</span>
-                      </div>
-                    );
-                  })}
-
-                  {showHint && hintText && (
-                    <div style={{ marginTop: 14, background: "#F3FBF9", border: "1px solid #cfeee6", borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                        <span style={{ fontSize: 18 }}>💡</span>
-                        <div style={{ fontSize: 13, color: "#0d7a6c", lineHeight: 1.55, fontWeight: 600, flex: 1 }}>{hintText}</div>
-                      </div>
-
-
-                    </div>
-                  )}
-
-                  {answered && (
-                    <div
-                      style={{
-                        marginTop: 16,
-                        borderRadius: 14,
-                        padding: "14px 16px",
-                        fontSize: 14,
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 11,
-                        ...(isCorrect
-                          ? { background: "#F0FCF8", border: "1px solid #b8ede0", color: "#0d7a6c" }
-                          : { background: "#fef3f5", border: "1px solid #f8d3da", color: "#c23a54" }),
-                      }}
-                    >
-                      <span style={{ fontSize: 20 }}>{isCorrect ? "🎉" : "🤗"}</span>
-                      <span>{isCorrect ? "Tuyệt vời! Em trả lời chính xác rồi." : "Chưa đúng rồi, nhưng không sao! Xem gợi ý và thử lại nhé."}</span>
-                    </div>
-                  )}
-
-                  {bridgeText && (
-                    <div style={{ marginTop: 16, background: "linear-gradient(135deg, #065f46, #047857)", borderRadius: 16, padding: "16px 20px", border: "1px solid #10b981", color: "#fff", boxShadow: "0 10px 25px -5px rgba(16,185,129,0.4)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "#6ee7b7", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                        <span>✨ Cầu nối Tư duy Socratic (LLM Bridge Agent)</span>
-                      </div>
-                      <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 14px", color: "#ecfdf5", fontWeight: 600 }}>
-                        {bridgeText}
-                      </p>
-                      <button
-                        onClick={() => {
-                          const orig = traversalStack[0];
-                          if (orig) {
-                            setCurrentStepId(orig.id);
-                            setTraversalStack([]);
-                            setBridgeText(null);
-                            setQIndex(0);
-                            setSelected(null);
-                            setAnswered(false);
-                            setShowHint(false);
-                            setHintText("");
-                            setHintPress(0);
-                            setIsCorrect(false);
-                            resetChat(orig.name);
-                            loadQuestions(orig.id);
-                            toast.success(`🚀 Đã chuyển tới Bài toán ban đầu "${orig.name}"!`);
-                          }
-                        }}
-                        style={{
-                          border: "none",
-                          borderRadius: 12,
-                          padding: "10px 18px",
-                          background: "linear-gradient(135deg,#fbbf24,#f59e0b)",
-                          color: "#0f172a",
-                          fontWeight: 850,
-                          fontSize: 13,
-                          cursor: "pointer",
-                          boxShadow: "0 8px 16px -4px rgba(245,158,11,0.5)",
-                        }}
-                      >
-                        🚀 Quay trở lại thử sức Bài toán gốc "{traversalStack[0]?.name}"
-                      </button>
-                    </div>
-                  )}
-
-                  {cantDoOptions && (
-                    <div style={{ marginTop: 14, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 16, padding: "16px 18px" }}>
-                      <div style={{ ...POPPINS, fontSize: 13, fontWeight: 800, color: "#5b2fc0", marginBottom: 8 }}>
-                        💡 Đề xuất từ {COMPANION.name}:
-                      </div>
-                      <p style={{ fontSize: 12.5, color: "#5b6072", lineHeight: 1.5, margin: "0 0 12px" }}>
-                        Em gặp khó khăn ở phần này ư? Đừng lo nhé, em có thể chọn giải pháp dưới đây để củng cố thêm:
-                      </p>
-                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                        {cantDoOptions.hasEasyQ && !difficultyFilter && (
-                          <button
-                            onClick={handleChooseEasier}
-                            style={{
-                              ...POPPINS,
-                              border: "none",
-                              borderRadius: 10,
-                              padding: "8px 12px",
-                              background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
-                              color: "#fff",
-                              fontWeight: 800,
-                              fontSize: 11.5,
-                              cursor: "pointer",
-                              boxShadow: "0 6px 12px -4px rgba(15,185,166,.4)",
-                            }}
-                          >
-                            🟢 Làm câu nhận biết (Dễ hơn)
-                          </button>
-                        )}
-                        {cantDoOptions.parents && cantDoOptions.parents.map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => {
-                              const parentNode = nodes.find((n) => n.id === p.id);
-                              if (parentNode) {
-                                setCurrentStepId(parentNode.id);
-                                setQIndex(0);
-                                setSelected(null);
-                                setAnswered(false);
-                                setShowHint(false);
-                                setHintText("");
-                                setHintPress(0);
-                                setIsCorrect(false);
-                                setCorrectSession(0);
-                                setCantDoOptions(null);
-                                setDifficultyFilter(null);
-                                resetChat(parentNode.name);
-                                loadQuestions(parentNode.id);
-                                toast.info(`Đang chuyển về bài học nền tảng: ${parentNode.name}`);
-                              }
-                            }}
-                            style={{
-                              ...POPPINS,
-                              border: "1px solid #ece5fb",
-                              borderRadius: 10,
-                              padding: "8px 12px",
-                              background: "#fff",
-                              color: "#7C46E8",
-                              fontWeight: 800,
-                              fontSize: 11.5,
-                              cursor: "pointer",
-                            }}
-                          >
-                            📖 Ôn tập bài nền tảng: {p.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                    {!answered ? (
-                      <div
-                        onClick={submit}
-                        style={{
-                          ...POPPINS,
-                          flex: 1,
-                          borderRadius: 14,
-                          padding: 14,
-                          textAlign: "center",
-                          fontWeight: 800,
-                          fontSize: 15,
-                          cursor: selected === null || submitting ? "not-allowed" : "pointer",
-                          transition: "all .15s",
-                          ...(selected === null || submitting
-                            ? { background: "#eef1f4", color: "#b3b9c4" }
-                            : { background: "linear-gradient(135deg,#8B5CF6,#7C46E8)", color: "#fff", boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)" }),
-                        }}
-                      >
-                        {submitting ? "Đang chấm…" : "Trả lời"}
+                {/* Sub-tab Content */}
+                {reviewLeftSubTab === "practice" ? (
+                  <div
+                    className="ah-panel"
+                    style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 22, padding: "24px 26px", flex: 1 }}
+                  >
+                    {qLoading ? (
+                      <div style={{ textAlign: "center", color: "#9aa1b0", padding: "40px 0", ...POPPINS, fontWeight: 700 }}>Đang tải câu hỏi…</div>
+                    ) : !q ? (
+                      <div style={{ textAlign: "center", color: "#9aa1b0", padding: "40px 0" }}>
+                        <div style={{ fontSize: 30, marginBottom: 8 }}>📭</div>
+                        <div style={{ ...POPPINS, fontWeight: 700 }}>Bài này chưa có câu hỏi luyện tập.</div>
+                        <div style={{ fontSize: 13, marginTop: 4 }}>Em thử xem phần tóm tắt lý thuyết hoặc trò chuyện với trợ lý AI nhé!</div>
                       </div>
                     ) : (
-                      <div
-                        onClick={next}
-                        style={{
-                          ...POPPINS,
-                          flex: 1,
-                          borderRadius: 14,
-                          padding: 14,
-                          textAlign: "center",
-                          fontWeight: 800,
-                          fontSize: 15,
-                          cursor: "pointer",
-                          transition: "all .15s",
-                          background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
-                          color: "#fff",
-                          boxShadow: "0 12px 22px -8px rgba(15,185,166,.55)",
-                        }}
-                      >
-                        {isLastAnswered ? "🎉 Hoàn thành bài học" : "Câu tiếp theo →"}
-                      </div>
-                    )}
-                    {!answered && (
                       <>
-                        <div
-                          onClick={doHint}
-                          style={{ ...POPPINS, background: "#faf7ff", border: "1px solid #ece5fb", color: "#7C46E8", borderRadius: 14, padding: "14px 20px", fontWeight: 800, fontSize: 14, cursor: "pointer" }}
-                        >
-                          {hintLoading ? "…" : "💡 Gợi ý"}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                          <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <span style={{ ...POPPINS, fontSize: 11, fontWeight: 800, padding: "5px 13px", borderRadius: 999, textTransform: "uppercase", letterSpacing: ".04em", ...DIFF_STYLE[q.tag] }}>
+                              {q.tag}
+                            </span>
+                            {difficultyFilter && (
+                              <button
+                                onClick={() => setDifficultyFilter(null)}
+                                style={{
+                                  ...POPPINS,
+                                  borderRadius: 99,
+                                  padding: "4px 10px",
+                                  fontSize: 10,
+                                  fontWeight: 850,
+                                  background: "#faf7ff",
+                                  border: "1px solid #ece5fb",
+                                  color: "#7C46E8",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Xem tất cả ✕
+                              </button>
+                            )}
+                          </span>
+                          <span style={{ fontSize: 12, color: "#9aa1b0", fontWeight: 700 }}>
+                            Câu {qIndex + 1} / {qTotal}
+                          </span>
                         </div>
-                        <div
-                          onClick={handleCantDo}
-                          style={{ ...POPPINS, background: "#fff8ec", border: "1px solid #ffe6bd", color: "#b7811f", borderRadius: 14, padding: "14px 20px", fontWeight: 800, fontSize: 14, cursor: "pointer" }}
-                        >
-                          🤷 Không làm được
+
+                        {traversalStack.length > 1 && (
+                          <div style={{ marginBottom: 16, background: "linear-gradient(135deg, #1e1b4b, #312e81)", borderRadius: 14, padding: "12px 16px", border: "1px solid #6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, color: "#a5b4fc" }}>
+                              <span style={{ fontSize: 16 }}>📍</span>
+                              <span>Đang lùi Cây Tri thức về Nút Cha tiên quyết: <strong style={{ color: "#fbbf24" }}>"{currentNode?.name}"</strong></span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const orig = traversalStack[0];
+                                if (orig) {
+                                  setCurrentStepId(orig.id);
+                                  setTraversalStack([]);
+                                  setBridgeText(null);
+                                  setQIndex(0);
+                                  setSelected(null);
+                                  setAnswered(false);
+                                  setShowHint(false);
+                                  setHintText("");
+                                  setHintPress(0);
+                                  setIsCorrect(false);
+                                  resetChat(orig.name);
+                                  loadQuestions(orig.id);
+                                  toast.success(`🚀 Quay lại Nút gốc "${orig.name}"!`);
+                                }
+                              }}
+                              style={{
+                                ...POPPINS,
+                                border: "none",
+                                borderRadius: 10,
+                                padding: "6px 12px",
+                                background: "#c7d2fe",
+                                color: "#1e1b4b",
+                                fontWeight: 800,
+                                fontSize: 11,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Về nút gốc ↩
+                            </button>
+                          </div>
+                        )}
+
+                        <div style={{ ...BALOO, fontWeight: 800, fontSize: 16, color: "#16161F", lineHeight: 1.5, marginBottom: 16 }}>
+                          <SafeHtml text={q.q} />
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+                          {q.opts.map((opt, i) => {
+                            const isSel = selected === i;
+                            const isCorrOpt = i === q.correct;
+                            let cardStyle: CSSProperties = {
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                              borderRadius: 16,
+                              padding: "13px 16px",
+                              cursor: answered ? "not-allowed" : "pointer",
+                              fontSize: 14.5,
+                              fontWeight: 600,
+                              transition: "all .15s",
+                            };
+
+                            if (answered) {
+                              if (isCorrOpt) {
+                                cardStyle = { ...cardStyle, border: "2px solid #14D9C0", background: "#F3FBF9", color: "#0d7a6c" };
+                              } else if (isSel) {
+                                cardStyle = { ...cardStyle, border: "2px solid #F87171", background: "#FEF2F2", color: "#991b1b" };
+                              } else {
+                                cardStyle = { ...cardStyle, border: "1px solid #eef1f4", background: "#fcfdfe", color: "#9aa1b0", opacity: 0.8 };
+                              }
+                            } else {
+                              if (isSel) {
+                                cardStyle = { ...cardStyle, border: "2px solid #7C46E8", background: "#faf7ff", color: "#5b2fc0", boxShadow: "0 6px 16px -8px rgba(124,70,232,0.15)" };
+                              } else {
+                                cardStyle = { ...cardStyle, border: "1px solid #eef1f4", background: "#fff", color: "#4b5060" };
+                              }
+                            }
+
+                            return (
+                              <div
+                                key={i}
+                                onClick={() => selectOpt(i)}
+                                className={`ah-choice-card ${answered ? "disabled" : ""}`}
+                                style={cardStyle}
+                              >
+                                <span
+                                  style={{
+                                    height: 28,
+                                    width: 28,
+                                    borderRadius: 9,
+                                    display: "grid",
+                                    placeItems: "center",
+                                    fontSize: 12.5,
+                                    fontWeight: 800,
+                                    background: isSel ? "#7C46E8" : "#f4f6f9",
+                                    color: isSel ? "#fff" : "#9aa1b0",
+                                  }}
+                                >
+                                  {["A", "B", "C", "D", "E"][i] ?? i}
+                                </span>
+                                <SafeHtml as="span" text={opt} style={{ flex: 1 }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {answered && (
+                          <div style={{ marginTop: 18, padding: 14, borderRadius: 16, background: isCorrect ? "#F3FBF9" : "#FEF2F2", border: isCorrect ? "1px solid #d4f2ea" : "1px solid #fecaca", display: "flex", gap: 10, alignItems: "flex-start", animation: "ah-pop .3s ease" }}>
+                            <span style={{ fontSize: 20 }}>{isCorrect ? "🎉" : "😅"}</span>
+                            <div>
+                              <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13.5, color: isCorrect ? "#0d7a6c" : "#991b1b" }}>
+                                {isCorrect ? "Đúng rồi! Tuyệt vời quá!" : "Chưa chính xác rồi em ơi."}
+                              </div>
+                              <p style={{ fontSize: 12.5, color: isCorrect ? "#1e8474" : "#b91c1c", margin: "4px 0 0", lineHeight: 1.5 }}>
+                                {isCorrect
+                                  ? "Em đã nắm được cách giải quyết bài toán này. Hãy chuyển sang câu tiếp theo nhé!"
+                                  : "Đừng nản lòng nhé! Em có thể xem gợi ý lý thuyết hoặc nhờ Nova hướng dẫn từng bước."}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {bridgeText && (
+                          <div style={{ marginTop: 14, background: "linear-gradient(135deg, #047857, #065f46)", border: "1px solid #10b981", borderRadius: 16, padding: "16px 18px", color: "#fff", boxShadow: "0 10px 25px -5px rgba(6,95,70,0.3)" }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#6ee7b7", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                              <span>✨ Cầu nối Tư duy Socratic (First Principles Bridge)</span>
+                            </div>
+                            <p style={{ fontSize: 13.5, lineHeight: 1.6, margin: "0 0 14px", color: "#ecfdf5", fontWeight: 600 }}>
+                              {bridgeText}
+                            </p>
+                            <button
+                              onClick={() => {
+                                const orig = traversalStack[0];
+                                if (orig) {
+                                  setCurrentStepId(orig.id);
+                                  setTraversalStack([]);
+                                  setBridgeText(null);
+                                  setQIndex(0);
+                                  setSelected(null);
+                                  setAnswered(false);
+                                  setShowHint(false);
+                                  setHintText("");
+                                  setHintPress(0);
+                                  setIsCorrect(false);
+                                  resetChat(orig.name);
+                                  loadQuestions(orig.id);
+                                  toast.success(`🚀 Đã chuyển tới Bài toán ban đầu "${orig.name}"!`);
+                                }
+                              }}
+                              style={{
+                                border: "none",
+                                borderRadius: 12,
+                                padding: "10px 18px",
+                                background: "linear-gradient(135deg,#fbbf24,#f59e0b)",
+                                color: "#0f172a",
+                                fontWeight: 850,
+                                fontSize: 13,
+                                cursor: "pointer",
+                                boxShadow: "0 8px 16px -4px rgba(245,158,11,0.5)",
+                              }}
+                            >
+                              🚀 Quay trở lại thử sức Bài toán gốc "{traversalStack[0]?.name}"
+                            </button>
+                          </div>
+                        )}
+
+                        {cantDoOptions && (
+                          <div style={{ marginTop: 14, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 16, padding: "16px 18px" }}>
+                            <div style={{ ...POPPINS, fontSize: 13, fontWeight: 800, color: "#5b2fc0", marginBottom: 8 }}>
+                              💡 Đề xuất từ {COMPANION.name}:
+                            </div>
+                            <p style={{ fontSize: 12.5, color: "#5b6072", lineHeight: 1.5, margin: "0 0 12px" }}>
+                              Em gặp khó khăn ở phần này ư? Đừng lo nhé, em có thể chọn giải pháp dưới đây để củng cố thêm:
+                            </p>
+                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                              {cantDoOptions.hasEasyQ && !difficultyFilter && (
+                                <button
+                                  onClick={handleChooseEasier}
+                                  style={{
+                                    ...POPPINS,
+                                    border: "none",
+                                    borderRadius: 10,
+                                    padding: "8px 12px",
+                                    background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
+                                    color: "#fff",
+                                    fontWeight: 800,
+                                    fontSize: 11.5,
+                                    cursor: "pointer",
+                                    boxShadow: "0 6px 12px -4px rgba(15,185,166,.4)",
+                                  }}
+                                >
+                                  🟢 Làm câu nhận biết (Dễ hơn)
+                                </button>
+                              )}
+                              {cantDoOptions.parents && cantDoOptions.parents.map((p) => (
+                                <button
+                                  key={p.id}
+                                  onClick={() => {
+                                    const parentNode = nodes.find((n) => n.id === p.id);
+                                    if (parentNode) {
+                                      setCurrentStepId(parentNode.id);
+                                      setQIndex(0);
+                                      setSelected(null);
+                                      setAnswered(false);
+                                      setShowHint(false);
+                                      setHintText("");
+                                      setHintPress(0);
+                                      setIsCorrect(false);
+                                      setCorrectSession(0);
+                                      setCantDoOptions(null);
+                                      setDifficultyFilter(null);
+                                      resetChat(parentNode.name);
+                                      loadQuestions(parentNode.id);
+                                      setChat((c) => [...c, { sender: "student", text: "Mình muốn lùi về ôn bài nền tảng." }, { sender: "ai", text: `Đường rồi! Chúng mình cùng lùi về ôn tập kiến thức nền tảng: "${parentNode.name}". Cố lên nhé!` }]);
+                                      toast.info(`Đang chuyển về bài học nền tảng: ${parentNode.name}`);
+                                    }
+                                  }}
+                                  style={{
+                                    ...POPPINS,
+                                    border: "1px solid #ece5fb",
+                                    borderRadius: 10,
+                                    padding: "8px 12px",
+                                    background: "#fff",
+                                    color: "#7C46E8",
+                                    fontWeight: 800,
+                                    fontSize: 11.5,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  📚 Ôn bài nền tảng: {p.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, borderTop: "1px solid #f2f4f7", paddingTop: 16 }}>
+                          <button
+                            onClick={handleCantDo}
+                            disabled={submitting || answered}
+                            className="ah-btn-cantdo"
+                            style={{
+                              ...POPPINS,
+                              border: "1px solid #fee2e2",
+                              borderRadius: 12,
+                              padding: "11px 20px",
+                              background: "#fef2f2",
+                              color: "#ef4444",
+                              fontWeight: 800,
+                              fontSize: 13,
+                              cursor: (submitting || answered) ? "not-allowed" : "pointer",
+                              opacity: (submitting || answered) ? 0.6 : 1,
+                            }}
+                          >
+                            ⚠️ Gặp khó khăn / Không biết làm
+                          </button>
+
+                          <div style={{ display: "flex", gap: 10 }}>
+                            <button
+                              onClick={triggerReviewSocraticHint}
+                              disabled={answered || hintLoading}
+                              className="ah-btn-socratic"
+                              style={{
+                                ...POPPINS,
+                                border: "1px solid #ece5fb",
+                                borderRadius: 12,
+                                padding: "11px 20px",
+                                background: "#faf7ff",
+                                color: "#7C46E8",
+                                fontWeight: 800,
+                                fontSize: 13,
+                                cursor: answered ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              💡 Xem gợi ý ({Math.min(hintPress, 3)}/3)
+                            </button>
+
+                            {answered ? (
+                              <button
+                                onClick={next}
+                                className="ah-btn-socratic"
+                                style={{
+                                  ...POPPINS,
+                                  border: "none",
+                                  borderRadius: 12,
+                                  padding: "11px 24px",
+                                  background: "linear-gradient(135deg,#7C46E8,#5b2fc0)",
+                                  color: "#fff",
+                                  fontWeight: 800,
+                                  fontSize: 13,
+                                  cursor: "pointer",
+                                  boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
+                                }}
+                              >
+                                Tiếp tục
+                              </button>
+                            ) : (
+                              <button
+                                onClick={submit}
+                                disabled={selected === null || submitting}
+                                className="ah-btn-submit"
+                                style={{
+                                  ...POPPINS,
+                                  border: "none",
+                                  borderRadius: 12,
+                                  padding: "11px 24px",
+                                  background: selected === null ? "#eef1f4" : "linear-gradient(135deg,#14D9C0,#0FB9A6)",
+                                  color: selected === null ? "#9aa1b0" : "#fff",
+                                  fontWeight: 800,
+                                  fontSize: 13,
+                                  cursor: selected === null ? "not-allowed" : "pointer",
+                                  boxShadow: selected === null ? "none" : "0 8px 16px -6px rgba(15,185,166,.5)",
+                                }}
+                              >
+                                Kiểm tra
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
                   </div>
-                </>
-              )}
-            </div>
-          )}
+                ) : (
+                  <div className="ah-panel" style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 22, padding: 24, flex: 1 }}>
+                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 17, marginBottom: 12 }}>Ý tưởng chính 🍰</div>
+                    <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: "#4b5060", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
+                      {currentNode?.theory?.trim() || "Nội dung lý thuyết cho bài này đang được cập nhật. Em có thể trò chuyện với Nova hoặc luyện tập trắc nghiệm nhé!"}
+                    </p>
+                    <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                      <button
+                        onClick={() => setReviewLeftSubTab("practice")}
+                        style={{
+                          ...POPPINS,
+                          flex: 1,
+                          border: "none",
+                          background: "linear-gradient(135deg,#8B5CF6,#7C46E8)",
+                          color: "#fff",
+                          borderRadius: 14,
+                          padding: 14,
+                          textAlign: "center",
+                          fontWeight: 800,
+                          fontSize: 15,
+                          cursor: "pointer",
+                          boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)",
+                        }}
+                      >
+                        Mình hiểu rồi → Luyện tập
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
-          {/* ===== CHAT PANEL ===== */}
-          {activeTab === "chat" && (
-            <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap", width: "100%" }}>
-              <div
-                className="ah-panel"
-                style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flex: "1 1 480px", maxWidth: 760, minWidth: 320, display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
-              >
-                <div style={{ padding: "15px 20px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", gap: 11 }}>
-                  <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
-                    <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 30, height: 30, objectFit: "contain" }} />
-                  </div>
-                  <div>
-                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{COMPANION.name}</div>
-                    <div style={{ fontSize: 11, color: "#0FB9A6", fontWeight: 600 }}>● gợi mở, không cho đáp án sẵn</div>
-                  </div>
-                </div>
-                <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-                  {chat.map((m, i) =>
-                    m.sender === "ai" ? (
-                      <div key={i} style={{ display: "flex", maxWidth: "82%" }}>
-                        <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#3a3f4d", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                          {m.text}
+              {/* Right Column (42% width) - Socratic Companion & Mascot */}
+              <div style={{ flex: "1.5 1 550px", display: "flex", flexDirection: "column", gap: 16 }}>
+                
+                {/* Socratic Chat Companion & Mascot Frame */}
+                <div
+                  className="ah-panel"
+                  style={{
+                    background: "#fff",
+                    border: "1px solid #f1f5f9",
+                    borderRadius: 24,
+                    display: "flex",
+                    alignItems: "stretch",
+                    height: 540,
+                    overflow: "hidden"
+                  }}
+                >
+                  {/* Left Side: Chat Feed (65% width) */}
+                  <div style={{ flex: 1.4, display: "flex", flexDirection: "column", borderRight: "1px solid #f1f5f9" }}>
+                    
+                    {/* Chat Header */}
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", gap: 11, background: "#f8fafc" }}>
+                      <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                        <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 30, height: 30, objectFit: "contain" }} />
+                      </div>
+                      <div>
+                        <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>Gia sư Socratic: {COMPANION.name}</div>
+                        <div style={{ fontSize: 11, color: "#0FB9A6", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#0FB9A6" }}></span>
+                          gợi mở từng bước, giải thích tư duy gốc
                         </div>
                       </div>
-                    ) : (
-                      <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
-                        <div style={{ background: "#16161F", color: "#fff", borderRadius: 16, borderBottomRightRadius: 5, padding: "11px 15px", fontSize: 13.5, lineHeight: 1.55, maxWidth: "78%" }}>
-                          {m.text}
+                    </div>
+
+                    {/* Chat Message Stream */}
+                    <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14, background: "#fafbfc" }}>
+                      {chat.map((m, i) =>
+                        m.sender === "ai" ? (
+                          <div key={i} style={{ display: "flex", maxWidth: "85%" }}>
+                            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#1e293b", lineHeight: 1.6, boxShadow: "0 2px 8px -2px rgba(0,0,0,0.04)" }}>
+                              <SafeHtml text={m.text} variant="tutor" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+                            <div style={{ background: "linear-gradient(135deg, #1e1b4b, #312e81)", color: "#fff", borderRadius: 16, borderBottomRightRadius: 5, padding: "11px 15px", fontSize: 13.5, lineHeight: 1.55, maxWidth: "80%", boxShadow: "0 6px 12px -4px rgba(30,27,75,0.25)" }}>
+                              <SafeHtml text={m.text} variant="tutor" />
+                            </div>
+                          </div>
+                        ),
+                      )}
+                      {chatSending && (
+                        <div style={{ display: "flex", maxWidth: "85%" }}>
+                          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#94a3b8" }}>
+                            {COMPANION.name} đang soạn… ✍️
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Socratic Chat Footer Form */}
+                    <div style={{ padding: "14px 18px 16px", borderTop: "1px solid #f1f5f9", background: "#fff" }}>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                        <div
+                          onClick={() => {
+                            setChatMascotState("encourage");
+                            setChatMascotSpeech("Cố lên em! Nova ở đây giúp em từng bước nè 💪✨");
+                            sendMessage("Em chưa hiểu chỗ này ạ");
+                          }}
+                          style={{ background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 999, padding: "7px 13px", fontSize: 11.5, fontWeight: 650, color: "#5b2fc0", cursor: "pointer", transition: "all 0.2s" }}
+                          className="ah-btn-socratic"
+                        >
+                          🤔 Em chưa hiểu
+                        </div>
+                        <div
+                          onClick={() => {
+                            setChatMascotState("review");
+                            setChatMascotSpeech("Nova sẽ đưa ví dụ minh họa để em dễ hình dung nhé! 📖💡");
+                            sendMessage("Cho em một ví dụ khác");
+                          }}
+                          style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 999, padding: "7px 13px", fontSize: 11.5, fontWeight: 650, color: "#0FB9A6", cursor: "pointer", transition: "all 0.2s" }}
+                          className="ah-btn-submit"
+                        >
+                          💡 Cho em ví dụ
                         </div>
                       </div>
-                    ),
-                  )}
-                  {chatSending && (
-                    <div style={{ display: "flex", maxWidth: "82%" }}>
-                      <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#9aa1b0" }}>
-                        {COMPANION.name} đang soạn… ✍️
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div style={{ padding: "12px 18px 16px", borderTop: "1px solid #f2f4f7" }}>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                    <div
-                      onClick={() => {
-                        setChatMascotState("encourage");
-                        setChatMascotSpeech("Cố lên em! Nova ở đây giúp em từng bước nè 💪✨");
-                        sendMessage("Em chưa hiểu chỗ này ạ");
-                      }}
-                      style={{ background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
-                    >
-                      🤔 Em chưa hiểu
-                    </div>
-                    <div
-                      onClick={() => {
-                        setChatMascotState("review");
-                        setChatMascotSpeech("Nova sẽ đưa ví dụ minh họa để em dễ hình dung nhé! 📖💡");
-                        sendMessage("Cho em một ví dụ khác");
-                      }}
-                      style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#0FB9A6", cursor: "pointer" }}
-                    >
-                      💡 Cho em ví dụ
+                      <form onSubmit={onSubmitChat} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 16, padding: "6px 6px 6px 14px" }}>
+                        <input
+                          ref={inputRef}
+                          placeholder={`Hỏi ${COMPANION.name} về lý thuyết hoặc câu hỏi...`}
+                          style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 13.5, fontFamily: "'Inter', sans-serif", color: "#1e293b" }}
+                        />
+                        <button
+                          type="submit"
+                          disabled={chatSending}
+                          className="ah-btn-submit"
+                          style={{ height: 36, width: 40, border: "none", borderRadius: 12, background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", fontSize: 14, cursor: "pointer", boxShadow: "0 8px 16px -6px rgba(15,185,166,.6)", opacity: chatSending ? 0.6 : 1 }}
+                        >
+                          ➤
+                        </button>
+                      </form>
                     </div>
                   </div>
-                  <form onSubmit={onSubmitChat} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "7px 7px 7px 16px" }}>
-                    <input
-                      ref={inputRef}
-                      placeholder={`Nhắn cho ${COMPANION.name}...`}
-                      style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#16161F" }}
+
+                  {/* Right Side: Animated Mascot Column (35% width) */}
+                  <div style={{ width: 220, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(185deg, #ffffff 0%, #f8fafc 100%)", padding: 12, borderTopRightRadius: 24, borderBottomRightRadius: 24 }}>
+                    <MascotCompanion
+                      state={chatMascotState}
+                      name={COMPANION.name}
+                      speechBubble={chatMascotSpeech}
+                      compact={true}
+                      borderless={true}
                     />
-                    <button
-                      type="submit"
-                      disabled={chatSending}
-                      style={{ height: 40, width: 44, border: "none", borderRadius: 12, background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", fontSize: 16, cursor: "pointer", boxShadow: "0 8px 16px -6px rgba(15,185,166,.6)", opacity: chatSending ? 0.6 : 1 }}
-                    >
-                      ➤
-                    </button>
-                  </form>
+                  </div>
+
                 </div>
+
               </div>
 
-              {/* Mascot Companion Animated GIF outside Chat Frame */}
-              <div style={{ flexShrink: 0, marginTop: 4 }}>
-                <MascotCompanion
-                  state={chatMascotState}
-                  name={COMPANION.name}
-                  speechBubble={chatMascotSpeech}
-                />
-              </div>
             </div>
           )}
+
+
 
           {/* ===== EXAMS PANEL ===== */}
           {activeTab === "exams" && !needsDiagnostic && (

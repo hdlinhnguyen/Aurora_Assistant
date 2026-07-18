@@ -371,3 +371,56 @@
 /* ===== Hub Companion Rail ===== */
 @keyframes hr-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .hr-in { animation: hr-fade 0.26s ease; }
+
+/* ===== Socratic Review Studio Premium Styling ===== */
+.ah-choice-card {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.ah-choice-card:hover:not(.disabled) {
+  border-color: #7C46E8 !important;
+  background: #faf7ff !important;
+  transform: translateY(-2px) scale(1.008) !important;
+  box-shadow: 0 10px 20px -10px rgba(124, 70, 232, 0.15) !important;
+}
+.ah-choice-card:active:not(.disabled) {
+  transform: translateY(0) scale(1) !important;
+}
+
+.ah-btn-socratic {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.ah-btn-socratic:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.05) !important;
+  box-shadow: 0 10px 20px -8px rgba(124, 70, 232, 0.35) !important;
+}
+.ah-btn-socratic:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+
+.ah-btn-submit {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.ah-btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.05) !important;
+  box-shadow: 0 10px 20px -8px rgba(15, 185, 166, 0.35) !important;
+}
+.ah-btn-submit:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+
+.ah-btn-cantdo {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.ah-btn-cantdo:hover:not(:disabled) {
+  background: #fff5f5 !important;
+  border-color: #feb2b2 !important;
+  color: #dc2626 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 16px -6px rgba(239, 68, 68, 0.12) !important;
+}
+.ah-btn-cantdo:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+

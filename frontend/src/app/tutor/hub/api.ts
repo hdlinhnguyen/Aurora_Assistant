@@ -111,10 +111,11 @@ export const chatTheory = (
   nodeId: string,
   message: string,
   history: { sender: string; content: string }[],
+  questionText?: string,
 ) =>
   apiFetch(`/nodes/${nodeId}/chat-theory`, {
     method: "POST",
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, questionText }),
   }) as Promise<{ reply: string }>;
 
 export interface HintResult {
@@ -266,7 +267,7 @@ export const submitCantDo = (nodeId: string) =>
   }>;
 
 export const submitAdaptiveDowngrade = (nodeId: string) =>
-  apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
+  apiFetch(`/nodes/${nodeId}/adaptive-downgrade`, {
     method: "POST",
   }) as Promise<{
     hasParent: boolean;

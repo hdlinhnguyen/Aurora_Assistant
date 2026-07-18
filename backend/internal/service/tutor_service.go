@@ -72,7 +72,7 @@ type TutorService interface {
 	GetClassInterventionGroups(subject string) (map[string]interface{}, error)
 
 	// Socratic RAG Chat
-	ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string) (string, error)
+	ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string, questionText string) (string, error)
 
 	// Guardrail
 	GetGuardrailEvents(severity string, limit int) ([]GuardrailEventView, error)
