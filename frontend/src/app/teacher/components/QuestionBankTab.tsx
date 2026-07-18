@@ -97,7 +97,7 @@ export default function QuestionBankTab({
       let m = expr;
       m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
         return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[12px] leading-tight font-sans">
-          <span class="border-b border-indigo-700 px-1 text-center pb-0.5">${num}</span>
+          <span class="border-b border-violet-700 px-1 text-center pb-0.5">${num}</span>
           <span class="px-1 text-center pt-0.5">${den}</span>
         </span>`;
       });
@@ -109,7 +109,7 @@ export default function QuestionBankTab({
       m = m.replace(/\\times/g, "×");
       m = m.replace(/\\div/g, "÷");
 
-      return `<span class="font-mono bg-indigo-50/70 text-indigo-900 px-1.5 py-0.5 rounded text-[11px] font-bold border border-indigo-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
+      return `<span class="font-mono bg-violet-50/70 text-violet-900 px-1.5 py-0.5 rounded text-[11px] font-bold border border-violet-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
     };
 
     html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
@@ -321,7 +321,7 @@ export default function QuestionBankTab({
 
                     {/* Options */}
                     {(q.questionType || "multiple_choice") === "essay" ? (
-                      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-[10px] font-bold text-indigo-800">
+                      <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2 text-[10px] font-bold text-violet-850">
                         {q.rubricItems?.length || 0} ý trong barem
                       </div>
                     ) : (

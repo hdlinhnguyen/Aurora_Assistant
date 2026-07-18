@@ -7,6 +7,46 @@ import { BookOpen, CheckCircle2, ChevronRight, Clock3, FileDown, FilePenLine, Gr
 type Exam = { id: string; title: string; subject: string; gradeLevel: string; durationMinutes: number; totalPoints: string; status: string; version: number; questions?: any[] };
 const statusCopy: Record<string, string> = { drafting: "Bản nháp", preparing_exam: "Sẵn sàng chấm", done: "Hoàn tất" };
 
+const formatMarkdown = (text: string): string => {
+  if (!text) return "";
+  let html = text;
+
+  html = html
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+  const renderMathExpr = (expr: string) => {
+    let m = expr;
+    m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
+      return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[12px] leading-tight font-sans">
+        <span class="border-b border-violet-700 px-1 text-center pb-0.5">${num}</span>
+        <span class="px-1 text-center pt-0.5">${den}</span>
+      </span>`;
+    });
+    m = m.replace(/\\cdot/g, "·");
+    m = m.replace(/\\neq/g, "≠");
+    m = m.replace(/\\Rightarrow|\\implies/g, "⇒");
+    m = m.replace(/\\le|\\leq/g, "≤");
+    m = m.replace(/\\ge|\\geq/g, "≥");
+    m = m.replace(/\\times/g, "×");
+    m = m.replace(/\\div/g, "÷");
+
+    return `<span class="font-mono bg-violet-50/70 text-violet-900 px-1.5 py-0.5 rounded text-[11px] font-bold border border-violet-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
+  };
+
+  html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
+    return renderMathExpr(p1);
+  });
+
+  html = html.replace(/\n/g, "<br />");
+  return html;
+};
+
 export default function ExamBuilderTab({ subjects }: { subjects: string[] }) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [detail, setDetail] = useState<Exam | null>(null);
@@ -258,14 +298,67 @@ export default function ExamBuilderTab({ subjects }: { subjects: string[] }) {
               </button>
             </div>
           )}
-          <div className="space-y-3">{detail.questions?.map((q,index) => <article key={q.id} onClick={() => setSelectedQuestionId(q.id)} className={`group rounded-2xl border p-4 cursor-pointer transition-all ${selectedQuestionId === q.id ? "border-indigo-300 bg-indigo-50/40" : "hover:shadow-md"}`}><div className="flex gap-3"><GripVertical className="text-muted-foreground" size={17}/><div className="flex-1"><div className="flex justify-between gap-3"><div><span className="text-[9px] font-black text-muted-foreground uppercase">Câu {index+1} · {q.questionType === "essay" ? "Tự luận" : "Trắc nghiệm"}</span><p className="mt-1 text-sm font-bold leading-relaxed">{q.content}</p></div><span className="text-sm font-black">{q.points}đ</span></div>{q.questionType === "essay" && <p className="mt-2 text-[10px] text-indigo-700 font-bold">{q.rubricItems?.length || 0} ý barem</p>}</div><button onClick={(e)=>{e.stopPropagation();removeQuestion(q.id)}} disabled={detail.status !== "drafting"} className="text-rose-600 hover:bg-rose-50 p-2 rounded-xl border border-rose-100 hover:border-rose-300 disabled:opacity-50 transition-all self-center cursor-pointer shrink-0" title="Xóa câu hỏi"><Trash2 size={15}/></button></div></article>)}{!detail.questions?.length && <div className="py-16 text-center border border-dashed rounded-3xl"><BookOpen className="mx-auto text-muted-foreground"/><p className="mt-3 text-sm font-black">Đề chưa có câu hỏi</p><p className="text-xs text-muted-foreground">Chọn từ ngân hàng hoặc tạo câu hỏi ở panel bên phải.</p></div>}</div>
+          <div className="space-y-3">
+            {detail.questions?.map((q, index) => (
+              <article
+                key={q.id}
+                onClick={() => setSelectedQuestionId(q.id)}
+                className={`group rounded-2xl border p-4 cursor-pointer transition-all ${
+                  selectedQuestionId === q.id
+                    ? "border-[var(--purple)] bg-violet-50/30"
+                    : "hover:shadow-md border-border"
+                }`}
+              >
+                <div className="flex gap-3">
+                  <GripVertical className="text-muted-foreground" size={17} />
+                  <div className="flex-1">
+                    <div className="flex justify-between gap-3">
+                      <div>
+                        <span className="text-[9px] font-black text-muted-foreground uppercase">
+                          Câu {index + 1} · {q.questionType === "essay" ? "Tự luận" : "Trắc nghiệm"}
+                        </span>
+                        <p
+                          className="mt-1 text-sm font-bold leading-relaxed text-slate-800"
+                          dangerouslySetInnerHTML={{ __html: formatMarkdown(q.content) }}
+                        />
+                      </div>
+                      <span className="text-sm font-black shrink-0">{q.points}đ</span>
+                    </div>
+                    {q.questionType === "essay" && (
+                      <p className="mt-2 text-[10px] text-violet-700 font-bold">
+                        {q.rubricItems?.length || 0} ý barem
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeQuestion(q.id);
+                    }}
+                    disabled={detail.status !== "drafting"}
+                    className="text-rose-600 hover:bg-rose-50 p-2 rounded-xl border border-rose-100 hover:border-rose-300 disabled:opacity-50 transition-all self-center cursor-pointer shrink-0"
+                    title="Xóa câu hỏi"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </article>
+            ))}
+            {!detail.questions?.length && (
+              <div className="py-16 text-center border border-dashed rounded-3xl border-border">
+                <BookOpen className="mx-auto text-muted-foreground" />
+                <p className="mt-3 text-sm font-black">Đề chưa có câu hỏi</p>
+                <p className="text-xs text-muted-foreground">Chọn từ ngân hàng hoặc tạo câu hỏi ở panel bên phải.</p>
+              </div>
+            )}
+          </div>
         </div></>}
     </main>
 
     <aside className="min-h-0 rounded-3xl border border-border bg-card shadow-sm overflow-auto p-4 space-y-5">
-      {detail ? <><div><div className="flex items-center gap-2"><Library size={16} className="text-[var(--purple)]"/><h3 className="text-sm font-black">Ngân hàng câu hỏi</h3></div><div className="mt-3 relative"><Search size={14} className="absolute left-3 top-3 text-muted-foreground"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Tìm câu hỏi..." className="w-full rounded-xl border bg-background pl-9 pr-3 py-2.5 text-xs"/></div><div className="mt-3 max-h-64 overflow-auto space-y-2">{filteredBank.slice(0,12).map(q=><button key={q.id} onClick={()=>addBank(q.id)} disabled={detail.status !== "drafting"} className="w-full rounded-xl border p-3 text-left hover:border-emerald-300 hover:bg-emerald-50/50 disabled:opacity-50 cursor-pointer"><p className="text-xs font-bold line-clamp-2">{q.content}</p><span className="mt-2 inline-flex text-[9px] font-black text-emerald-700"><Plus size={11}/> Thêm vào đề</span></button>)}</div></div>
+      {detail ? <><div><div className="flex items-center gap-2"><Library size={16} className="text-[var(--purple)]"/><h3 className="text-sm font-black">Ngân hàng câu hỏi</h3></div><div className="mt-3 relative"><Search size={14} className="absolute left-3 top-3 text-muted-foreground"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Tìm câu hỏi..." className="w-full rounded-xl border bg-background pl-9 pr-3 py-2.5 text-xs"/></div><div className="mt-3 max-h-64 overflow-auto space-y-2">{filteredBank.slice(0,12).map(q=><button key={q.id} onClick={()=>addBank(q.id)} disabled={detail.status !== "drafting"} className="w-full rounded-xl border border-border p-3 text-left hover:border-violet-300 hover:bg-violet-50/30 disabled:opacity-50 cursor-pointer transition-all"><p className="text-xs font-bold line-clamp-2 text-slate-800" dangerouslySetInnerHTML={{ __html: formatMarkdown(q.content) }} /><span className="mt-2 inline-flex text-[9px] font-black text-violet-700 items-center gap-1"><Plus size={11}/> Thêm vào đề</span></button>)}</div></div>
         <div className="border-t pt-4"><h3 className="text-sm font-black">Soạn câu hỏi nhanh</h3><div className="mt-3 space-y-2"><select value={manual.type} onChange={e=>setManual({...manual,type:e.target.value})} className="w-full rounded-xl border bg-background p-2.5 text-xs"><option value="single_choice">Trắc nghiệm</option><option value="essay">Tự luận</option></select><textarea value={manual.content} onChange={e=>setManual({...manual,content:e.target.value})} placeholder="Nội dung câu hỏi" className="w-full rounded-xl border bg-background p-3 text-xs min-h-20"/><input value={manual.points} onChange={e=>setManual({...manual,points:e.target.value})} placeholder="Điểm" className="w-full rounded-xl border bg-background p-2.5 text-xs"/>{manual.type === "single_choice" && manual.choices.map((c,i)=><input key={i} value={c} onChange={e=>{const choices=[...manual.choices];choices[i]=e.target.value;setManual({...manual,choices})}} placeholder={`Phương án ${String.fromCharCode(65+i)}`} className="w-full rounded-xl border bg-background p-2.5 text-xs"/>)}<button onClick={addManual} disabled={!manual.content || detail.status !== "drafting"} className="w-full rounded-xl bg-foreground text-background py-2.5 text-xs font-black cursor-pointer hover:opacity-90 active:scale-95 transition-all">Thêm câu hỏi</button></div></div>
-        {selectedQuestion?.questionType === "essay" && <div className="border-t pt-4"><h3 className="text-sm font-black">Barem câu tự luận</h3><div className="mt-2 space-y-2">{selectedQuestion.rubricItems?.map((r:any)=><div key={r.id} className="rounded-xl bg-indigo-50 p-3 text-xs"><b>{r.content || r.description}</b><span className="float-right font-black">{r.points}đ</span></div>)}<textarea value={rubric.description} onChange={e=>setRubric({...rubric,description:e.target.value})} placeholder="Mô tả ý chấm" className="w-full rounded-xl border p-2.5 text-xs"/><input value={rubric.points} onChange={e=>setRubric({...rubric,points:e.target.value})} className="w-full rounded-xl border p-2.5 text-xs"/><button onClick={addRubric} className="w-full rounded-xl bg-indigo-600 text-white py-2.5 text-xs font-black cursor-pointer hover:opacity-90 active:scale-95 transition-all">Thêm ý barem</button></div></div>}
+        {selectedQuestion?.questionType === "essay" && <div className="border-t pt-4"><h3 className="text-sm font-black">Barem câu tự luận</h3><div className="mt-2 space-y-2">{selectedQuestion.rubricItems?.map((r:any)=><div key={r.id} className="rounded-xl bg-violet-50/60 p-3 text-xs border border-violet-100/60 text-slate-800"><b>{r.content || r.description}</b><span className="float-right font-black text-violet-700">{r.points}đ</span></div>)}<textarea value={rubric.description} onChange={e=>setRubric({...rubric,description:e.target.value})} placeholder="Mô tả ý chấm" className="w-full rounded-xl border border-border p-2.5 text-xs bg-background"/><input value={rubric.points} onChange={e=>setRubric({...rubric,points:e.target.value})} className="w-full rounded-xl border border-border p-2.5 text-xs bg-background"/><button onClick={addRubric} className="w-full rounded-xl bg-violet-600 text-white py-2.5 text-xs font-black cursor-pointer hover:bg-violet-750 active:scale-95 transition-all">Thêm ý barem</button></div></div>}
       </> : <div className="h-full grid place-items-center text-center py-16"><div><Clock3 className="mx-auto text-muted-foreground"/><p className="mt-3 text-sm font-black">Chọn một đề</p><p className="text-xs text-muted-foreground">Công cụ biên soạn sẽ xuất hiện tại đây.</p></div></div>}
       {notice && <div className="rounded-xl border bg-muted p-3 text-xs font-bold flex gap-2"><CheckCircle2 size={15}/>{notice}</div>}
     </aside>
