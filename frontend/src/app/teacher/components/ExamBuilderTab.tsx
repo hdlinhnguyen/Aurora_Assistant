@@ -33,9 +33,9 @@ const formatMarkdown = (text: string): string => {
          .replace(/\\!/g, "");
 
     m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
-      return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[12px] leading-tight font-sans">
-        <span class="border-b border-violet-700 px-1 text-center pb-0.5">${num}</span>
-        <span class="px-1 text-center pt-0.5">${den}</span>
+      return `<span class="inline-flex flex-col items-center mx-1 font-semibold text-[11px] leading-none font-sans">
+        <span class="border-b border-violet-700 px-1 text-center pb-1 leading-none">${num}</span>
+        <span class="px-1 text-center pt-1 leading-none">${den}</span>
       </span>`;
     });
     m = m.replace(/\\cdot/g, "·");
