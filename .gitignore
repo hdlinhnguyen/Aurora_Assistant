@@ -2,6 +2,7 @@
 *.log
 .DS_Store
 Thumbs.db
+*.exe
 
 # Dependencies
 node_modules/

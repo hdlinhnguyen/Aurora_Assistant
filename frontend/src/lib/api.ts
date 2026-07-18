@@ -62,7 +62,8 @@ export async function apiFetch(endpoint: string, options: ApiOptions = {}) {
             "Unauthorized": "Không có quyền truy cập",
             "Invalid email or password": "Email hoặc mật khẩu không chính xác",
             "email already exists": "Email này đã được đăng ký trước đó",
-            "record not found": "Không tìm thấy dữ liệu yêu cầu."
+            "record not found": "Không tìm thấy dữ liệu yêu cầu.",
+            "HTTP Error 404": "Không tìm thấy đường dẫn hoặc dữ liệu yêu cầu (404 Not Found)"
           };
           for (const [enKey, viVal] of Object.entries(viMap)) {
             if (rawError.includes(enKey) || enKey.includes(rawError)) {
