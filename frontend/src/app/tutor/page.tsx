@@ -10,6 +10,8 @@ import KnowledgeTree from "../components/KnowledgeTree";
 import GuidedTour from "../components/GuidedTour";
 import QuickRoleSwitcher from "../components/QuickRoleSwitcher";
 import StudentMasteryDashboard from "./components/StudentMasteryDashboard";
+import LearningPathProgress from "./components/LearningPathProgress";
+import { startLearningPathStep, type LearningPathProgressResponse } from "./hub/api";
 import { TopicMastery } from "@/lib/mastery";
 import {
   buildQuestionAttemptProperties,
@@ -101,7 +103,8 @@ export default function StudentTutorPage() {
   const [activityLogs, setActivityLogs] = useState<LogItem[]>([]);
 
   // Learning Path & Hints States
-  const [learningPath, setLearningPath] = useState<any>(null);
+  const [learningPath, setLearningPath] = useState<LearningPathProgressResponse | null>(null);
+  const [startingPathTopicId, setStartingPathTopicId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"logs" | "path">("path");
   const [hintPressCount, setHintPressCount] = useState<number>(0);
   const [activeHint, setActiveHint] = useState<string | null>(null);
@@ -493,6 +496,22 @@ export default function StudentTutorPage() {
     }
   };
 
+  const handleStartLearningPathStep = async (topicId: string) => {
+    if (startingPathTopicId) return;
+    setStartingPathTopicId(topicId);
+    try {
+      await startLearningPathStep(topicId);
+      await loadLearningPath();
+      const node = nodes.find((item) => item.id === topicId);
+      if (node) handleNodeClick(node);
+    } catch (err: any) {
+      await loadLearningPath();
+      toast.error("Chưa thể mở bước này", { description: err.message });
+    } finally {
+      setStartingPathTopicId(null);
+    }
+  };
+
   const handleRequestHint = async () => {
     if (!selectedNode || hintLoading) return;
     setHintLoading(true);
@@ -528,6 +547,7 @@ export default function StudentTutorPage() {
       );
       void telemetry.flush().catch(() => undefined);
       setActiveHint(res.content || "Chưa có gợi ý nào cho cấp độ này.");
+      await loadLearningPath();
     } catch (err: any) {
       toast.error("Không thể tải gợi ý: " + err.message);
     } finally {
@@ -767,6 +787,7 @@ export default function StudentTutorPage() {
       const res = await apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
         method: "POST"
       });
+      await loadLearningPath();
       if (res.hasParent) {
         toast.warning("HẠ CẤP THÍCH ỨNG", {
           description: `⚠️ NHẬN DIỆN HỔNG KIẾN THỨC NỀN: Phần này có vẻ hơi khó với em. Hãy cùng ôn tập bài học nền tảng "${res.parentName}" trước nhé!`
@@ -827,12 +848,12 @@ export default function StudentTutorPage() {
         },
       );
       void telemetry.flush().catch(() => undefined);
+      void loadLearningPath();
 
       if (res.isCorrect) {
         setAnswerFeedback({ isCorrect: true, message: "🎉 Tuyệt vời! Câu trả lời của em hoàn toàn chính xác." });
         loadStudentState();
         loadTreeData();
-        loadLearningPath();
 
         // Trigger promax confetti animation
         setShowConfetti(true);
@@ -886,6 +907,7 @@ export default function StudentTutorPage() {
         method: "POST",
       });
       setCantDoOptions(res);
+      await loadLearningPath();
       setAnswerFeedback(null);
       setShake(true);
       setTimeout(() => setShake(false), 500);
@@ -1088,6 +1110,14 @@ export default function StudentTutorPage() {
           ) : (
             <>
               <h3 className="text-[10px] font-black text-slate-400 px-2 uppercase tracking-widest">Lộ trình của em</h3>
+              {learningPath?.progress && (
+                <LearningPathProgress
+                  progress={learningPath.progress}
+                  nodeNames={Object.fromEntries(nodes.map((node) => [node.id, node.name]))}
+                  onStart={handleStartLearningPathStep}
+                  startingTopicId={startingPathTopicId}
+                />
+              )}
               {learningPath && learningPath.ordered_steps && learningPath.ordered_steps.length > 0 ? (
                 <div className="space-y-2">
                   {learningPath.ordered_steps.map((step: any) => {
