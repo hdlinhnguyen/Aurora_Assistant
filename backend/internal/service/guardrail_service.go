@@ -1,8 +1,11 @@
 package service
 
 import (
+	_ "embed"
+	"encoding/json"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // ─── Guardrail Layer ─────────────────────────────────────────────────────────
@@ -13,6 +16,10 @@ import (
 //   2. safety_flag: LLM tự gắn cờ trong JSON response (xem ai_service.go) —
 //      bắt các trường hợp lách luật mà regex bỏ sót.
 // Sự kiện bị gắn cờ được lưu vào bảng guardrail_events (xem tutor_service.go).
+//
+// Danh sách rule nằm ở guardrail_rules.json (không phải Go source) để có thể
+// bổ sung từ/biến thể mới (teencode, viết tắt) mà không phải sửa logic Go —
+// chỉ cần sửa JSON rồi rebuild.
 
 type GuardrailVerdict struct {
 	Category string // "self_harm" | "abuse" | "sexual" | "violence" | "profanity" | "jailbreak" | "personal_info"
@@ -62,27 +69,73 @@ func mustRule(category, severity, pattern string, folded bool) guardrailRule {
 	}
 }
 
-var guardrailRules = []guardrailRule{
-	// ── Tự hại / khủng hoảng (ưu tiên cao nhất — kiểm tra trước) ──
-	mustRule("self_harm", "high", `tự tử|tự sát|tự hại`, false),
-	mustRule("self_harm", "high", `\bmuon chet\b|khong muon song|ket thuc cuoc doi|chan song lam|\btu sat\b|cat tay minh|tu lam dau ban than`, true),
-	// ── Bạo hành / bắt nạt (học sinh kể bị hại — cần giáo viên can thiệp) ──
-	mustRule("abuse", "high", `bị đánh|bạo hành|xâm hại|bị bắt nạt`, false),
-	mustRule("abuse", "high", `bat nat em|danh em o|bao hanh|xam hai`, true),
-	// ── Nội dung người lớn ──
-	mustRule("sexual", "medium", `\bsex\b|khoa than|lam tinh|phim nguoi lon|coi truong|bo phan sinh duc`, true),
-	// ── Bạo lực / vũ khí ──
-	mustRule("violence", "medium", `giet nguoi|giet ban|dam chem|che tao bom|lam bom|mua sung|vu khi`, true),
-	// ── Chửi bậy / xúc phạm ──
-	mustRule("profanity", "medium", `dit me|du ma|deo me|con cac|cai lon|\boc cho\b|mat day|do ngu ngoc|thang cho|con cho nay|cut di|im mom`, true),
-	// ── Prompt injection / thao túng vai trò AI ──
-	// Lưu ý: regexp Go là RE2, KHÔNG hỗ trợ lookahead — chỉ dùng alternation thuần.
-	mustRule("jailbreak", "low", `bo qua (moi |cac )?(huong dan|quy tac|chi dan)|quen (het )?vai tro|ignore (all |previous )?instructions?|system prompt|bay gio ban la|gia vo la|pretend you are|jailbreak`, true),
-	// ── Xin đáp án trực tiếp (vi phạm triết lý "học thật") ──
-	mustRule("jailbreak", "low", `cho (em |minh |tui |to )?(xin )?dap an|noi dap an|dap an luon|giai ho (em |minh )?(luon|het)|lam ho em (het |ca )?bai`, true),
-	// ── Lộ thông tin cá nhân (số điện thoại VN 9-11 số) ──
-	mustRule("personal_info", "low", `(so dien thoai|sdt|dia chi nha) (cua )?(em|minh|to) (la|o)`, true),
-	mustRule("personal_info", "low", `\b0\d{9,10}\b`, true),
+//go:embed guardrail_rules.json
+var guardrailRulesJSON []byte
+
+type guardrailRuleDef struct {
+	Category string `json:"category"`
+	Severity string `json:"severity"`
+	Folded   bool   `json:"folded"`
+	Pattern  string `json:"pattern"`
+}
+
+// guardrailRules nạp từ guardrail_rules.json lúc khởi động (nhúng vào binary
+// qua go:embed). Thêm/sửa từ khoá, biến thể teencode chỉ cần sửa file JSON đó
+// rồi build lại — không phải đụng vào logic Go.
+var guardrailRules = loadGuardrailRules()
+
+func loadGuardrailRules() []guardrailRule {
+	var defs []guardrailRuleDef
+	if err := json.Unmarshal(guardrailRulesJSON, &defs); err != nil {
+		panic("guardrail_rules.json không hợp lệ: " + err.Error())
+	}
+	rules := make([]guardrailRule, 0, len(defs))
+	for _, d := range defs {
+		rules = append(rules, mustRule(d.Category, d.Severity, d.Pattern, d.Folded))
+	}
+	return rules
+}
+
+// noiseChars là ký tự đệm học sinh hay chèn giữa các chữ để né blocklist,
+// vd "d.m", "d-m", "d_m". Xoá hẳn (không thay bằng khoảng trắng) để "d.m"
+// gộp lại thành "dm" — khoảng trắng thật giữa 2 từ không đổi.
+var noiseChars = regexp.MustCompile(`[.\-_*~']+`)
+
+// collapseRepeatLetters gộp ký tự chữ cái (mọi ngôn ngữ) lặp liên tiếp từ 3
+// lần trở lên xuống còn ĐÚNG 1 lần, vd "ngungungu"... "nguuu" -> "ngu",
+// "ngốccc" -> "ngốc". Giữ nguyên cặp đôi hợp lệ trong tiếng Việt (vd "xoong",
+// "soóc") vì tiếng Việt không có từ nào lặp 3 ký tự identical liên tiếp một
+// cách tự nhiên — chỉ chuỗi lặp từ 3 trở lên mới coi là học sinh cố tình kéo
+// dài để né blocklist. RE2 không hỗ trợ backreference nên phải viết tay bằng
+// duyệt rune thay vì regex. Chỉ áp dụng cho unicode.IsLetter — KHÔNG áp dụng
+// cho chữ số để không phá vỡ rule số điện thoại lặp số (vd 0888888888).
+func collapseRepeatLetters(s string) string {
+	runes := []rune(s)
+	out := make([]rune, 0, len(runes))
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		if unicode.IsLetter(r) {
+			j := i
+			for j < len(runes) && runes[j] == r {
+				j++
+			}
+			if run := j - i; run >= 3 {
+				out = append(out, r)
+				i = j - 1
+				continue
+			}
+		}
+		out = append(out, r)
+	}
+	return string(out)
+}
+
+// normalizeForGuardrail chuẩn hoá noise-char và ký tự lặp trước khi match,
+// nhằm bắt các biến thể chính tả né kiểm duyệt (xem guardrail_rules.json).
+func normalizeForGuardrail(s string) string {
+	s = noiseChars.ReplaceAllString(s, "")
+	s = collapseRepeatLetters(s)
+	return s
 }
 
 // CheckStudentInput trả về verdict đầu tiên khớp, hoặc nil nếu nội dung sạch.
@@ -92,12 +145,17 @@ func CheckStudentInput(text string) *GuardrailVerdict {
 	if lower == "" {
 		return nil
 	}
-	folded := foldVietnamese(lower)
+	// clean loại noise-char + gộp ký tự lặp, vẫn giữ dấu tiếng Việt — dùng cho
+	// rule folded=false (nơi dấu quyết định nghĩa, vd "tự tử" khác "từ từ").
+	clean := normalizeForGuardrail(lower)
+	// foldedClean chuẩn hoá thêm bước bỏ dấu — dùng cho rule folded=true, bắt
+	// cả biến thể gõ không dấu lẫn biến thể chèn ký tự/lặp ký tự.
+	foldedClean := foldVietnamese(clean)
 
 	for _, r := range guardrailRules {
-		target := lower
+		target := clean
 		if r.folded {
-			target = folded
+			target = foldedClean
 		}
 		if m := r.re.FindString(target); m != "" {
 			return &GuardrailVerdict{Category: r.category, Severity: r.severity, Matched: m}

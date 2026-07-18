@@ -148,6 +148,17 @@ export default function StudentTutorPage() {
     const user = JSON.parse(userStr);
     setUserName(user.name);
 
+    // Restore saved states
+    const savedDrawerTab = localStorage.getItem("aurora_student_drawer_tab") as "theory" | "practice" | null;
+    const savedActiveMainTab = localStorage.getItem("aurora_student_active_main_tab") as "graph" | "workspace" | null;
+
+    if (savedDrawerTab) {
+      setDrawerTab(savedDrawerTab);
+    }
+    if (savedActiveMainTab) {
+      setActiveMainTab(savedActiveMainTab);
+    }
+
     loadSubjects();
   }, [router]);
 
@@ -157,7 +168,22 @@ export default function StudentTutorPage() {
       loadTreeData();
       loadStudentState();
       loadLearningPath();
-      setSelectedNode(null);
+      
+      const savedNodeStr = localStorage.getItem("aurora_student_selected_node");
+      if (savedNodeStr) {
+        try {
+          const parsedNode = JSON.parse(savedNodeStr);
+          if (parsedNode.subject === selectedSubject) {
+            setSelectedNode(parsedNode);
+          } else {
+            setSelectedNode(null);
+          }
+        } catch (e) {
+          setSelectedNode(null);
+        }
+      } else {
+        setSelectedNode(null);
+      }
     }
   }, [selectedSubject]);
 
@@ -166,11 +192,37 @@ export default function StudentTutorPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [theoryChat]);
 
+  // Save active states to localStorage to persist reload
+  useEffect(() => {
+    if (selectedSubject) {
+      localStorage.setItem("aurora_student_subject", selectedSubject);
+    }
+  }, [selectedSubject]);
+
+  useEffect(() => {
+    if (selectedNode) {
+      localStorage.setItem("aurora_student_selected_node", JSON.stringify(selectedNode));
+    } else {
+      localStorage.removeItem("aurora_student_selected_node");
+    }
+  }, [selectedNode]);
+
+  useEffect(() => {
+    localStorage.setItem("aurora_student_drawer_tab", drawerTab);
+  }, [drawerTab]);
+
+  useEffect(() => {
+    localStorage.setItem("aurora_student_active_main_tab", activeMainTab);
+  }, [activeMainTab]);
+
   const loadSubjects = async () => {
     try {
       const data = await apiFetch("/subjects");
       setSubjects(data || []);
-      if (data && data.length > 0) {
+      const savedSub = localStorage.getItem("aurora_student_subject");
+      if (savedSub && data && data.includes(savedSub)) {
+        setSelectedSubject(savedSub);
+      } else if (data && data.length > 0) {
         setSelectedSubject(data[0]);
       }
     } catch (err) {

@@ -38,6 +38,48 @@ func TestGuardrailBlocksUnsafeInput(t *testing.T) {
 	}
 }
 
+func TestGuardrailCatchesSpellingVariants(t *testing.T) {
+	cases := []struct {
+		text     string
+		category string
+	}{
+		// Chèn ký tự đệm để né blocklist
+		{"d.i.t m.e", "profanity"},
+		{"d-i-t m-e", "profanity"},
+		{"đ_ị_t m_ẹ", "profanity"},
+		// Lặp ký tự để né blocklist
+		{"đồồồ nguuu ngốccc", "profanity"},
+		{"cút điiii", "profanity"},
+		// Teencode phổ biến
+		{"thằng vcl", "profanity"},
+		{"dkm mày", "profanity"},
+		// Số điện thoại lặp số không được vỡ bởi collapse-repeat
+		{"số điện thoại của em là 0888888888", "personal_info"},
+	}
+	for _, c := range cases {
+		v := CheckStudentInput(c.text)
+		if v == nil {
+			t.Errorf("expected %q to be flagged as %s, got nil", c.text, c.category)
+			continue
+		}
+		if v.Category != c.category {
+			t.Errorf("%q: expected category %s, got %s (matched %q)", c.text, c.category, v.Category, v.Matched)
+		}
+	}
+}
+
+func TestCollapseRepeatLettersKeepsDigitsIntact(t *testing.T) {
+	if got := collapseRepeatLetters("0888888888"); got != "0888888888" {
+		t.Errorf("digits must not be collapsed, got %q", got)
+	}
+	if got := collapseRepeatLetters("dcmmmm"); got != "dcm" {
+		t.Errorf("expected letter run collapsed to 1, got %q", got)
+	}
+	if got := collapseRepeatLetters("xoong"); got != "xoong" {
+		t.Errorf("legit double letter must not be touched, got %q", got)
+	}
+}
+
 func TestGuardrailAllowsNormalMathChat(t *testing.T) {
 	clean := []string{
 		"Em không biết làm bài này ạ",

@@ -29,6 +29,7 @@ interface KnowledgeTreeProps {
   edges: EdgeItem[];
   mode: "teacher" | "student" | "view-only";
   studentNodeStatus?: Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">;
+  nodeAccuracy?: Record<string, { correct: number; incorrect: number; total: number }>;
   initialNodeId?: string;
   currentNodeId?: string;
   onNodeClick?: (node: NodeItem) => void;
@@ -44,6 +45,7 @@ export default function KnowledgeTree({
   edges,
   mode,
   studentNodeStatus = {},
+  nodeAccuracy = {},
   initialNodeId,
   currentNodeId,
   onNodeClick,
@@ -274,15 +276,17 @@ export default function KnowledgeTree({
     setPan({ x: 0, y: 0 });
     setScale(1);
 
-    // Save all positions to backend
-    for (const n of updatedNodes) {
-      try {
-        await apiFetch(`/subjects/nodes/${n.id}`, {
-          method: "PUT",
-          body: JSON.stringify({ posX: n.posX, posY: n.posY }),
-        });
-      } catch (err) {
-        console.error("Failed to save auto-layout position:", err);
+    // Save all positions to backend if mode is teacher
+    if (mode === "teacher") {
+      for (const n of updatedNodes) {
+        try {
+          await apiFetch(`/subjects/nodes/${n.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ posX: n.posX, posY: n.posY }),
+          });
+        } catch (err) {
+          console.error("Failed to save auto-layout position:", err);
+        }
       }
     }
     if (onRefresh) onRefresh();
@@ -525,19 +529,19 @@ export default function KnowledgeTree({
 
     switch (status) {
       case "mastered":
-        return "border-emerald-400/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30 text-emerald-950 shadow-md shadow-emerald-100/40 hover:shadow-emerald-200/50 font-bold";
+        return "border-emerald-400/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-100 text-emerald-950 shadow-md shadow-emerald-100/40 hover:shadow-emerald-200/50 font-bold";
       case "struggle":
-        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-50/30 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold animate-pulse";
+        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-100 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold animate-pulse";
       case "learning":
-        return "border-orange-400/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/30 text-orange-950 shadow-md shadow-orange-100/40 hover:shadow-orange-200/50 ring-2 ring-orange-300/60 font-bold";
+        return "border-orange-400/80 bg-gradient-to-br from-amber-50 via-white to-orange-100 text-orange-950 shadow-md shadow-orange-100/40 hover:shadow-orange-200/50 ring-2 ring-orange-300/60 font-bold";
       case "initial":
-        return "border-blue-400/80 bg-gradient-to-br from-blue-50 via-white to-blue-50/30 text-blue-950 shadow-md shadow-blue-100/40 hover:shadow-blue-200/50 ring-2 ring-blue-300/60 font-bold animate-pulse-subtle";
+        return "border-blue-400/80 bg-gradient-to-br from-blue-50 via-white to-blue-100 text-blue-950 shadow-md shadow-blue-100/40 hover:shadow-blue-200/50 ring-2 ring-blue-300/60 font-bold animate-pulse-subtle";
       default:
         // locked status
         if (isActiveOrHighlighted) {
           return "border-slate-350 bg-white text-slate-850 shadow-md font-semibold opacity-100 cursor-pointer";
         }
-        return "border-slate-200/70 bg-slate-50/90 text-slate-400/80 opacity-60 cursor-not-allowed";
+        return "border-slate-200/70 bg-slate-50 text-slate-400/80 opacity-60 cursor-not-allowed";
     }
   };
 
@@ -863,7 +867,7 @@ export default function KnowledgeTree({
             </div>
           )}
 
-          {mode === "teacher" && !isFocusedView && (
+          {!isFocusedView && (
             <div className="flex items-center gap-1.5 ml-2">
               <button
                 onClick={handleAutoLayout}
@@ -1022,12 +1026,64 @@ export default function KnowledgeTree({
 
                 const status = studentNodeStatus[node.id] || "locked";
 
+                // Mastery ring calculation
+                const nodeAcc = nodeAccuracy[node.id];
+                const masteryPercent = nodeAcc && nodeAcc.total > 0
+                  ? Math.round((nodeAcc.correct / nodeAcc.total) * 100)
+                  : 0;
+                const hasMasteryData = nodeAcc && nodeAcc.total > 0;
+                const ringPad = 6;
+                const ringW = nodeWidth + ringPad * 2;
+                const ringH = nodeHeight + ringPad * 2;
+                const ringR = 18;
+                const ringPerimeter = 2 * (ringW - 2 * ringR) + 2 * (ringH - 2 * ringR) + 2 * Math.PI * ringR;
+                const ringFill = (masteryPercent / 100) * ringPerimeter;
+                const ringGap = ringPerimeter - ringFill;
+                const ringColor = masteryPercent >= 80 ? "#10b981" : masteryPercent >= 50 ? "#f59e0b" : "#ef4444";
+
                 return (
                   <g 
                     key={node.id} 
                     className="group/node"
                     style={{ opacity, transition: "opacity 0.2s" }}
                   >
+                    {/* Mastery Progress Ring */}
+                    {hasMasteryData && mode !== "teacher" && (
+                      <rect
+                        x={node.posX - ringPad}
+                        y={node.posY - ringPad}
+                        width={ringW}
+                        height={ringH}
+                        rx={ringR}
+                        ry={ringR}
+                        fill="none"
+                        stroke={ringColor}
+                        strokeWidth={3.5}
+                        strokeDasharray={`${ringFill} ${ringGap}`}
+                        strokeDashoffset={0}
+                        strokeLinecap="round"
+                        style={{
+                          filter: `drop-shadow(0 0 4px ${ringColor}40)`,
+                          transition: "stroke-dasharray 0.6s ease, stroke 0.4s ease",
+                        }}
+                      />
+                    )}
+                    {/* Mastery ring background track */}
+                    {hasMasteryData && mode !== "teacher" && (
+                      <rect
+                        x={node.posX - ringPad}
+                        y={node.posY - ringPad}
+                        width={ringW}
+                        height={ringH}
+                        rx={ringR}
+                        ry={ringR}
+                        fill="none"
+                        stroke="#e2e8f0"
+                        strokeWidth={1.5}
+                        opacity={0.4}
+                        style={{ pointerEvents: "none" }}
+                      />
+                    )}
                     <foreignObject
                       x={node.posX}
                       y={node.posY}
@@ -1086,6 +1142,18 @@ export default function KnowledgeTree({
                               }[status]}
                             </span>
                           </div>
+                          {hasMasteryData && mode !== "teacher" && (
+                            <span
+                              className="text-[8px] font-black px-1.5 py-0.5 rounded-full border tabular-nums leading-none shrink-0"
+                              style={{
+                                backgroundColor: masteryPercent >= 80 ? "#ecfdf5" : masteryPercent >= 50 ? "#fffbeb" : "#fef2f2",
+                                color: ringColor,
+                                borderColor: ringColor + "40",
+                              }}
+                            >
+                              {masteryPercent}%
+                            </span>
+                          )}
                         </div>
 
                         {/* Title text */}

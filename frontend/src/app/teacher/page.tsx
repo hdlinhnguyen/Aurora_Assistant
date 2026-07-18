@@ -23,6 +23,8 @@ import KnowledgeTree from "../components/KnowledgeTree";
 import QuestionBankTab from "./components/QuestionBankTab";
 import MonitoringTab from "./components/MonitoringTab";
 import LearningPathTab from "./components/LearningPathTab";
+import StudentsProgressTab from "./components/StudentsProgressTab";
+import StudentMasteryMatrix from "./components/StudentMasteryMatrix";
 import {
   Users,
   GitBranch,
@@ -81,6 +83,9 @@ export interface StudentProgress {
   currentNodeId: string;
   currentNode: string;
   updatedAt: string;
+  totalAnswers: number;
+  correctAnswers: number;
+  lastActiveAt: string | null;
 }
 
 interface StudentDetailProgress {
@@ -101,6 +106,8 @@ interface StudentDetailProgress {
     createdAt: string;
   }>;
   nodeStatus: Record<string, "mastered" | "struggle">;
+  nodeAccuracy?: Record<string, { correct: number; incorrect: number; total: number }>;
+  nodeDifficultyStats?: Record<string, Record<string, { correct: number; incorrect: number; total: number }>>;
 }
 
 export interface Question {
@@ -149,6 +156,7 @@ export default function TeacherDashboard() {
   const [loadingMonitoring, setLoadingMonitoring] = useState(false);
   const [studentNodeStatus, setStudentNodeStatus] = useState<Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [studentViewMode, setStudentViewMode] = useState<"tree" | "matrix">("tree");
 
   // Active Node Editor Drawer (Graph Designer)
   const [editingNode, setEditingNode] = useState<NodeItem | null>(null);
@@ -185,6 +193,29 @@ export default function TeacherDashboard() {
       return;
     }
     setUserName(user.name);
+
+    // Restore saved states from localStorage
+    const savedSubject = localStorage.getItem("aurora_teacher_subject");
+    const savedTab = localStorage.getItem("aurora_teacher_tab") as ActiveTab | null;
+    const savedStudent = localStorage.getItem("aurora_teacher_student");
+    const savedViewMode = localStorage.getItem("aurora_teacher_view_mode") as "tree" | "matrix" | null;
+
+    if (savedSubject !== null) {
+      setSelectedSubject(savedSubject);
+    }
+    if (savedTab) {
+      setActiveTab(savedTab);
+    }
+    if (savedStudent) {
+      try {
+        setSelectedStudent(JSON.parse(savedStudent));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    if (savedViewMode) {
+      setStudentViewMode(savedViewMode);
+    }
 
     loadSubjects();
     loadStudentsProgress();
@@ -339,12 +370,49 @@ export default function TeacherDashboard() {
     }
   }, [activeTab, selectedSubject]);
 
+  // Save active states to localStorage to persist reload
+  useEffect(() => {
+    if (selectedSubject !== "") {
+      localStorage.setItem("aurora_teacher_subject", selectedSubject);
+    } else {
+      localStorage.setItem("aurora_teacher_subject", "");
+    }
+  }, [selectedSubject]);
+
+  useEffect(() => {
+    localStorage.setItem("aurora_teacher_tab", activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (selectedStudent) {
+      localStorage.setItem("aurora_teacher_student", JSON.stringify(selectedStudent));
+    } else {
+      localStorage.removeItem("aurora_teacher_student");
+    }
+  }, [selectedStudent]);
+
+  useEffect(() => {
+    localStorage.setItem("aurora_teacher_view_mode", studentViewMode);
+  }, [studentViewMode]);
+
   const loadSubjects = async (selectSubjectName?: string) => {
     try {
       const data = await apiFetch("/subjects");
       setSubjects(data || []);
+      const savedSub = localStorage.getItem("aurora_teacher_subject");
+      
       if (selectSubjectName && data && data.includes(selectSubjectName)) {
         setSelectedSubject(selectSubjectName);
+      } else if (savedSub !== null) {
+        if (savedSub && data && data.includes(savedSub)) {
+          setSelectedSubject(savedSub);
+        } else if (savedSub === "") {
+          setSelectedSubject("");
+        } else if (selectedSubject && data && data.includes(selectedSubject)) {
+          // Keep
+        } else if (data && data.length > 0) {
+          setSelectedSubject(data[0]);
+        }
       } else if (selectedSubject && data && data.includes(selectedSubject)) {
         // Keep currently selected
       } else if (data && data.length > 0) {
@@ -1298,33 +1366,71 @@ export default function TeacherDashboard() {
                 </div>
               </div>
 
-              {/* Path Legend */}
-              <div className="flex gap-2.5 bg-card px-3 py-1.5 border border-border rounded-xl text-[9px] font-black tracking-wide text-muted-foreground shadow-sm">
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Bắt đầu</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" /> Vị trí hiện tại</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Đã vượt qua</span>
-                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Lỗ hổng (Sai/Không làm được)</span>
+              {/* View Mode Toggle & Legend */}
+              <div className="flex items-center gap-3">
+                <div className="flex bg-muted border border-border rounded-xl p-0.5 shadow-sm">
+                  <button
+                    onClick={() => setStudentViewMode("tree")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      studentViewMode === "tree"
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Bản đồ cây
+                  </button>
+                  <button
+                    onClick={() => setStudentViewMode("matrix")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                      studentViewMode === "matrix"
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Ma trận theo dõi
+                  </button>
+                </div>
+
+                {studentViewMode === "tree" && (
+                  <div className="flex gap-2.5 bg-card px-3 py-1.5 border border-border rounded-xl text-[9px] font-black tracking-wide text-muted-foreground shadow-sm">
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Bắt đầu</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" /> Vị trí hiện tại</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Đã vượt qua</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Lỗ hổng (Sai/Không làm được)</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Split layout: Tree + Activity logs */}
+            {/* Split layout: Tree/Matrix + Activity logs */}
             <div className="flex-1 flex gap-5 overflow-hidden">
-              {/* SVG Tree Monitor */}
-              <div className="flex-1 relative rounded-3xl overflow-hidden bg-card shadow-sm border border-border">
-                {nodes.length > 0 ? (
-                  <KnowledgeTree
-                    subject={selectedStudent.subject}
-                    nodes={nodes}
-                    edges={edges}
-                    mode="view-only"
-                    studentNodeStatus={studentNodeStatus}
-                    initialNodeId={studentDetail?.state?.initialLevelNodeId}
-                    currentNodeId={studentDetail?.state?.currentLevelNodeId}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Đang tải sơ đồ...
+              {/* Main Workspace (Tree or Matrix) */}
+              <div className="flex-1 relative rounded-3xl overflow-hidden flex flex-col">
+                {studentViewMode === "tree" ? (
+                  <div className="flex-1 relative bg-card shadow-sm border border-border rounded-3xl overflow-hidden">
+                    {nodes.length > 0 ? (
+                      <KnowledgeTree
+                        subject={selectedStudent.subject}
+                        nodes={nodes}
+                        edges={edges}
+                        mode="view-only"
+                        studentNodeStatus={studentNodeStatus}
+                        nodeAccuracy={studentDetail?.nodeAccuracy}
+                        initialNodeId={studentDetail?.state?.initialLevelNodeId}
+                        currentNodeId={studentDetail?.state?.currentLevelNodeId}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        Đang tải sơ đồ...
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  <StudentMasteryMatrix
+                    nodes={nodes}
+                    studentDetail={studentDetail}
+                    subject={selectedStudent.subject}
+                  />
                 )}
               </div>
 
@@ -1424,61 +1530,11 @@ export default function TeacherDashboard() {
 
             {/* Split logic between Teacher tabs */}
             {activeTab === "students" ? (
-              // Tab 1: Students progress table list
-              <div className="flex-1 bg-card border border-border rounded-3xl p-6 shadow-sm overflow-hidden flex flex-col">
-                <div className="overflow-x-auto flex-1">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-border text-muted-foreground font-black uppercase tracking-wider text-[10px]">
-                        <th className="py-3 px-4">Học sinh</th>
-                        <th className="py-3 px-4">Email</th>
-                        <th className="py-3 px-4">Môn Học</th>
-                        <th className="py-3 px-4">Level Ban Đầu</th>
-                        <th className="py-3 px-4">Level Thực Tế</th>
-                        <th className="py-3 px-4">Cập nhật cuối</th>
-                        <th className="py-3 px-4 text-center">Hành động</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border font-medium text-foreground/80">
-                      {studentsProgress.filter(p => p.subject === selectedSubject).map((progress, idx) => (
-                        <tr
-                          key={idx}
-                          onClick={() => handleInspectStudent(progress)}
-                          className="hover:bg-slate-50 transition-colors cursor-pointer group active:bg-slate-100"
-                        >
-                          <td className="py-4 px-4 font-black text-slate-900 flex items-center gap-2">
-                            <span className="h-6 w-6 rounded-full bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center text-[10px] text-slate-500 group-hover:text-indigo-600 transition-colors"><User size={12} /></span>
-                            {progress.studentName}
-                          </td>
-                          <td className="py-4 px-4 text-slate-500 font-semibold">{progress.studentEmail}</td>
-                          <td className="py-4 px-4"><span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-bold border border-slate-200">{progress.subject}</span></td>
-                          <td className="py-4 px-4 text-[var(--mint)] font-bold">{progress.initialNode || "Chưa bắt đầu"}</td>
-                          <td className="py-4 px-4 text-emerald-600 font-bold">{progress.currentNode || "Chưa bắt đầu"}</td>
-                          <td className="py-4 px-4 text-slate-500 font-semibold">{new Date(progress.updatedAt).toLocaleString("vi-VN")}</td>
-                          <td className="py-4 px-4 text-center">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleInspectStudent(progress);
-                              }}
-                              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black tracking-wide uppercase transition-all shadow-sm cursor-pointer flex items-center gap-1 mx-auto"
-                            >
-                              <Eye size={12} /> Xem hành trình
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      {studentsProgress.filter(p => p.subject === selectedSubject).length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="text-center py-12 text-muted-foreground font-semibold">
-                            Chưa có dữ liệu học tập nào của học sinh trong môn học này.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <StudentsProgressTab
+                studentsProgress={studentsProgress}
+                selectedSubject={selectedSubject}
+                onInspectStudent={handleInspectStudent}
+              />
             ) : activeTab === "graph-designer" ? (
               // Tab 2: Graph Tree Designer Canvas (Teacher Editor)
               <div className="flex-1 flex gap-5 overflow-hidden">

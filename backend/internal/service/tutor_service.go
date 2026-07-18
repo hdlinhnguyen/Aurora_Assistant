@@ -601,29 +601,71 @@ func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 		return nil, err
 	}
 
-	// 3. For each student and subject, obtain status
+	// 3. Preload all node names to avoid N+1 queries
+	type nodeNameRow struct {
+		ID   uuid.UUID
+		Name string
+	}
+	var allNodes []nodeNameRow
+	s.db.Table("nodes").Select("id, name").Find(&allNodes)
+	nodeNameMap := map[uuid.UUID]string{}
+	for _, n := range allNodes {
+		nodeNameMap[n.ID] = n.Name
+	}
+
+	// 4. Preload activity log aggregation: per student+subject
+	type logAgg struct {
+		StudentID      uuid.UUID `gorm:"column:student_id"`
+		Subject        string    `gorm:"column:subject"`
+		TotalAnswers   int       `gorm:"column:total_answers"`
+		CorrectAnswers int       `gorm:"column:correct_answers"`
+		LastActiveAt   time.Time `gorm:"column:last_active_at"`
+	}
+	var logAggs []logAgg
+	s.db.Table("activity_logs").
+		Select(`student_id, subject,
+			COUNT(CASE WHEN action IN ('answer_correct','answer_incorrect') THEN 1 END) as total_answers,
+			COUNT(CASE WHEN action = 'answer_correct' THEN 1 END) as correct_answers,
+			MAX(created_at) as last_active_at`).
+		Group("student_id, subject").
+		Find(&logAggs)
+
+	// Build lookup map: studentID:subject -> logAgg
+	logAggMap := map[string]logAgg{}
+	for _, la := range logAggs {
+		key := la.StudentID.String() + ":" + la.Subject
+		logAggMap[key] = la
+	}
+
+	// 5. For each student and subject, obtain status + aggregated metrics
 	for _, student := range students {
 		for _, subject := range subjects {
 			var state model.StudentState
-			err := s.db.Where("student_id = ? AND subject = ?", student.ID, subject).First(&state).Error
+			stateErr := s.db.Where("student_id = ? AND subject = ?", student.ID, subject).First(&state).Error
 			
 			var initialNodeName, currentNodeName string
 			var initialNodeId, currentNodeId interface{}
 			var updatedAtVal time.Time
 
-			if err == nil {
+			if stateErr == nil {
 				initialNodeId = state.InitialLevelNodeID
 				currentNodeId = state.CurrentLevelNodeID
 				updatedAtVal = state.UpdatedAt
 
 				if state.InitialLevelNodeID != uuid.Nil {
-					s.db.Table("nodes").Where("id = ?", state.InitialLevelNodeID).Select("name").Row().Scan(&initialNodeName)
+					initialNodeName = nodeNameMap[state.InitialLevelNodeID]
+					if initialNodeName == "" {
+						initialNodeName = "Chưa chẩn đoán/Chưa học"
+					}
 				} else {
 					initialNodeName = "Chưa chẩn đoán/Chưa học"
 				}
 
 				if state.CurrentLevelNodeID != uuid.Nil {
-					s.db.Table("nodes").Where("id = ?", state.CurrentLevelNodeID).Select("name").Row().Scan(&currentNodeName)
+					currentNodeName = nodeNameMap[state.CurrentLevelNodeID]
+					if currentNodeName == "" {
+						currentNodeName = "Chưa học"
+					}
 				} else {
 					currentNodeName = "Chưa học"
 				}
@@ -635,22 +677,37 @@ func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 				updatedAtVal = student.CreatedAt
 			}
 
+			// Lookup aggregated activity log stats
+			aggKey := student.ID.String() + ":" + subject
+			agg := logAggMap[aggKey]
+
+			var lastActiveAtVal interface{}
+			if agg.TotalAnswers > 0 || !agg.LastActiveAt.IsZero() {
+				lastActiveAtVal = agg.LastActiveAt
+			} else {
+				lastActiveAtVal = nil
+			}
+
 			results = append(results, map[string]interface{}{
-				"studentId":     student.ID,
-				"studentName":   student.Name,
-				"studentEmail":  student.Email,
-				"subject":       subject,
-				"initialNodeId": initialNodeId,
-				"initialNode":   initialNodeName,
-				"currentNodeId": currentNodeId,
-				"currentNode":   currentNodeName,
-				"updatedAt":     updatedAtVal,
+				"studentId":      student.ID,
+				"studentName":    student.Name,
+				"studentEmail":   student.Email,
+				"subject":        subject,
+				"initialNodeId":  initialNodeId,
+				"initialNode":    initialNodeName,
+				"currentNodeId":  currentNodeId,
+				"currentNode":    currentNodeName,
+				"updatedAt":      updatedAtVal,
+				"totalAnswers":   agg.TotalAnswers,
+				"correctAnswers": agg.CorrectAnswers,
+				"lastActiveAt":   lastActiveAtVal,
 			})
 		}
 	}
 
 	return results, nil
 }
+
 
 func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject string) (map[string]interface{}, error) {
 	var state model.StudentState
@@ -718,10 +775,63 @@ func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject st
 		}
 	}
 
+	// Build per-node accuracy map for mastery ring visualization
+	nodeAccuracy := map[string]map[string]int{}
+	allNodeIds := map[string]bool{}
+	for k := range nodeCorrectCount { allNodeIds[k] = true }
+	for k := range nodeIncorrectCount { allNodeIds[k] = true }
+	for k := range nodeCantDoCount { allNodeIds[k] = true }
+	for nodeIDStr := range allNodeIds {
+		correct := nodeCorrectCount[nodeIDStr]
+		incorrect := nodeIncorrectCount[nodeIDStr]
+		cantDo := nodeCantDoCount[nodeIDStr]
+		total := correct + incorrect + cantDo
+		nodeAccuracy[nodeIDStr] = map[string]int{
+			"correct":   correct,
+			"incorrect": incorrect,
+			"total":     total,
+		}
+	}
+
+	// Build detailed per-node per-difficulty statistics for the tracking matrix
+	nodeDifficultyStats := map[string]map[string]map[string]int{}
+	for _, l := range logs {
+		nodeIdStr := l.NodeID.String()
+		if nodeDifficultyStats[nodeIdStr] == nil {
+			nodeDifficultyStats[nodeIdStr] = map[string]map[string]int{
+				"easy":      {"correct": 0, "incorrect": 0, "total": 0},
+				"medium":    {"correct": 0, "incorrect": 0, "total": 0},
+				"hard":      {"correct": 0, "incorrect": 0, "total": 0},
+				"very_hard": {"correct": 0, "incorrect": 0, "total": 0},
+			}
+		}
+
+		difficulty := "medium"
+		if strings.Contains(l.Detail, "Độ khó: easy") || strings.Contains(l.Detail, "Độ khó: Nhận biết") {
+			difficulty = "easy"
+		} else if strings.Contains(l.Detail, "Độ khó: medium") || strings.Contains(l.Detail, "Độ khó: Thông hiểu") {
+			difficulty = "medium"
+		} else if strings.Contains(l.Detail, "Độ khó: hard") || strings.Contains(l.Detail, "Độ khó: Vận dụng") {
+			difficulty = "hard"
+		} else if strings.Contains(l.Detail, "Độ khó: very_hard") || strings.Contains(l.Detail, "Độ khó: Vận dụng cao") {
+			difficulty = "very_hard"
+		}
+
+		if l.Action == "answer_correct" {
+			nodeDifficultyStats[nodeIdStr][difficulty]["correct"]++
+			nodeDifficultyStats[nodeIdStr][difficulty]["total"]++
+		} else if l.Action == "answer_incorrect" {
+			nodeDifficultyStats[nodeIdStr][difficulty]["incorrect"]++
+			nodeDifficultyStats[nodeIdStr][difficulty]["total"]++
+		}
+	}
+
 	return map[string]interface{}{
-		"state":      state,
-		"logs":       formattedLogs,
-		"nodeStatus": nodeStatus,
+		"state":               state,
+		"logs":                formattedLogs,
+		"nodeStatus":          nodeStatus,
+		"nodeAccuracy":        nodeAccuracy,
+		"nodeDifficultyStats": nodeDifficultyStats,
 	}, nil
 }
 
