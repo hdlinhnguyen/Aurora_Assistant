@@ -47,7 +47,7 @@ func main() {
 	config.ConnectDB()
 
 	// Read de1_bank.json
-	data, err := os.ReadFile("../de1_bank.json")
+	data, err := os.ReadFile("../data/de1_bank.json")
 	if err != nil {
 		log.Fatalf("Failed to read de1_bank.json: %v", err)
 	}
