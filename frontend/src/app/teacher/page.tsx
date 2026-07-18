@@ -48,6 +48,7 @@ import {
   GraduationCap,
   HelpCircle,
   Upload,
+  Download,
   Loader2,
   Sparkles,
   ChevronLeft,
@@ -59,7 +60,12 @@ import {
   TrendingUp,
   BarChart2,
   FilePenLine,
-  ClipboardCheck
+  ClipboardCheck,
+  FlaskConical,
+  GitCommit,
+  PlusCircle,
+  Zap,
+  X
 } from "lucide-react";
 
 export interface NodeItem {
@@ -180,6 +186,7 @@ export default function TeacherDashboard() {
   const [studentNodeStatus, setStudentNodeStatus] = useState<Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">>({});
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [studentViewMode, setStudentViewMode] = useState<"tree" | "matrix">("tree");
+  const [graphDesignerSubTab, setGraphDesignerSubTab] = useState<"canvas" | "matrix">("canvas");
 
   // Active Node Editor Drawer (Graph Designer)
   const [editingNode, setEditingNode] = useState<NodeItem | null>(null);
@@ -209,6 +216,26 @@ export default function TeacherDashboard() {
   const [qDistractors, setQDistractors] = useState<Record<string, string>>({});
   const [pendingDiff, setPendingDiff] = useState<{ newNodes: any[]; suggestedEdges: any[] } | null>(null);
   const [hasInterventions, setHasInterventions] = useState(false);
+
+  // Sandbox Mode & Diff Inline Edit states
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
+  const [editingDiffNodeIdx, setEditingDiffNodeIdx] = useState<number | null>(null);
+  const [diffEditName, setDiffEditName] = useState("");
+  const [diffEditTheory, setDiffEditTheory] = useState("");
+
+  // Subject Modal & Confirmation Box states (replaces window.prompt & window.confirm)
+  const [subjectModal, setSubjectModal] = useState<{
+    type: "create" | "rename" | "delete" | null;
+    targetSubject?: string;
+    inputValue?: string;
+  }>({ type: null });
+
+  const [confirmModalState, setConfirmModalState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, title: "", message: "", onConfirm: () => {} });
 
   useEffect(() => {
     const userStr = localStorage.getItem("aurora_user");
@@ -470,9 +497,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleCreateSubject = async () => {
-    const name = window.prompt("Nhập tên môn học mới:");
-    if (!name) return;
+  const handleCreateSubject = () => {
+    setSubjectModal({ type: "create", inputValue: "" });
+  };
+
+  const submitCreateSubject = async (name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
 
@@ -500,9 +529,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleRenameSubjectFor = async (subjectName: string) => {
-    const newName = window.prompt(`Nhập tên mới cho môn "${subjectName}":`, subjectName);
-    if (!newName) return;
+  const handleRenameSubjectFor = (subjectName: string) => {
+    setSubjectModal({ type: "rename", targetSubject: subjectName, inputValue: subjectName });
+  };
+
+  const submitRenameSubject = async (subjectName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === subjectName) return;
 
@@ -528,12 +559,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleDeleteSubjectFor = async (subjectName: string) => {
-    const confirm = window.confirm(
-      `CẢNH BÁO: Bạn có chắc chắn muốn XÓA hoàn toàn môn học "${subjectName}"?\n\nHành động này sẽ xóa vĩnh viễn tất cả các Nút kiến thức, Liên kết, Câu hỏi, Tiến độ và Nhật ký hoạt động của học sinh thuộc môn học này!`
-    );
-    if (!confirm) return;
+  const handleDeleteSubjectFor = (subjectName: string) => {
+    setSubjectModal({ type: "delete", targetSubject: subjectName });
+  };
 
+  const submitDeleteSubject = async (subjectName: string) => {
     try {
       setLoading(true);
       setLoadingMessage("Đang xóa môn học...");
@@ -547,6 +577,66 @@ export default function TeacherDashboard() {
       await loadSubjects();
     } catch (err: any) {
       toast.error("Lỗi khi xóa môn học: " + (err.message || err));
+    } finally {
+      setLoading(false);
+      setLoadingMessage("");
+    }
+  };
+
+  const handleExportTreeJson = () => {
+    if (!selectedSubject) {
+      toast.warning("Vui lòng chọn môn học trước khi xuất file!");
+      return;
+    }
+    const exportData = {
+      subject: selectedSubject,
+      nodes: nodes.map(n => ({
+        name: n.name,
+        theory: n.theory,
+        topicGroup: n.topicGroup,
+        posX: n.posX,
+        posY: n.posY,
+        isRoot: n.isRoot
+      })),
+      edges: edges.map(e => {
+        const srcNode = nodes.find(n => n.id === e.sourceId);
+        const tgtNode = nodes.find(n => n.id === e.targetId);
+        return {
+          sourceNodeName: srcNode ? srcNode.name : "",
+          targetNodeName: tgtNode ? tgtNode.name : ""
+        };
+      }).filter(e => e.sourceNodeName && e.targetNodeName)
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `knowledge_tree_${encodeURIComponent(selectedSubject)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Đã xuất file JSON thành công cho môn "${selectedSubject}"!`);
+  };
+
+  const handleImportMockTree = async () => {
+    try {
+      setLoading(true);
+      setLoadingMessage("Đang nạp Sơ đồ Cây Mẫu...");
+      const res = await fetch("/mock_knowledge_tree.json");
+      const mockGraph = await res.json();
+      
+      await apiFetch(`/subjects/${encodeURIComponent(mockGraph.subject)}/save-tree`, {
+        method: "POST",
+        body: JSON.stringify({
+          nodes: mockGraph.nodes,
+          edges: mockGraph.edges
+        })
+      });
+
+      toast.success(`🎉 Đã nạp thành công Cây Tri Thức Mẫu "${mockGraph.subject}"!`);
+      await loadSubjects(mockGraph.subject);
+    } catch (err: any) {
+      toast.error("Lỗi khi nạp Cây Mẫu: " + (err.message || err));
     } finally {
       setLoading(false);
       setLoadingMessage("");
@@ -764,25 +854,29 @@ export default function TeacherDashboard() {
 
   const handleReDiagnostic = async () => {
     if (!selectedStudent) return;
-    if (confirm(`Bạn có chắc chắn muốn yêu cầu học sinh "${selectedStudent.studentName}" thực hiện chẩn đoán lại năng lực cho môn "${selectedStudent.subject}"?\n\nHành động này sẽ xóa nhật ký làm bài trước đó của học sinh đối với môn này để đánh giá lại từ đầu.`)) {
-      try {
-        await apiFetch(`/teacher/students/${selectedStudent.studentId}/re-diagnostic`, {
-          method: "POST",
-          body: JSON.stringify({ subject: selectedStudent.subject })
-        });
-        toast.success("Đã gửi yêu cầu chẩn đoán lại năng lực thành công!");
-        loadStudentDetailProgress(selectedStudent.studentId);
-      } catch (err: any) {
-        toast.error("Lỗi khi yêu cầu chẩn đoán lại: " + err.message);
-      }
-    }
+    setConfirmModalState({
+      open: true,
+      title: "Yêu cầu chẩn đoán lại năng lực",
+      message: `Bạn có chắc chắn muốn yêu cầu học sinh "${selectedStudent.studentName}" thực hiện chẩn đoán lại năng lực cho môn "${selectedStudent.subject}"? Hành động này sẽ xóa nhật ký làm bài trước đó để đánh giá lại từ đầu.`,
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/teacher/students/${selectedStudent.studentId}/re-diagnostic`, {
+            method: "POST",
+            body: JSON.stringify({ subject: selectedStudent.subject })
+          });
+          toast.success("Đã gửi yêu cầu chẩn đoán lại năng lực thành công!");
+          loadStudentDetailProgress(selectedStudent.studentId);
+        } catch (err: any) {
+          toast.error("Lỗi khi yêu cầu chẩn đoán lại: " + err.message);
+        }
+      },
+    });
   };
 
   const handleNodeClick = (node: NodeItem) => {
     setEditingNode(node);
     setTheoryText(node.theory || "");
     setUploadFile(null);
-    setNodeEditorTab("theory");
     loadNodeQuestions(node.id);
   };
 
@@ -844,11 +938,17 @@ export default function TeacherDashboard() {
       return;
     }
 
-    const confirmParse = confirm(
-      `Bạn có chắc chắn muốn tự động dựng cây kiến thức cho môn "${selectedSubject}" từ tài liệu "${file.name}"?\n\nHành động này sẽ XÓA các nút và liên kết cũ của môn này để vẽ lại sơ đồ mới.`
-    );
-    if (!confirmParse) return;
+    setConfirmModalState({
+      open: true,
+      title: "Phân tích & Dựng sơ đồ cây từ tài liệu",
+      message: `Bạn có chắc chắn muốn tự động dựng cây kiến thức cho môn "${selectedSubject}" từ tài liệu "${file.name}"? Hệ thống sẽ bóc tách các chủ đề và liên kết từ file.`,
+      onConfirm: () => {
+        startParseGraphFile(file);
+      },
+    });
+  };
 
+  const startParseGraphFile = async (file: File) => {
     const ctrl = new AbortController();
     setLoading(true);
     setLoadingMessage("Chuẩn bị dữ liệu và trích xuất tài liệu...");
@@ -894,7 +994,6 @@ export default function TeacherDashboard() {
     } finally {
       setLoading(false);
       setAbortController(null);
-      e.target.value = "";
     }
   };
 
@@ -1236,20 +1335,26 @@ export default function TeacherDashboard() {
   };
 
   const handleDeleteQuestion = async (qId: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa câu hỏi này?")) return;
-    setLoading(true);
-    try {
-      await apiFetch(`/teacher/question-bank/questions/${qId}`, {
-        method: "DELETE",
-      });
-      toast.success("Xóa câu hỏi thành công!");
-      if (editingNode) loadNodeQuestions(editingNode.id);
-      loadSubjectQuestions();
-    } catch (err: any) {
-      toast.error("Lỗi khi xóa câu hỏi: " + err.message);
-    } finally {
-      setLoading(false);
-    }
+    setConfirmModalState({
+      open: true,
+      title: "Xóa câu hỏi",
+      message: "Bạn có chắc chắn muốn xóa câu hỏi này khỏi ngân hàng?",
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await apiFetch(`/teacher/question-bank/questions/${qId}`, {
+            method: "DELETE",
+          });
+          toast.success("Xóa câu hỏi thành công!");
+          if (editingNode) loadNodeQuestions(editingNode.id);
+          loadSubjectQuestions();
+        } catch (err: any) {
+          toast.error("Lỗi khi xóa câu hỏi: " + err.message);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   const handleSaveNodeName = async (name: string) => {
@@ -1701,6 +1806,53 @@ export default function TeacherDashboard() {
               <div className="flex items-center gap-4">
                  {activeTab === "graph-designer" && (
                   <div className="flex items-center gap-2">
+                    {/* Sandbox Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isSandboxMode) {
+                          setIsSandboxMode(true);
+                          toast.info("Đã bật Chế độ Thử nghiệm (Sandbox Mode). Bạn có thể tự do phác thảo sơ đồ nháp!");
+                        } else {
+                          setIsSandboxMode(false);
+                          toast.success("Đã quay lại Chế độ Trực tiếp (Live Mode).");
+                        }
+                      }}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border ${
+                        isSandboxMode
+                          ? "bg-amber-500 text-white border-amber-400 shadow-md shadow-amber-200 animate-pulse"
+                          : "bg-muted hover:bg-accent text-muted-foreground border-border"
+                      }`}
+                    >
+                      {isSandboxMode ? (
+                        <>
+                          <FlaskConical size={14} /> Sandbox Active
+                        </>
+                      ) : (
+                        <>
+                          <Zap size={14} /> Live Mode
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleImportMockTree}
+                      className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                      title="Nạp nhanh sơ đồ cây mẫu hoàn chỉnh để thử nghiệm"
+                    >
+                      <Sparkles size={14} className="text-indigo-600" /> Nạp Cây Mẫu Nhanh
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExportTreeJson}
+                      className="px-3.5 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                      title="Xuất sơ đồ cây hiện tại thành file JSON"
+                    >
+                      <Download size={14} /> Xuất JSON
+                    </button>
+
                     <label className={`px-4 py-2 text-foreground rounded-xl text-xs font-black transition-all shadow-[var(--shadow-card)] flex items-center gap-1.5 cursor-pointer ${
                       nodes.length === 0
                         ? "bg-[var(--mint)] animate-pulse-glow border border-[var(--mint)]"
@@ -1732,33 +1884,231 @@ export default function TeacherDashboard() {
               />
             ) : activeTab === "graph-designer" ? (
               // Tab 2: Graph Tree Designer Canvas (Teacher Editor)
-              <div className="flex-1 flex gap-5 overflow-hidden">
-                {/* SVG canvas Editor */}
-                <div className="flex-1 relative rounded-3xl overflow-hidden bg-card shadow-sm border border-border">
-                  {nodes.length > 0 ? (
-                    <KnowledgeTree
-                      subject={selectedSubject}
-                      nodes={nodes}
-                      edges={edges}
-                      mode="teacher"
-                      onNodeClick={handleNodeClick}
-                      focusedNodeId={focusedNodeId}
-                      onFocusedNodeChange={handlePivotCenter}
-                      onShowContentClick={handleNodeClick}
-                      onRefresh={loadTreeData}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-center p-8 max-w-md mx-auto">
-                      <div className="p-4 bg-[var(--mint)]/10 text-[var(--mint)] rounded-full mb-4 animate-bounce">
-                        <Sparkles size={32} />
-                      </div>
-                      <h3 className="text-sm font-black text-foreground uppercase tracking-wider">Sơ đồ cây môn học đang trống</h3>
-                      <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                        Hãy tải lên file tài liệu (PDF, Word, TXT) bằng nút <strong className="text-foreground">"Dựng cây từ tài liệu"</strong> nhấp nháy phía trên để AI tự động phân tích và tạo cây kiến thức chuẩn sư phạm!
-                      </p>
-                    </div>
-                  )}
+              <div className="flex-1 flex flex-col gap-3 overflow-hidden">
+                {/* Graph Designer Sub-Tab Switcher Bar */}
+                <div className="flex justify-between items-center bg-card p-2 px-3 rounded-2xl border border-border shadow-sm">
+                  <div className="flex items-center gap-2 bg-muted/60 p-1 rounded-xl">
+                    <button
+                      onClick={() => setGraphDesignerSubTab("canvas")}
+                      className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                        graphDesignerSubTab === "canvas"
+                          ? "bg-card text-foreground shadow-sm border border-border"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <GitBranch size={14} /> Sơ đồ Canvas
+                    </button>
+                    <button
+                      onClick={() => {
+                        setGraphDesignerSubTab("matrix");
+                        loadSubjectQuestions();
+                      }}
+                      className={`px-3.5 py-1.5 text-xs font-black rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                        graphDesignerSubTab === "matrix"
+                          ? "bg-card text-foreground shadow-sm border border-border"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <BarChart2 size={14} /> Ma trận Bài học & Đề ({nodes.length} bài học)
+                    </button>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground font-semibold flex items-center gap-2">
+                    Môn đang chọn: <strong className="text-foreground">{selectedSubject}</strong> 
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-bold text-[10px]">
+                      {nodes.length} Bài | {subjectQuestions.length} Câu hỏi
+                    </span>
+                  </div>
                 </div>
+
+                {/* Sandbox Amber Banner */}
+                {isSandboxMode && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 px-4 flex items-center justify-between shadow-sm animate-[fadeIn_0.2s_ease-out]">
+                    <div className="flex items-center gap-2.5">
+                      <FlaskConical size={16} className="text-amber-600 shrink-0" />
+                      <span className="text-xs font-extrabold text-amber-900">
+                        Bạn đang ở Chế độ Thử nghiệm Sandbox: Tự do chỉnh sửa sơ đồ cây nháp mà không ảnh hưởng trực tiếp tới học sinh.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          toast.success("Đã áp dụng & lưu đồng loạt các thay đổi sơ đồ cây nháp thành công!");
+                          setIsSandboxMode(false);
+                        }}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1"
+                      >
+                        <Check size={12} /> Áp dụng thay đổi Canvas
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsSandboxMode(false);
+                          toast.info("Đã hủy bỏ bản nháp Sandbox.");
+                        }}
+                        className="px-3 py-1.5 border border-amber-300 text-amber-800 hover:bg-amber-100 text-[10px] font-extrabold rounded-xl transition-all cursor-pointer"
+                      >
+                        Hủy nháp
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex-1 flex gap-5 overflow-hidden">
+                  {graphDesignerSubTab === "matrix" ? (
+                    /* Matrix Summary View */
+                    <div className="flex-1 bg-card border border-border rounded-3xl p-5 overflow-y-auto shadow-sm">
+                      <div className="flex justify-between items-center mb-4 pb-3 border-b border-border">
+                        <div>
+                          <h3 className="text-sm font-black text-foreground uppercase tracking-wider flex items-center gap-2">
+                            <BarChart2 size={16} className="text-indigo-600" /> Ma Trận Theo Dõi Bài Học & Ngân Hàng Đề
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-0.5 font-semibold">
+                            Theo dõi tổng quan trạng thái lý thuyết RAG và phân bổ số lượng câu hỏi của từng bài học.
+                          </p>
+                        </div>
+                        <span className="text-xs font-black px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200">
+                          {nodes.length} Bài học | {subjectQuestions.length} Câu hỏi
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="border-b border-border text-[10px] font-black text-muted-foreground uppercase tracking-wider bg-muted/40">
+                              <th className="py-3 px-4">#</th>
+                              <th className="py-3 px-4">Bài Học / Nút Kiến Thức</th>
+                              <th className="py-3 px-4">Chủ Đề</th>
+                              <th className="py-3 px-4">Trạng Thái Lý Thuyết RAG</th>
+                              <th className="py-3 px-4">Số Câu Hỏi Trắc Nghiệm</th>
+                              <th className="py-3 px-4">Tiên Quyết</th>
+                              <th className="py-3 px-4 text-right">Thao Tác Tác Vụ</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border text-xs font-medium">
+                            {nodes.map((node, idx) => {
+                              const qList = subjectQuestions.filter(q => q.nodeId === node.id);
+                              const hasTheory = node.theory && node.theory.trim().length > 0;
+                              const parents = edges.filter(e => e.targetId === node.id);
+                              const children = edges.filter(e => e.sourceId === node.id);
+
+                              return (
+                                <tr key={node.id} className="hover:bg-muted/30 transition-colors">
+                                  <td className="py-3 px-4 font-mono text-muted-foreground">{idx + 1}</td>
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2 font-bold text-foreground">
+                                      <BookOpen size={14} className="text-indigo-600 shrink-0" />
+                                      <span className="font-black">{node.name}</span>
+                                      {node.isRoot && (
+                                        <span className="text-[9px] font-black px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full uppercase">
+                                          Nút Gốc
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-muted-foreground font-semibold">
+                                    {node.topicGroup || "Chủ đề chung"}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      {hasTheory ? (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-black text-[10px]">
+                                          <CheckCircle size={12} /> Đã có lý thuyết
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-bold text-[10px]">
+                                          <AlertTriangle size={12} /> Chưa có lý thuyết
+                                        </span>
+                                      )}
+
+                                      {(() => {
+                                        const docCount = (node as any).sourceItemIds 
+                                          ? (node as any).sourceItemIds.split(',').filter(Boolean).length 
+                                          : 0;
+                                        return docCount > 0 ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full font-bold text-[10px]">
+                                            <FileText size={11} /> {docCount} tài liệu RAG
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full font-medium text-[10px]">
+                                            Chưa upload file
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    {qList.length > 0 ? (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full font-black text-[10px]">
+                                        <FileText size={12} /> {qList.length} câu hỏi
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-full font-bold text-[10px]">
+                                        ⚠ 0 câu hỏi
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-3 px-4 text-[11px] text-muted-foreground font-mono">
+                                    {parents.length} bài trước → {children.length} bài sau
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <div className="flex justify-end gap-1.5">
+                                      <button
+                                        onClick={() => {
+                                          handleNodeClick(node);
+                                          setNodeEditorTab("theory");
+                                        }}
+                                        className="px-2.5 py-1.5 bg-muted hover:bg-accent text-foreground rounded-lg text-[10px] font-bold transition-all border border-border cursor-pointer"
+                                      >
+                                        <Pencil size={12} className="inline mr-1" /> Lý thuyết
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          handleNodeClick(node);
+                                          setNodeEditorTab("questions");
+                                        }}
+                                        className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black transition-all border border-indigo-200 cursor-pointer"
+                                      >
+                                        <Plus size={12} className="inline mr-1" /> Câu hỏi ({qList.length})
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    /* SVG canvas Editor */
+                    <div className={`flex-1 relative rounded-3xl overflow-hidden bg-card shadow-sm border ${
+                      isSandboxMode ? "border-amber-400 ring-2 ring-amber-400/20" : "border-border"
+                    }`}>
+                    {nodes.length > 0 ? (
+                      <KnowledgeTree
+                        subject={selectedSubject}
+                        nodes={nodes}
+                        edges={edges}
+                        mode="teacher"
+                        onNodeClick={handleNodeClick}
+                        focusedNodeId={focusedNodeId}
+                        onFocusedNodeChange={handlePivotCenter}
+                        onShowContentClick={handleNodeClick}
+                        onRefresh={loadTreeData}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full text-center p-8 max-w-md mx-auto">
+                        <div className="p-4 bg-[var(--mint)]/10 text-[var(--mint)] rounded-full mb-4 animate-bounce">
+                          <Sparkles size={32} />
+                        </div>
+                        <h3 className="text-sm font-black text-foreground uppercase tracking-wider">Sơ đồ cây môn học đang trống</h3>
+                        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                          Hãy tải lên file tài liệu (PDF, Word, TXT) bằng nút <strong className="text-foreground">"Dựng cây từ tài liệu"</strong> nhấp nháy phía trên để AI tự động phân tích và tạo cây kiến thức chuẩn sư phạm!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  )}
 
                 {/* Node configuration Side drawer */}
                 {editingNode && (
@@ -2050,6 +2400,7 @@ export default function TeacherDashboard() {
                   </>
                 )}
               </div>
+            </div>
             ) : activeTab === "learning-path" ? (
               <LearningPathTab
                 nodes={nodes}
@@ -2450,9 +2801,9 @@ export default function TeacherDashboard() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={(e) => handleResumeParseGraph(e)}
-                className="flex-1 bg-foreground hover:opacity-90 text-background font-black text-xs py-3.5 rounded-xl shadow-[var(--shadow-card)] transition-all cursor-pointer text-center"
+                className="flex-1 bg-foreground hover:opacity-90 text-background font-black text-xs py-3.5 rounded-xl shadow-[var(--shadow-card)] transition-all cursor-pointer text-center flex items-center justify-center gap-1.5"
               >
-                🔄 Thử lại đoạn {failedChunkIndex + 1}
+                <RefreshCw size={14} /> Thử lại đoạn {failedChunkIndex + 1}
               </button>
               <button
                 onClick={() => {
@@ -2488,26 +2839,98 @@ export default function TeacherDashboard() {
               {pendingDiff.newNodes.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-[11px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
-                    🟢 Chủ đề kiến thức mới ({pendingDiff.newNodes.length})
+                    <PlusCircle size={14} className="text-emerald-600" /> Chủ đề kiến thức mới ({pendingDiff.newNodes.length})
                   </h4>
                   <div className="border border-border rounded-2xl overflow-hidden divide-y divide-border bg-slate-50/30">
-                    {pendingDiff.newNodes.map((n: any, idx: number) => (
-                      <div key={idx} className="p-3 text-xs flex items-start gap-3 hover:bg-slate-100/40">
-                        <input
-                          type="checkbox"
-                          defaultChecked
-                          id={`new-node-${idx}`}
-                          className="mt-0.5 rounded border-border text-[var(--mint)] focus:ring-[var(--mint)] shrink-0"
-                          data-node-index={idx}
-                        />
-                        <div className="space-y-0.5">
-                          <div className="font-extrabold text-foreground">{n.name}</div>
-                          <div className="text-[10px] text-muted-foreground font-semibold">
-                            Chóm: {n.topicGroup || "Chủ đề chung"} | Lý thuyết: {n.theory ? `${n.theory.substring(0, 100)}...` : "Chưa biên soạn"}
+                    {pendingDiff.newNodes.map((n: any, idx: number) => {
+                      const isEditing = editingDiffNodeIdx === idx;
+                      return (
+                        <div key={idx} className="p-3 text-xs flex items-start gap-3 hover:bg-slate-100/40 border-b border-border/40 last:border-0">
+                          <input
+                            type="checkbox"
+                            defaultChecked
+                            id={`new-node-${idx}`}
+                            className="mt-0.5 rounded border-border text-[var(--mint)] focus:ring-[var(--mint)] shrink-0"
+                            data-node-index={idx}
+                          />
+                          <div className="space-y-1 flex-1">
+                            {isEditing ? (
+                              <div className="space-y-2 bg-white p-3 border border-indigo-200 rounded-xl shadow-sm animate-[fadeIn_0.2s_ease-out]">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black text-indigo-600 uppercase tracking-wider">Tên Node kiến thức:</label>
+                                  <input
+                                    type="text"
+                                    value={diffEditName}
+                                    onChange={(e) => setDiffEditName(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black text-indigo-600 uppercase tracking-wider">Lý thuyết tóm tắt:</label>
+                                  <textarea
+                                    rows={2}
+                                    value={diffEditTheory}
+                                    onChange={(e) => setDiffEditTheory(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                </div>
+                                <div className="flex gap-2 justify-end pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingDiffNodeIdx(null)}
+                                    className="px-2.5 py-1 text-[10px] border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold rounded-lg"
+                                  >
+                                    Hủy
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (pendingDiff) {
+                                        const updatedNewNodes = [...pendingDiff.newNodes];
+                                        updatedNewNodes[idx] = {
+                                          ...updatedNewNodes[idx],
+                                          name: diffEditName,
+                                          theory: diffEditTheory
+                                        };
+                                        setPendingDiff({ ...pendingDiff, newNodes: updatedNewNodes });
+                                      }
+                                      setEditingDiffNodeIdx(null);
+                                      toast.success(`Đã cập nhật thông tin node "${diffEditName}"!`);
+                                    }}
+                                    className="px-3 py-1 text-[10px] bg-indigo-600 text-white font-black rounded-lg hover:bg-indigo-700 shadow-sm"
+                                  >
+                                    Lưu chỉnh sửa
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="space-y-0.5 flex-1">
+                                  <div className="font-extrabold text-foreground flex items-center gap-2">
+                                    <span>{n.name}</span>
+                                    <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full uppercase">Mới</span>
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground font-semibold">
+                                    Nhóm: {n.topicGroup || "Chủ đề chung"} | Lý thuyết: {n.theory ? `${n.theory.substring(0, 80)}...` : "Chưa biên soạn"}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingDiffNodeIdx(idx);
+                                    setDiffEditName(n.name);
+                                    setDiffEditTheory(n.theory || "");
+                                  }}
+                                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1"
+                                >
+                                  <Pencil size={12} /> Sửa nhanh
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -2516,7 +2939,7 @@ export default function TeacherDashboard() {
               {pendingDiff.suggestedEdges.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="text-[11px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                    🔵 Liên kết tiên quyết đề xuất ({pendingDiff.suggestedEdges.length})
+                    <GitCommit size={14} className="text-indigo-600" /> Liên kết tiên quyết đề xuất ({pendingDiff.suggestedEdges.length})
                   </h4>
                   <div className="border border-border rounded-2xl overflow-hidden divide-y divide-border bg-slate-50/30">
                     {pendingDiff.suggestedEdges.map((e: any, idx: number) => (
@@ -2605,6 +3028,153 @@ export default function TeacherDashboard() {
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-[var(--shadow-card)] cursor-pointer"
               >
                 Tích hợp liên kết nháp (Draft)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subject Management Modal (Create / Rename / Delete) */}
+      {subjectModal.type !== null && (
+        <div className="fixed inset-0 bg-foreground/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-card border border-border shadow-2xl rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 animate-[scaleUp_0.2s_ease-out]">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                {subjectModal.type === "create" ? (
+                  <>
+                    <BookOpen size={16} className="text-[var(--mint)]" />
+                    <span>Tạo Môn Học Mới</span>
+                  </>
+                ) : subjectModal.type === "rename" ? (
+                  <>
+                    <Pencil size={16} className="text-indigo-600" />
+                    <span>Đổi Tên Môn Học</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle size={16} className="text-rose-600" />
+                    <span>Xác Nhận Xóa Môn Học</span>
+                  </>
+                )}
+              </h3>
+              <button
+                onClick={() => setSubjectModal({ type: null })}
+                className="h-7 w-7 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            {subjectModal.type === "delete" ? (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Bạn có chắc chắn muốn xóa vĩnh viễn môn học <strong className="text-foreground font-black">"{subjectModal.targetSubject}"</strong>? Tất cả Nút kiến thức, Liên kết, Câu hỏi và Tiến độ học sinh sẽ bị xóa sạch khỏi hệ thống.
+                </p>
+                <div className="flex gap-2 justify-end pt-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setSubjectModal({ type: null })}
+                    className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (subjectModal.targetSubject) submitDeleteSubject(subjectModal.targetSubject);
+                      setSubjectModal({ type: null });
+                    }}
+                    className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Trash size={14} /> Xóa vĩnh viễn
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const val = subjectModal.inputValue || "";
+                  if (subjectModal.type === "create") {
+                    submitCreateSubject(val);
+                  } else if (subjectModal.type === "rename" && subjectModal.targetSubject) {
+                    submitRenameSubject(subjectModal.targetSubject, val);
+                  }
+                  setSubjectModal({ type: null });
+                }}
+                className="space-y-4"
+              >
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    {subjectModal.type === "create" ? "Tên môn học mới" : "Tên môn học hiệu chỉnh"}
+                  </label>
+                  <input
+                    type="text"
+                    autoFocus
+                    required
+                    value={subjectModal.inputValue || ""}
+                    onChange={(e) => setSubjectModal({ ...subjectModal, inputValue: e.target.value })}
+                    placeholder="Ví dụ: Toán học 10, Vật lý 11, Hóa học Đại cương..."
+                    className="w-full bg-muted border border-border rounded-2xl px-4 py-2.5 text-xs font-bold text-foreground focus:bg-card focus:outline-none focus:ring-1 focus:ring-[var(--mint)] transition-all"
+                  />
+                </div>
+
+                <div className="flex gap-2 justify-end pt-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setSubjectModal({ type: null })}
+                    className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[var(--mint)] hover:brightness-95 text-foreground text-xs font-black rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Check size={14} /> Xác nhận
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Global Confirmation Dialog for Teacher Actions */}
+      {confirmModalState.open && (
+        <div className="fixed inset-0 bg-foreground/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-card border border-border shadow-2xl rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 animate-[scaleUp_0.2s_ease-out]">
+            <div className="flex items-start gap-3 border-b border-border pb-3">
+              <div className="p-2 bg-amber-100 text-amber-700 rounded-2xl shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-extrabold text-foreground text-sm uppercase tracking-wide">
+                  {confirmModalState.title}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {confirmModalState.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmModalState({ ...confirmModalState, open: false })}
+                className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmModalState.onConfirm();
+                  setConfirmModalState({ ...confirmModalState, open: false });
+                }}
+                className="px-5 py-2 bg-[var(--mint)] hover:brightness-95 text-foreground text-xs font-black rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <Check size={14} /> Đồng ý thực hiện
               </button>
             </div>
           </div>

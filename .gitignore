@@ -2,6 +2,7 @@
 *.log
 .DS_Store
 Thumbs.db
+*.exe
 
 # Dependencies
 node_modules/
@@ -36,7 +37,7 @@ frontend_backup/
 .antigravity/
 antigravity_collaboration_log.md
 scratch/
-
+tmp/
 # Document files uploaded for testing
 *.doc
 *.docx

@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, MouseEvent } from "react";
 import { apiFetch } from "@/lib/api";
 import { TopicMastery, masteryPercent as toMasteryPercent } from "@/lib/mastery";
-import { Plus, Trash, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo, Redo, RefreshCw, Layers, LayoutGrid, CheckCircle2, AlertCircle, PlayCircle, Lock, Compass } from "lucide-react";
+import { toast } from "sonner";
+import { Plus, Trash, Trash2, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo, Redo, RefreshCw, Layers, LayoutGrid, CheckCircle2, AlertCircle, PlayCircle, Lock, Compass, X, Check, HelpCircle, AlertTriangle } from "lucide-react";
 
 
 interface NodeItem {
@@ -74,6 +75,21 @@ export default function KnowledgeTree({
   const activeSelectedNodeId = selectedNodeId || focusedNodeId;
   const [isFocusedView, setIsFocusedView] = useState(false);
   const [showGroups, setShowGroups] = useState(false);
+  
+  // Custom modal dialog states (replaces prompt, confirm & alert)
+  const [treeModalState, setTreeModalState] = useState<{
+    open: boolean;
+    mode: "add" | "add_child";
+    parentNode?: NodeItem | null;
+    inputValue: string;
+  }>({ open: false, mode: "add", inputValue: "" });
+
+  const [treeConfirmState, setTreeConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, title: "", message: "", onConfirm: () => {} });
   
   // Track pan start coordinates
   const panStartRef = useRef({ x: 0, y: 0 });
@@ -405,28 +421,40 @@ export default function KnowledgeTree({
         method: "POST",
         body: JSON.stringify({ sourceId, targetId }),
       });
+      toast.success("Đã tạo liên kết tiên quyết mới!");
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      alert("Không thể tạo liên kết: " + err.message);
+      toast.error("Không thể tạo liên kết: " + (err.message || err));
     }
   };
 
   const handleDeleteEdge = async (edgeId: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa liên kết tiên quyết này?")) return;
-    try {
-      await apiFetch(`/subjects/edges/${edgeId}`, {
-        method: "DELETE",
-      });
-      if (onRefresh) onRefresh();
-    } catch (err: any) {
-      alert("Lỗi khi xóa liên kết: " + err.message);
-    }
+    setTreeConfirmState({
+      open: true,
+      title: "Xóa liên kết tiên quyết",
+      message: "Bạn có chắc chắn muốn xóa liên kết tiên quyết này?",
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/subjects/edges/${edgeId}`, { method: "DELETE" });
+          toast.success("Đã xóa liên kết tiên quyết!");
+          if (onRefresh) onRefresh();
+        } catch (err: any) {
+          toast.error("Lỗi khi xóa liên kết: " + (err.message || err));
+        }
+      },
+    });
   };
 
-  const handleAddNode = async () => {
-    const name = prompt("Nhập tên nút kiến thức mới:");
-    if (!name || !name.trim()) return;
+  const handleAddNode = () => {
+    setTreeModalState({
+      open: true,
+      mode: "add",
+      inputValue: "",
+    });
+  };
 
+  const submitAddNode = async (name: string) => {
+    if (!name || !name.trim()) return;
     try {
       await apiFetch(`/subjects/${encodeURIComponent(subject)}/nodes`, {
         method: "POST",
@@ -438,28 +466,41 @@ export default function KnowledgeTree({
           isRoot: false,
         }),
       });
+      toast.success(`Đã thêm nút kiến thức "${name.trim()}"!`);
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      alert("Lỗi tạo nút mới: " + err.message);
+      toast.error("Lỗi tạo nút mới: " + (err.message || err));
     }
   };
 
   const handleDeleteNode = async (nodeId: string) => {
-    if (!confirm("Xóa nút này sẽ xóa toàn bộ câu hỏi và liên kết liên quan. Bạn có chắc chắn?")) return;
-    try {
-      await apiFetch(`/subjects/nodes/${nodeId}`, {
-        method: "DELETE",
-      });
-      if (onRefresh) onRefresh();
-    } catch (err: any) {
-      alert("Lỗi khi xóa nút: " + err.message);
-    }
+    setTreeConfirmState({
+      open: true,
+      title: "Xóa nút kiến thức",
+      message: "Xóa nút này sẽ xóa toàn bộ câu hỏi và liên kết liên quan. Bạn có chắc chắn?",
+      onConfirm: async () => {
+        try {
+          await apiFetch(`/subjects/nodes/${nodeId}`, { method: "DELETE" });
+          toast.success("Đã xóa nút kiến thức!");
+          if (onRefresh) onRefresh();
+        } catch (err: any) {
+          toast.error("Lỗi khi xóa nút: " + (err.message || err));
+        }
+      },
+    });
   };
 
-  const handleAddChildNode = async (parent: NodeItem) => {
-    const name = prompt(`Nhập tên nút kiến thức con tiên quyết của "${parent.name}":`);
-    if (!name || !name.trim()) return;
+  const handleAddChildNode = (parent: NodeItem) => {
+    setTreeModalState({
+      open: true,
+      mode: "add_child",
+      parentNode: parent,
+      inputValue: "",
+    });
+  };
 
+  const submitAddChildNode = async (parent: NodeItem, name: string) => {
+    if (!name || !name.trim()) return;
     try {
       const child = await apiFetch(`/subjects/${encodeURIComponent(subject)}/nodes`, {
         method: "POST",
@@ -480,9 +521,10 @@ export default function KnowledgeTree({
         }),
       });
 
+      toast.success(`Đã thêm nút con "${name.trim()}" cho "${parent.name}"!`);
       if (onRefresh) onRefresh();
     } catch (err: any) {
-      alert("Lỗi khi thêm nút con trực tiếp: " + err.message);
+      toast.error("Lỗi khi thêm nút con: " + (err.message || err));
     }
   };
 
@@ -718,10 +760,15 @@ export default function KnowledgeTree({
     const xs = groupNodes.map(n => n.posX);
     const ys = groupNodes.map(n => n.posY);
     if (xs.length === 0 || ys.length === 0) return null;
-    const minX = Math.min(...xs) - 25;
-    const minY = Math.min(...ys) - 25;
-    const maxX = Math.max(...xs) + 200 + 25;
-    const maxY = Math.max(...ys) + 70 + 25;
+
+    const paddingX = 30;
+    const paddingTop = 35;
+    const paddingBottom = 30;
+
+    const minX = Math.min(...xs) - paddingX;
+    const minY = Math.min(...ys) - paddingTop;
+    const maxX = Math.max(...xs) + 230 + paddingX;
+    const maxY = Math.max(...ys) + 85 + paddingBottom;
 
     return {
       name: groupName,
@@ -1117,7 +1164,7 @@ export default function KnowledgeTree({
                           if (selectable) {
                             handleNodeClick(node);
                           } else {
-                            alert(`🔒 Chủ đề "${node.name}" đang bị khóa. Em hãy học và hoàn thành các bài học tiên quyết trước nhé!`);
+                            toast.warning(`Chủ đề "${node.name}" đang bị khóa. Em hãy học và hoàn thành các bài học tiên quyết trước nhé!`);
                           }
                         }}
                         className={`h-full w-full rounded-2xl border-2 p-3 flex flex-col justify-between items-start shadow-sm select-none transition-all duration-200 relative ${colorClass} ${
@@ -1240,6 +1287,115 @@ export default function KnowledgeTree({
           </g>
         </svg>
       </div>
+
+      {/* Tree Custom Node Modal (Add / Add Child Node) */}
+      {treeModalState.open && (
+        <div className="fixed inset-0 bg-foreground/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-card border border-border shadow-2xl rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 animate-[scaleUp_0.2s_ease-out]">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
+                <PlusCircle size={16} className="text-[var(--mint)]" />
+                <span>
+                  {treeModalState.mode === "add_child"
+                    ? `Thêm Nút Con Cho "${treeModalState.parentNode?.name}"`
+                    : "Thêm Nút Kiến Thức Mới"}
+                </span>
+              </h3>
+              <button
+                onClick={() => setTreeModalState({ ...treeModalState, open: false })}
+                className="h-7 w-7 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (treeModalState.mode === "add_child" && treeModalState.parentNode) {
+                  submitAddChildNode(treeModalState.parentNode, treeModalState.inputValue);
+                } else {
+                  submitAddNode(treeModalState.inputValue);
+                }
+                setTreeModalState({ ...treeModalState, open: false, inputValue: "" });
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                  Tên nút kiến thức
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={treeModalState.inputValue}
+                  onChange={(e) => setTreeModalState({ ...treeModalState, inputValue: e.target.value })}
+                  placeholder="Ví dụ: Phép nhân phân số, Định lý Pythagoras..."
+                  className="w-full bg-muted border border-border rounded-2xl px-4 py-2.5 text-xs font-bold text-foreground focus:bg-card focus:outline-none focus:ring-1 focus:ring-[var(--mint)] transition-all"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setTreeModalState({ ...treeModalState, open: false })}
+                  className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[var(--mint)] hover:brightness-95 text-foreground text-xs font-black rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check size={14} /> Xác nhận tạo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Tree Confirmation Dialog */}
+      {treeConfirmState.open && (
+        <div className="fixed inset-0 bg-foreground/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-card border border-border shadow-2xl rounded-3xl p-6 max-w-md w-full flex flex-col gap-4 animate-[scaleUp_0.2s_ease-out]">
+            <div className="flex items-start gap-3 border-b border-border pb-3">
+              <div className="p-2 bg-rose-100 text-rose-600 rounded-2xl shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-extrabold text-foreground text-sm uppercase tracking-wide">
+                  {treeConfirmState.title}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {treeConfirmState.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setTreeConfirmState({ ...treeConfirmState, open: false })}
+                className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  treeConfirmState.onConfirm();
+                  setTreeConfirmState({ ...treeConfirmState, open: false });
+                }}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 size={14} /> Xóa vĩnh viễn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

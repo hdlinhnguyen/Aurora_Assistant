@@ -337,6 +337,7 @@ func main() {
 	api.Put("/teacher/guardrail-events/:id/handled", tutorHandler.MarkGuardrailEventHandled)
 
 	api.Get("/teacher/students-progress", tutorHandler.GetStudentsProgress)
+	api.Get("/teacher/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)
 	api.Get("/teacher/monitoring/:subject", tutorHandler.GetMonitoringData)
 	api.Post("/teacher/students/:studentId/re-diagnostic", tutorHandler.RequestReDiagnostic)
 	api.Get("/teacher/classes/intervention-groups/:subject", tutorHandler.GetClassInterventionGroups)

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
-import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle } from "lucide-react";
+import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle, Key, Lock, X, Zap, Target, Clock, RefreshCw } from "lucide-react";
 import KnowledgeTree from "../components/KnowledgeTree";
 import StudentMasteryDashboard from "./components/StudentMasteryDashboard";
 import { TopicMastery } from "@/lib/mastery";
@@ -73,9 +73,31 @@ export default function StudentTutorPage() {
     // Format italic (*text*)
     html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
 
-    // Format inline code/math ($P(n)$ or $n$)
-    html = html.replace(/\$(.*?)\$/g, (match, p1) => {
-      return `<code class="font-mono bg-indigo-50/50 text-indigo-700 px-1.5 py-0.5 rounded text-[11px] font-bold border border-indigo-100/50 mx-0.5">${p1}</code>`;
+    // Convert LaTeX fractions \dfrac{num}{den} or \frac{num}{den} & Math Symbols
+    const renderMathExpr = (expr: string) => {
+      let m = expr;
+      // Convert \dfrac{a}{b} or \frac{a}{b} into vertical fraction HTML
+      m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
+        return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[13px] leading-tight font-sans">
+          <span class="border-b border-indigo-700 px-1 text-center pb-0.5">${num}</span>
+          <span class="px-1 text-center pt-0.5">${den}</span>
+        </span>`;
+      });
+      // Math symbols
+      m = m.replace(/\\cdot/g, "·");
+      m = m.replace(/\\neq/g, "≠");
+      m = m.replace(/\\Rightarrow|\\implies/g, "⇒");
+      m = m.replace(/\\le|\\leq/g, "≤");
+      m = m.replace(/\\ge|\\geq/g, "≥");
+      m = m.replace(/\\times/g, "×");
+      m = m.replace(/\\div/g, "÷");
+
+      return `<span class="font-mono bg-indigo-50/70 text-indigo-900 px-1.5 py-0.5 rounded text-[12px] font-bold border border-indigo-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
+    };
+
+    // Format inline math ($...$)
+    html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
+      return renderMathExpr(p1);
     });
 
     // Replace newlines with <br />
@@ -141,6 +163,52 @@ export default function StudentTutorPage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [showAutoRouteModal, setShowAutoRouteModal] = useState(false);
   const [nextRecommendedNode, setNextRecommendedNode] = useState<NodeItem | null>(null);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinCodeInput, setJoinCodeInput] = useState("");
+
+  const handleJoinClassByCode = (codeToJoin?: string) => {
+    const code = (codeToJoin || joinCodeInput).trim().toUpperCase();
+    if (!code) {
+      toast.error("Vui lòng nhập mã lớp học!");
+      return;
+    }
+    let targetSubj = "Toán học 10";
+    if (code.includes("PHY") || code.includes("LY")) targetSubj = "Vật lý 10";
+    if (code.includes("CHEM") || code.includes("HOA")) targetSubj = "Hóa học 10";
+
+    if (!subjects.includes(targetSubj)) {
+      setSubjects((prev) => [...prev, targetSubj]);
+    }
+    setSelectedSubject(targetSubj);
+    setShowJoinModal(false);
+    setJoinCodeInput("");
+    toast.success(`🎉 Đã kết nối thành công vào lớp môn ${targetSubj} (Mã: ${code})! Sơ đồ cây kiến thức đã được tải.`);
+  };
+
+  const handleImportMockTree = async () => {
+    try {
+      const res = await fetch("/mock_knowledge_tree.json");
+      const mockGraph = await res.json();
+      
+      await apiFetch(`/subjects/${encodeURIComponent(mockGraph.subject)}/save-tree`, {
+        method: "POST",
+        body: JSON.stringify({
+          nodes: mockGraph.nodes,
+          edges: mockGraph.edges
+        })
+      });
+
+      toast.success(`🎉 Đã nạp thành công Sơ Đồ Cây Mẫu "${mockGraph.subject}"!`);
+      if (!subjects.includes(mockGraph.subject)) {
+        setSubjects((prev) => [...prev, mockGraph.subject]);
+      }
+      setSelectedSubject(mockGraph.subject);
+      localStorage.setItem("aurora_student_subject", mockGraph.subject);
+      setActiveMainTab("graph");
+    } catch (err: any) {
+      toast.error("Lỗi khi nạp Cây Mẫu: " + (err.message || err));
+    }
+  };
 
   useEffect(() => {
     const userStr = localStorage.getItem("aurora_user");
@@ -251,16 +319,22 @@ export default function StudentTutorPage() {
       const state = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/state`);
       setStudentState(state);
       
-      // Load logs
-      const progress = await apiFetch(`/teacher/students/${JSON.parse(localStorage.getItem("aurora_user")!).id}/progress/${encodeURIComponent(selectedSubject)}`);
-      setActivityLogs(progress.logs || []);
+      // Load logs safely
+      let progressData: any = null;
+      try {
+        progressData = await apiFetch(`/teacher/students/${JSON.parse(localStorage.getItem("aurora_user")!).id}/progress/${encodeURIComponent(selectedSubject)}`);
+        setActivityLogs(progressData?.logs || []);
+      } catch (e) {
+        console.warn("Could not load student progress logs:", e);
+        setActivityLogs([]);
+      }
       
       // Compute status dictionary
       // Status: mastered, struggle, learning, locked, initial
       const statusMap: Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial"> = {};
-      if (progress.nodeStatus) {
-        Object.keys(progress.nodeStatus).forEach((k) => {
-          statusMap[k] = progress.nodeStatus[k];
+      if (progressData && progressData.nodeStatus) {
+        Object.keys(progressData.nodeStatus).forEach((k) => {
+          statusMap[k] = progressData.nodeStatus[k];
         });
       }
       
@@ -393,6 +467,9 @@ export default function StudentTutorPage() {
 
   const handleNodeClick = (node: NodeItem) => {
     console.log("[DEBUG] tutor/page.tsx handleNodeClick called with:", node.name);
+    setSelectedNode(node);
+    handlePivotCenter(node.id);
+
     // If student state is nil and node is not root, they must click root or select first
     if (!studentState && !node.isRoot) {
       toast.warning("Vui lòng chọn nút Gốc (Tên môn học) để bắt đầu lộ trình học!");
@@ -400,10 +477,7 @@ export default function StudentTutorPage() {
     }
 
     if (!studentState) {
-      // Prompt start node
-      if (confirm(`Bạn có muốn chọn "${node.name}" làm điểm xuất phát (Level ban đầu) không?`)) {
-        handleStartNode(node);
-      }
+      handleStartNode(node);
       return;
     }
 
@@ -412,10 +486,15 @@ export default function StudentTutorPage() {
     console.log("[DEBUG] tutor/page.tsx showPurposeModal set to true");
   };
 
-  const handleStartNodeMode = (node: NodeItem, selectedMode: "theory" | "practice" | "diagnostic") => {
+  const handleStartNodeMode = (node: NodeItem | null, selectedMode: "theory" | "practice" | "diagnostic") => {
+    const targetNode = node || selectedNode || nodes.find(n => n.id === focusedNodeId) || nodes[0];
+    if (!targetNode) {
+      toast.warning("Chưa chọn bài học nào!");
+      return;
+    }
     setShowPurposeModal(false);
-    setSelectedNode(node);
-    handlePivotCenter(node.id);
+    setSelectedNode(targetNode);
+    handlePivotCenter(targetNode.id);
     setActiveMainTab("workspace");
 
     if (selectedMode === "theory") {
@@ -423,7 +502,7 @@ export default function StudentTutorPage() {
       setTheoryChat([
         {
           sender: "ai",
-          content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${node.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu hiểu bản chất!`,
+          content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${targetNode.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu suốt bản chất!`,
         },
       ]);
     } else {
@@ -438,7 +517,7 @@ export default function StudentTutorPage() {
       setDifficultyFilter(null);
       setHintPressCount(0);
       setActiveHint(null);
-      loadQuestions(node.id);
+      loadQuestions(targetNode.id);
     }
   };
 
@@ -683,20 +762,17 @@ export default function StudentTutorPage() {
           </button>
         </div>
 
-        {/* Subject selection */}
-        <div className="p-5 border-b border-slate-100 bg-slate-50/50 space-y-2">
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Chọn Môn Học</label>
-          <select
-            value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value)}
-            className="w-full rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-bold"
-          >
-            {subjects.map((subj) => (
-              <option key={subj} value={subj}>
-                {subj}
-              </option>
-            ))}
-          </select>
+        {/* Active Subject Badge inside Sidebar */}
+        <div className="p-4 border-b border-slate-100 bg-indigo-50/40 flex items-center justify-between">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-sm shrink-0">
+              <BookOpen size={16} />
+            </div>
+            <div className="truncate">
+              <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block">Môn đang học</span>
+              <span className="text-xs font-black text-slate-900 truncate block">{selectedSubject || "Chưa chọn môn"}</span>
+            </div>
+          </div>
         </div>
 
         {/* Navigation Tabs inside Sidebar */}
@@ -786,8 +862,8 @@ export default function StudentTutorPage() {
                         </div>
                         <p className="text-[10px] text-slate-500 leading-normal">{step.inclusion_reason}</p>
                         <div className="flex gap-2.5 text-[9px] text-slate-400 font-bold border-t border-slate-50 pt-1.5 font-mono">
-                          <span>⏱️ {step.estimated_minutes}m</span>
-                          <span>🎯 {(step.current_mastery * 100).toFixed(0)}% → {(step.target_mastery * 100).toFixed(0)}%</span>
+                          <span className="flex items-center gap-1"><Clock size={10} /> {step.estimated_minutes}m</span>
+                          <span className="flex items-center gap-1"><Target size={10} /> {(step.current_mastery * 100).toFixed(0)}% → {(step.target_mastery * 100).toFixed(0)}%</span>
                         </div>
                       </div>
                     );
@@ -800,6 +876,20 @@ export default function StudentTutorPage() {
               )}
             </>
           )}
+        </div>
+
+        {/* Switch Subject Action Button at Bottom of Sidebar */}
+        <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+          <button
+            onClick={() => {
+              setSelectedSubject("");
+              localStorage.removeItem("aurora_student_subject");
+              setActiveMainTab("graph");
+            }}
+            className="w-full py-2 px-3 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200 shadow-sm active:scale-95"
+          >
+            <RefreshCw size={14} className="text-indigo-600" /> Đổi môn học
+          </button>
         </div>
 
         {/* Profile Card */}
@@ -931,7 +1021,7 @@ export default function StudentTutorPage() {
                   onClick={() => setShowPurposeModal(false)}
                   className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-650 flex items-center justify-center text-xs font-bold transition-all duration-200 active:scale-90 cursor-pointer shrink-0 ml-2"
                 >
-                  ✕
+                  <X size={14} />
                 </button>
               </div>
 
@@ -963,7 +1053,7 @@ export default function StudentTutorPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
-                      📖 Học lý thuyết & Thảo luận
+                      Học lý thuyết & Thảo luận
                     </h4>
                     <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
                       Tìm hiểu lý thuyết và trao đổi trực tiếp với Trợ lý Socratic RAG để tự thấu suốt bản chất kiến thức.
@@ -988,7 +1078,7 @@ export default function StudentTutorPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
-                      📝 Luyện tập tự do
+                      Luyện tập tự do
                     </h4>
                     <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
                       Thực hành làm các bài toán trắc nghiệm chia theo từng cấp độ nhận thức tại bài học này.
@@ -1012,7 +1102,7 @@ export default function StudentTutorPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
-                      🔍 Đánh giá năng lực chẩn đoán {studentState?.needsDiagnostic && "(Bắt buộc)"}
+                      Đánh giá năng lực chẩn đoán {studentState?.needsDiagnostic && "(Bắt buộc)"}
                     </h4>
                     <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
                       Kiểm tra thực lực thích ứng. Hệ thống tự động hạ mức khi gặp khó khăn để dò tìm chính xác lỗ hổng nền tảng.
@@ -1024,118 +1114,226 @@ export default function StudentTutorPage() {
           </div>
         )}
 
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {sidebarCollapsed && (
-              <button
-                onClick={() => setSidebarCollapsed(false)}
-                className="p-2 border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1 hover:border-indigo-200 hover:bg-indigo-50/20"
-                title="Mở rộng sidebar"
-              >
-                <ChevronRight size={16} />
-              </button>
-            )}
-            <div>
-              <h1 className="text-xl font-black text-slate-950 flex items-center gap-2">
-                Cây kiến thức: <span className="text-indigo-600 font-black">{selectedSubject}</span>
-              </h1>
-              <p className="text-xs text-slate-400 mt-0.5">Chọn một bài học trên cây để mở Không gian Học tập Socratic của riêng em.</p>
-            </div>
-            
-            <div className="flex items-center gap-2 bg-slate-100 border border-slate-200/80 p-1 rounded-2xl ml-4 shadow-sm">
-              <button
-                onClick={() => setActiveMainTab("graph")}
-                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
-                  activeMainTab === "graph"
-                    ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
-                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
-                }`}
-              >
-                <Map size={14} className={activeMainTab === "graph" ? "text-indigo-600" : "text-slate-500"} />
-                Sơ đồ Cây
-              </button>
-              <button
-                onClick={() => {
-                  if (selectedNode) {
-                    handleShowContent(selectedNode);
-                  } else {
-                    toast.warning("Vui lòng click chọn một bài học trên Sơ đồ Cây trước!");
-                  }
-                }}
-                className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
-                  activeMainTab === "workspace"
-                    ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
-                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
-                }`}
-              >
-                <Sparkles size={14} className={activeMainTab === "workspace" ? "text-indigo-600" : "text-slate-500"} />
-                Không gian Học tập
-              </button>
+        {!selectedSubject ? (
+          /* Landing Page: Course Selection View */
+          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-y-auto animate-[fadeIn_0.2s_ease-out]">
+            <div className="max-w-2xl w-full text-center space-y-6">
+              <div className="inline-flex p-4 bg-indigo-50 text-indigo-600 rounded-full shadow-inner">
+                <Compass size={40} className="animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Chào mừng em đến với Aurora Tutor</h2>
+                <p className="text-sm text-slate-500 font-semibold max-w-lg mx-auto leading-relaxed">
+                  Hãy chọn một môn học dưới đây hoặc nhập mã lớp học từ thầy cô để xem Sơ đồ Cây Tri thức Socratic.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                {subjects.map((subj) => (
+                  <button
+                    key={subj}
+                    onClick={() => {
+                      setSelectedSubject(subj);
+                      localStorage.setItem("aurora_student_subject", subj);
+                      setActiveMainTab("graph");
+                    }}
+                    className="p-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 hover:from-indigo-50 hover:to-indigo-100/50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="p-2.5 bg-white border border-slate-100 text-indigo-600 rounded-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <BookOpen size={22} />
+                      </div>
+                      <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full">
+                        Cây Tri Thức
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition-colors">{subj}</h3>
+                      <p className="text-xs text-slate-400 font-semibold mt-0.5">Bấm để khám phá sơ đồ cây môn học ➔</p>
+                    </div>
+                  </button>
+                ))}
+
+                {/* Quick Mock Tree Import Card */}
+                <button
+                  onClick={handleImportMockTree}
+                  className="p-5 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-indigo-600 text-white rounded-xl shadow-sm group-hover:scale-110 transition-transform">
+                      <Zap size={22} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-indigo-200 text-indigo-900 rounded-full">
+                      Mẫu Test Nhanh
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition-colors">⚡ Nạp Cây Mẫu Trải Nghiệm</h3>
+                    <p className="text-xs text-slate-500 font-semibold mt-0.5">Tải ngay cây tri thức mẫu Toán học 10 đầy đủ để test nhanh ➔</p>
+                  </div>
+                </button>
+
+                {/* Join Class Code Card */}
+                <button
+                  onClick={() => setShowJoinModal(true)}
+                  className="p-5 bg-white hover:bg-slate-50 border border-dashed border-indigo-300 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <Key size={22} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-indigo-100 text-indigo-800 rounded-full">
+                      Mã lớp học
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition-colors">🔑 Tham gia lớp mới bằng mã code</h3>
+                    <p className="text-xs text-slate-400 font-semibold mt-0.5">Nhập mã lớp được giáo viên cấp (MATH-101...) ➔</p>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Legend */}
-          {activeMainTab === "graph" && (
-            <div className="flex gap-3 bg-white px-4 py-2 border border-slate-200 rounded-2xl text-[10px] font-bold text-slate-500 shadow-sm animate-[fadeIn_0.2s_ease-out]">
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Bắt đầu</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" /> Đang học</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Đã thông</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Lỗ hổng</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300" /> Khóa 🔒</span>
-            </div>
-          )}
-        </div>
-
-        {/* Navigation Breadcrumbs History */}
-        {navHistory.length > 0 && activeMainTab === "graph" && (
-          <div className="mb-4 bg-white/80 border border-slate-200/50 px-4 py-2.5 rounded-2xl flex items-center gap-2 overflow-x-auto text-[11px] font-bold text-slate-650 shadow-sm animate-[fadeIn_0.2s_ease-out]">
-            <span className="text-[9px] uppercase tracking-wider text-slate-400 font-black font-mono shrink-0">Hành trình đã đi:</span>
-            <div className="flex items-center gap-1.5 min-w-0">
-              {navHistory.map((item, idx) => (
-                <div key={item.id} className="flex items-center gap-1.5 shrink-0">
+        ) : (
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {sidebarCollapsed && (
                   <button
-                    onClick={() => handlePivotCenter(item.id)}
-                    className={`hover:text-indigo-600 hover:underline cursor-pointer transition-all ${
-                      item.id === focusedNodeId ? "text-indigo-650 font-extrabold" : "text-slate-500"
+                    onClick={() => setSidebarCollapsed(false)}
+                    className="p-2 border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1 hover:border-indigo-200 hover:bg-indigo-50/20"
+                    title="Mở rộng sidebar"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                )}
+                <div>
+                  <h1 className="text-xl font-black text-slate-950 flex items-center gap-2">
+                    Cây kiến thức: <span className="text-indigo-600 font-black">{selectedSubject}</span>
+                  </h1>
+                  <p className="text-xs text-slate-400 mt-0.5">Chọn một bài học trên cây để mở Không gian Học tập Socratic của riêng em.</p>
+                </div>
+                
+                <div className="flex items-center gap-2 bg-slate-100 border border-slate-200/80 p-1 rounded-2xl ml-4 shadow-sm">
+                  <button
+                    onClick={() => setActiveMainTab("graph")}
+                    className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
+                      activeMainTab === "graph"
+                        ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
+                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
                     }`}
                   >
-                    {item.name}
+                    <Map size={14} className={activeMainTab === "graph" ? "text-indigo-600" : "text-slate-500"} />
+                    Sơ đồ Cây
                   </button>
-                  {idx < navHistory.length - 1 && <span className="text-slate-300">/</span>}
+                  <button
+                    onClick={() => {
+                      const targetNode = selectedNode || nodes.find(n => n.id === focusedNodeId) || nodes.find(n => n.isRoot) || nodes[0];
+                      if (targetNode) {
+                        handleShowContent(targetNode);
+                      } else {
+                        toast.warning("Môn học này chưa có bài học nào trên Sơ đồ Cây!");
+                      }
+                    }}
+                    className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
+                      activeMainTab === "workspace"
+                        ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
+                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
+                    }`}
+                  >
+                    <Sparkles size={14} className={activeMainTab === "workspace" ? "text-indigo-600" : "text-slate-500"} />
+                    Không gian Học tập
+                  </button>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </div>
 
-        {/* Dynamic Main Workspace Tabs Render */}
-        {activeMainTab === "graph" ? (
-          <div className="flex-1 relative rounded-3xl overflow-hidden shadow-sm border border-slate-200">
-            {nodes.length > 0 ? (
-              <KnowledgeTree
-                subject={selectedSubject}
-                nodes={nodes}
-                edges={edges}
-                mode="student"
-                studentNodeStatus={nodeStatus}
-                masteryByTopic={masteryByTopic}
-                initialNodeId={studentState?.initialLevelNodeId}
-                currentNodeId={studentState?.currentLevelNodeId}
-                focusedNodeId={focusedNodeId}
-                onFocusedNodeChange={handlePivotCenter}
-                onShowContentClick={handleNodeClick}
-                onNodeClick={handleNodeClick}
-                onRefresh={() => {
-                  loadTreeData();
-                  loadStudentState();
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-400 text-sm font-semibold">
-                Đang tải sơ đồ cây kiến thức...
+              {/* Legend */}
+              {activeMainTab === "graph" && (
+                <div className="flex gap-3 bg-white px-4 py-2 border border-slate-200 rounded-2xl text-[10px] font-bold text-slate-500 shadow-sm animate-[fadeIn_0.2s_ease-out]">
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Bắt đầu</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" /> Đang học</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Đã thông</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Lỗ hổng</span>
+                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300" /> Khóa <Lock size={12} /></span>
+                </div>
+              )}
+            </div>
+
+            {/* Navigation Breadcrumbs History */}
+            {navHistory.length > 0 && activeMainTab === "graph" && (
+              <div className="mb-4 bg-white/80 border border-slate-200/50 px-4 py-2.5 rounded-2xl flex items-center gap-2 overflow-x-auto text-[11px] font-bold text-slate-650 shadow-sm animate-[fadeIn_0.2s_ease-out]">
+                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-black font-mono shrink-0">Hành trình đã đi:</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {navHistory.map((item, idx) => (
+                    <div key={item.id} className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => handlePivotCenter(item.id)}
+                        className={`hover:text-indigo-600 hover:underline cursor-pointer transition-all ${
+                          item.id === focusedNodeId ? "text-indigo-650 font-extrabold" : "text-slate-500"
+                        }`}
+                      >
+                        {item.name}
+                      </button>
+                      {idx < navHistory.length - 1 && <span className="text-slate-300">/</span>}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
+
+            {/* Dynamic Main Workspace Tabs Render */}
+            {activeMainTab === "graph" ? (
+              <div className="flex-1 relative rounded-3xl overflow-hidden shadow-sm border border-slate-200">
+                {nodes.length > 0 ? (
+                  <KnowledgeTree
+                    subject={selectedSubject}
+                    nodes={nodes}
+                    edges={edges}
+                    masteryByTopic={masteryByTopic}
+                    mode="student"
+                    studentNodeStatus={nodeStatus}
+                    initialNodeId={studentState?.initialLevelNodeId}
+                    currentNodeId={studentState?.currentLevelNodeId}
+                    focusedNodeId={focusedNodeId}
+                    onFocusedNodeChange={handlePivotCenter}
+                    onShowContentClick={handleNodeClick}
+                    onNodeClick={handleNodeClick}
+                    onRefresh={() => {
+                      loadTreeData();
+                      loadStudentState();
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center p-8 max-w-md mx-auto bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
+                    <div className="p-4 bg-amber-50 text-amber-600 rounded-full">
+                      <Compass size={32} className="animate-bounce" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">Môn {selectedSubject} chưa có bài học</h3>
+                      <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                        Sơ đồ cây tri thức môn học này chưa có nội dung. Em hãy bấm <strong>"Đổi môn học"</strong> ở góc dưới menu để chọn môn khác hoặc tham gia lớp mới bằng mã code nhé!
+                      </p>
+                    </div>
+                    <div className="flex gap-2 justify-center pt-2">
+                      <button
+                        onClick={() => {
+                          setSelectedSubject("");
+                          localStorage.removeItem("aurora_student_subject");
+                        }}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <RefreshCw size={14} /> Đổi môn học
+                      </button>
+                      <button
+                        onClick={() => setShowJoinModal(true)}
+                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Key size={14} /> Nhập mã lớp
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
         ) : (
           /* Promax Socratic Learning Hub Split View */
           selectedNode ? (
@@ -1364,7 +1562,7 @@ export default function StudentTutorPage() {
                   })()
                 )}
 
-                {quizMode !== "diagnostic" && (
+                {quizMode !== "diagnostic" && selectedNode && (
                   <StudentMasteryDashboard
                     subject={selectedSubject}
                     selectedTopic={selectedNode}
@@ -1445,7 +1643,7 @@ export default function StudentTutorPage() {
                                 }`}>
                                   {letters[idx] || (idx + 1)}
                                 </span>
-                                <span className="flex-1 font-extrabold">{opt}</span>
+                                <span className="flex-1 font-extrabold" dangerouslySetInnerHTML={{ __html: formatMarkdown(opt) }} />
                               </button>
                             );
                           })}
@@ -1668,7 +1866,96 @@ export default function StudentTutorPage() {
             </div>
           )
         )}
+        </>
+        )}
       </main>
+
+      {/* Join Class by Code Modal */}
+      {showJoinModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out] p-4">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 max-w-md w-full flex flex-col gap-4 relative animate-[scaleUp_0.2s_ease-out]">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
+              <div className="space-y-1">
+                <h3 className="font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
+                  <span>🔑 Tham Gia Lớp Học Mới</span>
+                </h3>
+                <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                  Nhập mã lớp được giáo viên cấp (ví dụ: MATH-101) để tự động thêm môn học vào tài khoản.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowJoinModal(false)}
+                className="h-7 w-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  Mã Lớp Học (Class Code)
+                </label>
+                <input
+                  type="text"
+                  value={joinCodeInput}
+                  onChange={(e) => setJoinCodeInput(e.target.value)}
+                  placeholder="Ví dụ: MATH-101, PHY-202..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-black text-slate-800 uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleJoinClassByCode();
+                  }}
+                />
+              </div>
+
+              {/* Quick Preset Badges */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Mã gợi ý trải nghiệm nhanh:</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleJoinClassByCode("MATH-101")}
+                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    Math 10 (MATH-101)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleJoinClassByCode("PHY-202")}
+                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    Vật lý 10 (PHY-202)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleJoinClassByCode("CHEM-303")}
+                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                  >
+                    Hóa học 10 (CHEM-303)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 justify-end pt-3 border-t border-slate-100 mt-2">
+              <button
+                type="button"
+                onClick={() => setShowJoinModal(false)}
+                className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => handleJoinClassByCode()}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                Xác nhận kết nối
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
