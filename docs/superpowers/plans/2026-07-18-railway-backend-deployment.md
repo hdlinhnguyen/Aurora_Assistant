@@ -244,7 +244,7 @@ Explain creating a Railway project, adding PostgreSQL, creating two services fro
 
 - [ ] **Step 2: Document required variables**
 
-Include exact Go variables: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE=require`, `JWT_SECRET`, `JWT_EXPIRATION=24h`, `EXAM_INTERNAL_TOKEN`, `TELEMETRY_HMAC_KEY`, `OPENAI_API_BASE`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `ENABLE_SYNTHETIC_DATA=false`, `CORS_ALLOWED_ORIGINS`, and `LEARNING_PATH_URL`. Include exact Python variables: `LEARNING_PATH_DB=/data/learning-path.sqlite` and `GO_BACKEND_GRAPH_URL`.
+Include exact Go variables: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE=disable`, `JWT_SECRET`, `JWT_EXPIRATION=24h`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `EXAM_INTERNAL_TOKEN`, `INTERNAL_SERVICE_TOKEN`, `TELEMETRY_HMAC_KEY`, `OPENAI_API_BASE`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `ENABLE_SYNTHETIC_DATA=false`, `CORS_ALLOWED_ORIGINS`, and `LEARNING_PATH_URL`. Include exact Python variables: `LEARNING_PATH_DB=/data/learning-path.sqlite`, `GO_BACKEND_GRAPH_URL`, and the matching `INTERNAL_SERVICE_TOKEN`.
 
 - [ ] **Step 3: Document private references and volume**
 
