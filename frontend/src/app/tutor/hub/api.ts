@@ -258,7 +258,7 @@ export const submitCantDo = (nodeId: string) =>
   }>;
 
 export const submitAdaptiveDowngrade = (nodeId: string) =>
-  apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
+  apiFetch(`/nodes/${nodeId}/adaptive-downgrade`, {
     method: "POST",
   }) as Promise<{
     hasParent: boolean;

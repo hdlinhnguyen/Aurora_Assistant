@@ -764,7 +764,7 @@ export default function StudentTutorPage() {
 
   const handleAdaptiveDowngrade = async (nodeId: string) => {
     try {
-      const res = await apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
+      const res = await apiFetch(`/nodes/${nodeId}/adaptive-downgrade`, {
         method: "POST"
       });
       if (res.hasParent) {

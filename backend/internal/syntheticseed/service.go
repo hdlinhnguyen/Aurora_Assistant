@@ -35,7 +35,7 @@ func New(db *gorm.DB, config Config) *Service {
 func (s *Service) ResetAndSeed(ctx context.Context) (Result, error) {
 	var result Result
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := resetSyntheticData(tx, s.config); err != nil {
+		if err := resetSyntheticData(tx); err != nil {
 			return err
 		}
 		seeded, err := createSyntheticData(tx, s.config)
@@ -48,7 +48,7 @@ func (s *Service) ResetAndSeed(ctx context.Context) (Result, error) {
 	return result, err
 }
 
-func resetSyntheticData(tx *gorm.DB, config Config) error {
+func resetSyntheticData(tx *gorm.DB) error {
 	var users []model.User
 	if err := tx.Unscoped().Where("email LIKE ?", "synthetic.%@aurora.local").Find(&users).Error; err != nil {
 		return err
@@ -61,13 +61,9 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 		return err
 	}
 
-	var nodes []model.Node
-	if err := tx.Unscoped().Where("subject IN ?", []string{config.Subject, "Synthetic - Toán đại số", "Toán đại số"}).Find(&nodes).Error; err != nil {
+	nodeIDs, err := syntheticCurriculumNodeIDs()
+	if err != nil {
 		return err
-	}
-	nodeIDs := make([]uuid.UUID, 0, len(nodes))
-	for _, node := range nodes {
-		nodeIDs = append(nodeIDs, node.ID)
 	}
 
 	if len(nodeIDs) > 0 {
@@ -104,7 +100,13 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 		if err := tx.Where("topic_id IN ?", nodeIDs).Delete(&model.StudentTopicMastery{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("subject IN ?", []string{config.Subject, "Synthetic - Toán đại số", "Toán đại số"}).Delete(&model.Edge{}).Error; err != nil {
+		if err := tx.Where("node_id IN ?", nodeIDs).Delete(&model.QuestionRubricItemTopicMapping{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("node_id IN ?", nodeIDs).Delete(&model.QuestionTopicMapping{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("source_id IN ? OR target_id IN ?", nodeIDs, nodeIDs).Delete(&model.Edge{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Unscoped().Where("id IN ?", nodeIDs).Delete(&model.Node{}).Error; err != nil {

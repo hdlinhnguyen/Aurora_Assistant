@@ -53,6 +53,19 @@ func grade7TargetKeys() []string {
 	}
 }
 
+func syntheticCurriculumNodeIDs() ([]uuid.UUID, error) {
+	closure, err := resolveCurriculumClosure(syntheticCurriculumCatalog(), grade7TargetKeys())
+	if err != nil {
+		return nil, err
+	}
+	nodeIDs := make([]uuid.UUID, 0, 1+len(closure.Topics))
+	nodeIDs = append(nodeIDs, stableSyntheticUUID("curriculum", "root"))
+	for _, topic := range closure.Topics {
+		nodeIDs = append(nodeIDs, stableSyntheticUUID("curriculum", topic.StableKey))
+	}
+	return nodeIDs, nil
+}
+
 func syntheticCurriculumCatalog() []curriculumTopic {
 	topic := func(key, name string, grade int, prerequisites ...string) curriculumTopic {
 		return curriculumTopic{
