@@ -527,19 +527,19 @@ export default function KnowledgeTree({
 
     switch (status) {
       case "mastered":
-        return "border-emerald-400/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30 text-emerald-950 shadow-md shadow-emerald-100/40 hover:shadow-emerald-200/50 font-bold";
+        return "border-emerald-400/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-100 text-emerald-950 shadow-md shadow-emerald-100/40 hover:shadow-emerald-200/50 font-bold";
       case "struggle":
-        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-50/30 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold animate-pulse";
+        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-100 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold animate-pulse";
       case "learning":
-        return "border-orange-400/80 bg-gradient-to-br from-amber-50 via-white to-orange-50/30 text-orange-950 shadow-md shadow-orange-100/40 hover:shadow-orange-200/50 ring-2 ring-orange-300/60 font-bold";
+        return "border-orange-400/80 bg-gradient-to-br from-amber-50 via-white to-orange-100 text-orange-950 shadow-md shadow-orange-100/40 hover:shadow-orange-200/50 ring-2 ring-orange-300/60 font-bold";
       case "initial":
-        return "border-blue-400/80 bg-gradient-to-br from-blue-50 via-white to-blue-50/30 text-blue-950 shadow-md shadow-blue-100/40 hover:shadow-blue-200/50 ring-2 ring-blue-300/60 font-bold animate-pulse-subtle";
+        return "border-blue-400/80 bg-gradient-to-br from-blue-50 via-white to-blue-100 text-blue-950 shadow-md shadow-blue-100/40 hover:shadow-blue-200/50 ring-2 ring-blue-300/60 font-bold animate-pulse-subtle";
       default:
         // locked status
         if (isActiveOrHighlighted) {
           return "border-slate-350 bg-white text-slate-850 shadow-md font-semibold opacity-100 cursor-pointer";
         }
-        return "border-slate-200/70 bg-slate-50/90 text-slate-400/80 opacity-60 cursor-not-allowed";
+        return "border-slate-200/70 bg-slate-50 text-slate-400/80 opacity-60 cursor-not-allowed";
     }
   };
 
@@ -1082,28 +1082,6 @@ export default function KnowledgeTree({
                         style={{ pointerEvents: "none" }}
                       />
                     )}
-                    {/* Mastery percentage badge */}
-                    {hasMasteryData && mode !== "teacher" && (
-                      <foreignObject
-                        x={node.posX + nodeWidth - 18}
-                        y={node.posY - 14}
-                        width={40}
-                        height={20}
-                        className="overflow-visible"
-                        style={{ pointerEvents: "none" }}
-                      >
-                        <div
-                          className="text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm border text-center tabular-nums"
-                          style={{
-                            backgroundColor: masteryPercent >= 80 ? "#ecfdf5" : masteryPercent >= 50 ? "#fffbeb" : "#fef2f2",
-                            color: ringColor,
-                            borderColor: ringColor + "40",
-                          }}
-                        >
-                          {masteryPercent}%
-                        </div>
-                      </foreignObject>
-                    )}
                     <foreignObject
                       x={node.posX}
                       y={node.posY}
@@ -1162,6 +1140,18 @@ export default function KnowledgeTree({
                               }[status]}
                             </span>
                           </div>
+                          {hasMasteryData && mode !== "teacher" && (
+                            <span
+                              className="text-[8px] font-black px-1.5 py-0.5 rounded-full border tabular-nums leading-none shrink-0"
+                              style={{
+                                backgroundColor: masteryPercent >= 80 ? "#ecfdf5" : masteryPercent >= 50 ? "#fffbeb" : "#fef2f2",
+                                color: ringColor,
+                                borderColor: ringColor + "40",
+                              }}
+                            >
+                              {masteryPercent}%
+                            </span>
+                          )}
                         </div>
 
                         {/* Title text */}
