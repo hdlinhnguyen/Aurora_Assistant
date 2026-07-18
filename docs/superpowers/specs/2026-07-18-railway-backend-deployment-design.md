@@ -38,6 +38,8 @@ All Go-to-Python requests use a single normalized base URL from `LEARNING_PATH_U
 
 Python obtains its Go graph endpoint from `GO_BACKEND_GRAPH_URL`. On Railway this points to the Go service's private hostname plus `/api/internal/graph`. Its existing static graph fallback remains available if the Go service is temporarily unavailable.
 
+The internal graph request includes `X-Internal-Token`, sourced from `INTERNAL_SERVICE_TOKEN` on both services. Go rejects missing or incorrect tokens so the graph is not exposed through the public Go domain.
+
 Private service URLs must not be exposed to the browser or committed as fixed Railway hostnames. They are configured in the Railway Dashboard using Railway variable references.
 
 ## Database Configuration
@@ -63,12 +65,16 @@ The Go service reads allowed browser origins from `CORS_ALLOWED_ORIGINS`, repres
 Secrets are configured only in Railway and are not committed:
 
 - `JWT_SECRET`
+- `ADMIN_PASSWORD`
 - `TELEMETRY_HMAC_KEY`
 - `EXAM_INTERNAL_TOKEN`
+- `INTERNAL_SERVICE_TOKEN`
 - `OPENAI_API_KEY`
 - PostgreSQL credentials supplied by Railway
 
 `OPENAI_API_BASE` and `OPENAI_MODEL` remain non-secret configuration. Production secrets must not use the development fallback values in `backend/.env.example`.
+
+Go creates an initial administrator only when `ADMIN_PASSWORD` is explicitly configured. It never creates a production administrator with the public local-demo password.
 
 ## Railway Dashboard Setup
 

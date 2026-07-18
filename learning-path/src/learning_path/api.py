@@ -79,7 +79,11 @@ DEFAULT_MINUTES_BY_CAP = {"TH": 25, "THCS": 35, "THPT": 45}
 def fetch_dynamic_graph() -> CurriculumGraph:
     url = os.environ.get("GO_BACKEND_GRAPH_URL", "http://localhost:8082/api/internal/graph")
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        headers = {"User-Agent": "Aurora-Learning-Path/1.0"}
+        internal_token = os.environ.get("INTERNAL_SERVICE_TOKEN", "").strip()
+        if internal_token:
+            headers["X-Internal-Token"] = internal_token
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=5) as response:
             raw = json.loads(response.read().decode('utf-8'))
             

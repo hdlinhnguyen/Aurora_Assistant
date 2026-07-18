@@ -18,6 +18,8 @@
 - Production sets `ENABLE_SYNTHETIC_DATA=false`.
 - Python uses `LEARNING_PATH_DB=/data/learning-path.sqlite` on a mounted Railway Volume and stays at one replica.
 - CORS uses comma-separated `CORS_ALLOWED_ORIGINS`; secrets are supplied only by Railway.
+- Admin bootstrap requires an explicit `ADMIN_PASSWORD`; no public default admin password is created.
+- `/api/internal/graph` requires a shared `INTERNAL_SERVICE_TOKEN` sent by Python as `X-Internal-Token`.
 - Do not modify or revert unrelated dirty-worktree changes.
 
 ---
@@ -291,3 +293,10 @@ Expected: no hard-coded Python service call remains outside an explicitly tested
 - [ ] **Step 5: Review only the intended diff**
 
 Run: `git status --short` and `git diff --stat`. Confirm unrelated pre-existing deletions and edits remain untouched. Record test commands and results in the handoff.
+
+## Security Review Addendum
+
+- Add `backend/cmd/server/internal_service_auth.go` and its test to protect `/api/internal/graph` with a constant-time `X-Internal-Token` comparison.
+- Extend `learning-path/src/learning_path/api.py` and add `learning-path/tests/test_dynamic_graph_auth.py` so Python sends the shared token.
+- Extend `backend/internal/runtime/config.go` tests and startup wiring so an administrator is bootstrapped only when `ADMIN_PASSWORD` is set.
+- Document matching `INTERNAL_SERVICE_TOKEN` values and explicit admin credentials in `docs/deployment/railway.md`.

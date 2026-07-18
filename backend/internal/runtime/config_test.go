@@ -36,3 +36,26 @@ func TestCORSOriginsDefault(t *testing.T) {
 
 	require.Equal(t, []string{"http://localhost:3000", "http://localhost:3001"}, CORSOrigins())
 }
+
+func TestAdminBootstrapDisabledWithoutPassword(t *testing.T) {
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	_, enabled := AdminBootstrapConfig()
+
+	require.False(t, enabled)
+}
+
+func TestAdminBootstrapConfig(t *testing.T) {
+	t.Setenv("ADMIN_PASSWORD", "a-strong-production-password")
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_NAME", "")
+
+	config, enabled := AdminBootstrapConfig()
+
+	require.True(t, enabled)
+	require.Equal(t, AdminBootstrap{
+		Email:    "admin@aurora.edu.vn",
+		Password: "a-strong-production-password",
+		Name:     "Quản trị viên Hệ thống",
+	}, config)
+}

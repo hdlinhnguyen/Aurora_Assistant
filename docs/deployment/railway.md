@@ -29,6 +29,7 @@ Add these variables:
 | --- | --- |
 | `LEARNING_PATH_DB` | `/data/learning-path.sqlite` |
 | `GO_BACKEND_GRAPH_URL` | `http://${{aurora-go.RAILWAY_PRIVATE_DOMAIN}}:${{aurora-go.PORT}}/api/internal/graph` |
+| `INTERNAL_SERVICE_TOKEN` | The same new random token configured on `aurora-go` |
 
 Use Railway's variable-reference picker instead of typing service references when possible. The reference picker keeps the value linked if Railway changes the private hostname or port.
 
@@ -72,7 +73,11 @@ Add the following variables:
 | --- | --- |
 | `JWT_SECRET` | A new random secret of at least 32 bytes |
 | `JWT_EXPIRATION` | `24h` |
+| `ADMIN_EMAIL` | The initial administrator email |
+| `ADMIN_PASSWORD` | A new unique administrator password |
+| `ADMIN_NAME` | The initial administrator display name |
 | `EXAM_INTERNAL_TOKEN` | A separate new random secret |
+| `INTERNAL_SERVICE_TOKEN` | The same new random token configured on `aurora-learning-path` |
 | `TELEMETRY_HMAC_KEY` | A separate new random secret of at least 32 bytes |
 | `OPENAI_API_BASE` | `https://generativelanguage.googleapis.com/v1beta/openai` |
 | `OPENAI_API_KEY` | Your Gemini API key |
@@ -81,7 +86,7 @@ Add the following variables:
 | `LEARNING_PATH_URL` | `http://${{aurora-learning-path.RAILWAY_PRIVATE_DOMAIN}}:${{aurora-learning-path.PORT}}` |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:3001` until the frontend is deployed |
 
-Generate independent values for `JWT_SECRET`, `EXAM_INTERNAL_TOKEN`, and `TELEMETRY_HMAC_KEY`. Do not reuse values from `backend/.env.example`.
+Generate independent values for `JWT_SECRET`, `ADMIN_PASSWORD`, `EXAM_INTERNAL_TOKEN`, `INTERNAL_SERVICE_TOKEN`, and `TELEMETRY_HMAC_KEY`. The `INTERNAL_SERVICE_TOKEN` value must match between Go and Python. Do not reuse values from `backend/.env.example`. If `ADMIN_PASSWORD` is omitted, Go intentionally skips admin creation instead of creating an account with a public default password.
 
 When the frontend is deployed, replace `CORS_ALLOWED_ORIGINS` with its exact HTTPS origin. Multiple origins are comma-separated without paths, for example:
 
@@ -135,6 +140,7 @@ Use a teacher account to call a learning-path or mastery recalculation endpoint.
 
 - **Go cannot connect to PostgreSQL:** verify all five `DB_*` values are Railway references to `Postgres` and `DB_SSLMODE=disable`.
 - **Go receives connection refused from Python:** verify `LEARNING_PATH_URL` uses the Python private domain and referenced `PORT`, not `localhost`.
+- **Python graph requests return 401:** verify `INTERNAL_SERVICE_TOKEN` matches exactly in both services. The Go graph endpoint rejects requests when the token is missing or wrong.
 - **Python cannot load the dynamic graph:** verify `GO_BACKEND_GRAPH_URL`; Python falls back to the packaged `knowledge-graph/data/graph.json` while Go is unavailable.
 - **Pending approvals disappear:** verify the volume is mounted at `/data`, `LEARNING_PATH_DB` matches `/data/learning-path.sqlite`, and the service has one replica.
 - **Browser reports a CORS error:** set `CORS_ALLOWED_ORIGINS` to the frontend's exact scheme and hostname, then redeploy Go.

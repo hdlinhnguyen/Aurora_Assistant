@@ -127,14 +127,18 @@ func main() {
 		}
 	}()
 
-	// Ensure at least one admin exists.
-	var adminCount int64
-	config.DB.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount)
-	if adminCount == 0 {
-		log.Println("No admin account found. Creating default admin: admin@aurora.edu.vn")
-		if _, err := authSvc.Register("admin@aurora.edu.vn", "demo123", "Quản trị viên Hệ thống", "admin"); err != nil {
-			log.Printf("Failed to create default admin: %v", err)
+	// Bootstrap an admin only when an explicit password is supplied.
+	if admin, enabled := runtime.AdminBootstrapConfig(); enabled {
+		var adminCount int64
+		config.DB.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount)
+		if adminCount == 0 {
+			log.Printf("No admin account found. Creating configured admin: %s", admin.Email)
+			if _, err := authSvc.Register(admin.Email, admin.Password, admin.Name, "admin"); err != nil {
+				log.Printf("Failed to create configured admin: %v", err)
+			}
 		}
+	} else {
+		log.Println("ADMIN_PASSWORD is not set; skipping admin bootstrap")
 	}
 
 	// Reset synthetic fixtures and derive BKT exclusively from generated answer events.
@@ -151,7 +155,7 @@ func main() {
 	// Public Routes
 	app.Post("/api/auth/register", authHandler.Register)
 	app.Post("/api/auth/login", authHandler.Login)
-	app.Get("/api/internal/graph", tutorHandler.GetInternalGraph)
+	app.Get("/api/internal/graph", internalServiceAuth(os.Getenv("INTERNAL_SERVICE_TOKEN")), tutorHandler.GetInternalGraph)
 
 	// Protected Routes
 	api := app.Group("/api", middleware.Protected(config.DB))
