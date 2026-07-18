@@ -55,7 +55,7 @@ func main() {
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001"},
-		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization"},
+		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization, Idempotency-Key, idempotency-key"},
 	}))
 
 	// Initial check endpoint
