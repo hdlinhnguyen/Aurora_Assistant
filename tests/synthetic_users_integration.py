@@ -16,6 +16,7 @@ STUDENT_EMAILS = [
     "synthetic.student.b@aurora.local",
     "synthetic.student.c@aurora.local",
 ]
+SYNTHETIC_SUBJECT = "Synthetic - To\u00e1n \u0111\u1ea1i s\u1ed1"
 
 
 def request(method: str, path: str, *, token: str | None = None, body: dict | None = None):
@@ -36,7 +37,12 @@ def main() -> None:
     teacher = login(TEACHER_EMAIL)
     students = {email: login(email) for email in STUDENT_EMAILS}
     progress = request("GET", "/teacher/students-progress", token=teacher["token"])
-    target = next(row for row in progress if row["studentEmail"] == STUDENT_EMAILS[1])
+    target = next(
+        row
+        for row in progress
+        if row["studentEmail"] == STUDENT_EMAILS[1]
+        and row["subject"] == SYNTHETIC_SUBJECT
+    )
     subject = target["subject"]
     student_id = students[STUDENT_EMAILS[1]]["user"]["id"]
     profile = request(
