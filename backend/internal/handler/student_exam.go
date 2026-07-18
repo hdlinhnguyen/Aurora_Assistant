@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -14,11 +16,12 @@ import (
 )
 
 type StudentExamHandler struct {
-	db *gorm.DB
+	db            *gorm.DB
+	masteryRecalc masteryRecalculator // reuses same interface from tutor.go
 }
 
-func NewStudentExamHandler(db *gorm.DB) *StudentExamHandler {
-	return &StudentExamHandler{db: db}
+func NewStudentExamHandler(db *gorm.DB, mr masteryRecalculator) *StudentExamHandler {
+	return &StudentExamHandler{db: db, masteryRecalc: mr}
 }
 
 type StudentExamQuestionResponse struct {
@@ -475,6 +478,15 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 			CreatedAt: time.Now(),
 		}
 		h.db.Create(&logEntry)
+
+		// Trigger BKT mastery recalculation immediately
+		if h.masteryRecalc != nil {
+			go func() {
+				if _, err := h.masteryRecalc.RecalculateStudent(context.Background(), userID, exam.Subject); err != nil {
+					log.Printf("[StudentExam] mastery recalc error after answer: %v", err)
+				}
+			}()
+		}
 	}
 
 	// 5. Đếm số câu hỏi đã làm trong đề thi này

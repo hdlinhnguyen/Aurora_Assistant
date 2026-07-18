@@ -107,7 +107,7 @@ func main() {
 	examHandler := handler.NewExamHandler(examSvc, os.Getenv("EXAM_INTERNAL_TOKEN"))
 	masteryHandler := handler.NewMasteryHandler(masterySvc)
 	gamificationHandler := handler.NewGamificationHandler(gamificationSvc)
-	studentExamHandler := handler.NewStudentExamHandler(config.DB)
+	studentExamHandler := handler.NewStudentExamHandler(config.DB, masterySvc)
 	scoringSvc := scoring.NewService(scoring.NewRepository(config.DB), func(db *gorm.DB) exam.ScoringGateway {
 		return exam.NewScoringGateway(db)
 	})
