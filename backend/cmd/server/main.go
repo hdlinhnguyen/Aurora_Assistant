@@ -64,25 +64,37 @@ func main() {
 			"message": "Aurora Socratic Tutor API is running",
 		})
 	})
+	telemetryKey := os.Getenv("TELEMETRY_HMAC_KEY")
+	if telemetryKey == "" {
+		telemetryKey = "development-only-telemetry-key"
+		log.Println("TELEMETRY_HMAC_KEY is not set; using development telemetry key")
+	}
+	telemetryPublisher := telemetry.NewPublisher(config.DB, telemetry.SystemClock{}, telemetry.PseudonymConfig{
+		Key: []byte(telemetryKey), KeyVersion: "v1",
+	})
 
 	// Services
 	authSvc := service.NewAuthService(config.DB, os.Getenv("JWT_SECRET"))
 	aiSvc := service.NewAIService(config.DB)
-	tutorSvc := service.NewTutorService(config.DB, aiSvc)
+	tutorSvc := service.NewTutorService(config.DB, aiSvc, service.WithTelemetryPublisher(telemetryPublisher))
 	taggingSvc := service.NewTaggingService(config.DB)
 	questionBankSvc := service.NewQuestionBankService(config.DB)
 	examSvc := exam.NewServiceWithExporter(
 		exam.NewRepository(config.DB),
 		exam.NewDOCXExporter(),
 		config.ExamExportDir(),
+		exam.WithTelemetryPublisher(telemetryPublisher),
 	)
 	masteryRepo := masteryprofile.NewRepository(config.DB)
 	masteryClient := masteryprofile.NewClient(envOrDefault("LEARNING_PATH_URL", "http://127.0.0.1:8000"), nil)
-	masterySvc := masteryprofile.NewService(config.DB, masteryRepo, masteryClient)
+	masterySvc := masteryprofile.NewService(
+		config.DB, masteryRepo, masteryClient,
+		masteryprofile.WithTelemetryPublisher(telemetryPublisher),
+	)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
-	tutorHandler := handler.NewTutorHandler(tutorSvc)
+	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher))
 	adminHandler := handler.NewAdminHandler(config.DB)
 	studentMgmtHandler := handler.NewStudentMgmtHandler(config.DB)
 	taggingHandler := handler.NewTaggingHandler(taggingSvc)
@@ -93,12 +105,6 @@ func main() {
 		return exam.NewScoringGateway(db)
 	})
 	scoringHandler := handler.NewScoringHandler(scoringSvc)
-	telemetryKey := os.Getenv("TELEMETRY_HMAC_KEY")
-	if telemetryKey == "" {
-		telemetryKey = "development-only-telemetry-key"
-		log.Println("TELEMETRY_HMAC_KEY is not set; using development telemetry key")
-	}
-	telemetryPublisher := telemetry.NewPublisher(config.DB, telemetry.SystemClock{})
 	telemetryCollector := telemetry.NewCollector(
 		telemetryPublisher,
 		[]byte(telemetryKey),

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"backend/internal/model"
+	"backend/internal/telemetry"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -25,13 +26,25 @@ type Service struct {
 	subjectTopics  func(context.Context, uuid.UUID, string) ([]uuid.UUID, error)
 	evidence       func(context.Context, uuid.UUID, string) ([]QuizEvidence, error)
 	currentProfile func(context.Context, uuid.UUID, string) (Profile, error)
+	publisher      telemetry.ActorPublisher
 }
 
-func NewService(db *gorm.DB, store StateStore, calculator Calculator) *Service {
+type Option func(*Service)
+
+func WithTelemetryPublisher(publisher telemetry.ActorPublisher) Option {
+	return func(service *Service) {
+		service.publisher = publisher
+	}
+}
+
+func NewService(db *gorm.DB, store StateStore, calculator Calculator, options ...Option) *Service {
 	svc := &Service{db: db, store: store, calculator: calculator}
 	svc.subjectTopics = svc.loadSubjectTopics
 	svc.evidence = svc.loadEvidence
 	svc.currentProfile = store.GetProfile
+	for _, option := range options {
+		option(svc)
+	}
 	return svc
 }
 
@@ -100,7 +113,59 @@ func (s *Service) RecalculateStudent(ctx context.Context, studentID uuid.UUID, s
 	for _, state := range states {
 		profile.Topics[state.TopicID.String()] = state
 	}
+	s.publishDecision(ctx, studentID, subject, current, states, now)
 	return profile, nil
+}
+
+func (s *Service) publishDecision(
+	ctx context.Context,
+	studentID uuid.UUID,
+	subject string,
+	current Profile,
+	states []TopicState,
+	calculatedAt time.Time,
+) {
+	if s.publisher == nil {
+		return
+	}
+	totalEvidence := 0
+	totalConfidence := 0.0
+	for _, state := range states {
+		totalEvidence += state.EvidenceCount
+		totalConfidence += state.ConfidenceScore
+	}
+	meanConfidence := 0.0
+	if len(states) > 0 {
+		meanConfidence = totalConfidence / float64(len(states))
+	}
+	calculated := telemetry.Event{
+		EventID: uuid.NewString(), Name: "mastery_calculated", SchemaVersion: telemetry.CurrentSchemaVersion,
+		OccurredAt: calculatedAt, Source: "go_backend", ConsentState: "required", RetentionClass: "decision",
+		Properties: map[string]any{
+			"subject": subject, "topic_count": len(states), "evidence_count": totalEvidence,
+			"confidence_mean": meanConfidence, "model_version": "bkt-v1",
+		},
+	}
+	_, _ = s.publisher.PublishActor(ctx, studentID, "student", calculated)
+	for _, state := range states {
+		before := StatusUnknown
+		if previous, exists := current.Topics[state.TopicID.String()]; exists && previous.Status != "" {
+			before = previous.Status
+		}
+		if before == state.Status {
+			continue
+		}
+		changed := telemetry.Event{
+			EventID: uuid.NewString(), Name: "mastery_status_changed", SchemaVersion: telemetry.CurrentSchemaVersion,
+			OccurredAt: calculatedAt, TopicID: state.TopicID.String(), Source: "go_backend",
+			ConsentState: "required", RetentionClass: "decision",
+			Properties: map[string]any{
+				"status_before": before, "status_after": state.Status,
+				"mastery_probability": state.MasteryProbability, "confidence_score": state.ConfidenceScore,
+			},
+		}
+		_, _ = s.publisher.PublishActor(ctx, studentID, "student", changed)
+	}
 }
 
 func nextVersions(current map[string]TopicState) map[string]int {
