@@ -101,6 +101,7 @@ func main() {
 	questionBankHandler := handler.NewQuestionBankHandler(questionBankSvc)
 	examHandler := handler.NewExamHandler(examSvc, os.Getenv("EXAM_INTERNAL_TOKEN"))
 	masteryHandler := handler.NewMasteryHandler(masterySvc)
+	studentExamHandler := handler.NewStudentExamHandler(config.DB)
 	scoringSvc := scoring.NewService(scoring.NewRepository(config.DB), func(db *gorm.DB) exam.ScoringGateway {
 		return exam.NewScoringGateway(db)
 	})
@@ -186,6 +187,9 @@ func main() {
 	teacherExams.Post("/students/:studentId/mastery/recalculate", masteryHandler.RecalculateTeacherProfile)
 	studentMastery.Get("/mastery", masteryHandler.GetStudentProfile)
 	studentMastery.Get("/mastery/:topicId/history", masteryHandler.GetStudentHistory)
+	studentMastery.Get("/exams", studentExamHandler.GetStudentExams)
+	studentMastery.Get("/exams/:examId", studentExamHandler.GetStudentExam)
+	studentMastery.Post("/exams/:examId/submit", studentExamHandler.SubmitStudentExam)
 
 	app.Post("/internal/exams/:examId/first-submission", examHandler.FirstSubmission)
 	app.Post("/internal/exams/:examId/grading-completed", examHandler.GradingCompleted)

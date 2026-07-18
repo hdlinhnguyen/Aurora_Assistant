@@ -181,6 +181,36 @@ export default function TeacherDashboard() {
   const [selectedStudent, setSelectedStudent] = useState<StudentProgress | null>(null);
   const [studentDetail, setStudentDetail] = useState<StudentDetailProgress | null>(null);
   const [subjectQuestions, setSubjectQuestions] = useState<Question[]>([]);
+  const [examsCount, setExamsCount] = useState<number>(0);
+  const [hasActiveExam, setHasActiveExam] = useState<boolean>(false);
+  const [dismissedSteps, setDismissedSteps] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const saved = localStorage.getItem("aurora_dismissed_steps");
+    if (saved) {
+      try {
+        setDismissedSteps(JSON.parse(saved));
+      } catch (e) {}
+    }
+  }, []);
+
+  const dismissStep = (stepKey: string) => {
+    const updated = { ...dismissedSteps, [stepKey]: true };
+    setDismissedSteps(updated);
+    localStorage.setItem("aurora_dismissed_steps", JSON.stringify(updated));
+  };
+
+  const loadExamsStatus = async () => {
+    if (!selectedSubject) return;
+    try {
+      const list = await apiFetch(`/teacher/exams`);
+      setExamsCount(list?.length || 0);
+      setHasActiveExam(list?.some((e: any) => e.status === "preparing_exam") || false);
+    } catch (e) {
+      console.error("Failed to load exams status", e);
+    }
+  };
+
   const [qbSearchText, setQbSearchText] = useState("");
   const [qbFilterNodeId, setQbFilterNodeId] = useState("");
   const [qbFilterDifficulty, setQbFilterDifficulty] = useState("");
@@ -483,6 +513,36 @@ export default function TeacherDashboard() {
     reader.readAsText(file);
   };
 
+  const handleLoadDemoQuestions = async () => {
+    setLoading(true);
+    setLoadingMessage("Đang tải và nạp câu hỏi mẫu từ hệ thống...");
+    try {
+      const resFile = await fetch("/master_bank.json");
+      const json = await resFile.json();
+      const res = await apiFetch("/import/master-bank", {
+        method: "POST",
+        body: JSON.stringify(json),
+      });
+      toast.success(
+        `Nạp câu hỏi mẫu thành công: Đã import ${res.imported} câu hỏi!`,
+        {
+          description: [
+            res.skippedDedup > 0 ? `${res.skippedDedup} câu trùng sig (bỏ qua)` : "",
+            res.skippedNonTN4 > 0 ? `${res.skippedNonTN4} câu TuLuan/DungSai (bỏ qua)` : "",
+            res.skippedNoNode > 0 ? `${res.skippedNoNode} câu thiếu node (bỏ qua)` : "",
+          ].filter(Boolean).join(". ") || undefined,
+        }
+      );
+      loadSubjectQuestions();
+      loadExamsStatus();
+    } catch (err: any) {
+      toast.error("Lỗi khi nạp câu hỏi mẫu: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const loadMonitoringData = async () => {
     if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
       setMonitoringStats([
@@ -529,6 +589,7 @@ export default function TeacherDashboard() {
       loadSubjectQuestions();
       loadMonitoringData();
       checkClassInterventions(selectedSubject);
+      loadExamsStatus();
     }
   }, [selectedSubject]);
 
@@ -538,6 +599,9 @@ export default function TeacherDashboard() {
     }
     if (activeTab === "monitoring" && selectedSubject) {
       loadMonitoringData();
+    }
+    if (selectedSubject) {
+      loadExamsStatus();
     }
   }, [activeTab, selectedSubject]);
 
@@ -1754,9 +1818,6 @@ export default function TeacherDashboard() {
 
       {/* Main Panel Workspace */}
       <main className="flex-1 flex flex-col p-6 overflow-hidden bg-background relative">
-        <div className="absolute top-4 right-6 z-30">
-          <QuickRoleSwitcher />
-        </div>
         {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
           // Subject Selection Screen Dashboard
           <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">
@@ -2001,42 +2062,17 @@ export default function TeacherDashboard() {
               <div className="flex items-center gap-4">
                  {activeTab === "graph-designer" && (
                   <div className="flex items-center gap-2">
-                    {/* Sandbox Toggle Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!isSandboxMode) {
-                          setIsSandboxMode(true);
-                          toast.info("Đã bật Chế độ Thử nghiệm (Sandbox Mode). Bạn có thể tự do phác thảo sơ đồ nháp!");
-                        } else {
-                          setIsSandboxMode(false);
-                          toast.success("Đã quay lại Chế độ Trực tiếp (Live Mode).");
-                        }
-                      }}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border ${
-                        isSandboxMode
-                          ? "bg-amber-500 text-white border-amber-400 shadow-md shadow-amber-200 animate-pulse"
-                          : "bg-muted hover:bg-accent text-muted-foreground border-border"
-                      }`}
-                    >
-                      {isSandboxMode ? (
-                        <>
-                          <FlaskConical size={14} /> Sandbox Active
-                        </>
-                      ) : (
-                        <>
-                          <Zap size={14} /> Live Mode
-                        </>
-                      )}
-                    </button>
-
                     <button
                       type="button"
                       onClick={handleImportMockTree}
-                      className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md active:scale-95 border ${
+                        nodes.length <= 1
+                          ? "bg-violet-600 text-white border-violet-500 shadow-violet-200 animate-bounce"
+                          : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
+                      }`}
                       title="Nạp nhanh sơ đồ cây mẫu hoàn chỉnh để thử nghiệm"
                     >
-                      <Sparkles size={14} className="text-indigo-600" /> Nạp Cây Mẫu Nhanh
+                      <Sparkles size={14} className={nodes.length <= 1 ? "text-white animate-spin" : "text-indigo-600"} /> Nạp Cây Mẫu Nhanh
                     </button>
 
                     <button
@@ -2063,8 +2099,86 @@ export default function TeacherDashboard() {
                     </label>
                   </div>
                 )}
+                <QuickRoleSwitcher />
               </div>
             </div>
+
+            {(() => {
+              if (!selectedSubject) return null;
+
+              let stepKey = "";
+              let stepTitle = "";
+              let stepDesc = "";
+              let actionLabel = "";
+              let targetTab: ActiveTab | null = null;
+
+              if (nodes.length === 0) {
+                stepKey = "step1";
+                stepTitle = "Bước 1: Khởi tạo Cây kiến thức";
+                stepDesc = "Cây kiến thức môn học hiện đang trống. Thầy/cô vui lòng nạp nhanh cây mẫu hoặc tải tài liệu lên để hệ thống tự động trích xuất.";
+                actionLabel = "Mở Thiết kế sơ đồ cây";
+                targetTab = "graph-designer";
+              } else if (subjectQuestions.length === 0) {
+                stepKey = "step2";
+                stepTitle = "Bước 2: Nạp ngân hàng câu hỏi";
+                stepDesc = "Cây kiến thức đã sẵn sàng! Thầy/cô hãy nạp ngân hàng câu hỏi mẫu nhanh (hoặc upload từ Excel) để chuẩn bị cho việc tạo đề.";
+                actionLabel = "Đi tới Ngân hàng Câu hỏi ➔";
+                targetTab = "question-bank";
+              } else if (examsCount === 0) {
+                stepKey = "step3";
+                stepTitle = "Bước 3: Tạo đề thi tổng quan";
+                stepDesc = "Đã có câu hỏi! Tiếp theo, thầy/cô hãy tạo đề thi tổng quan để phục vụ đánh giá trình độ ban đầu của học sinh.";
+                actionLabel = "Đi tới Tạo đề Kiểm tra ➔";
+                targetTab = "exam-builder";
+              } else if (!hasActiveExam) {
+                stepKey = "step3_publish";
+                stepTitle = "Bước 3.5: Xuất bản đề kiểm tra";
+                stepDesc = "Thầy/cô đã tạo đề kiểm tra nhưng chưa xuất bản. Hãy chuyển trạng thái đề thi sang 'Chuẩn bị thi' hoặc 'Xuất bản' để học sinh có thể truy cập.";
+                actionLabel = "Đi tới Thiết kế Đề thi ➔";
+                targetTab = "exam-builder";
+              } else if (studentsProgress.length === 0) {
+                stepKey = "step4";
+                stepTitle = "Bước 4: Quản lý học sinh & lớp học";
+                stepDesc = "Đề thi tổng quan đã được xuất bản! Thầy/cô hãy tạo tài khoản cho học sinh (hoặc thêm nhanh học sinh Demo) để họ làm bài.";
+                actionLabel = "Đi tới Quản lý học sinh ➔";
+                targetTab = "student-mgmt";
+              } else {
+                stepKey = "step5";
+                stepTitle = "Bước 5: Học sinh làm bài kiểm tra";
+                stepDesc = "Mọi thiết lập đã hoàn tất! Hãy hướng dẫn học sinh đăng nhập bằng tài khoản của họ và làm bài kiểm tra tổng quan để mở khóa tính năng tự ôn tập.";
+              }
+
+              if (dismissedSteps[stepKey]) return null;
+
+              return (
+                <div className="mb-5 bg-gradient-to-br from-indigo-50 to-violet-50/50 border border-indigo-150 p-4.5 rounded-3xl flex items-start justify-between gap-4 shadow-sm animate-[fadeIn_0.3s_ease-out]">
+                  <div className="flex items-start gap-3">
+                    <div className="h-8 w-8 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
+                      💡
+                    </div>
+                    <div className="text-xs text-slate-800 leading-relaxed font-semibold">
+                      <span className="font-black text-indigo-700 uppercase tracking-wider block mb-0.5">{stepTitle}</span>
+                      {stepDesc}
+                      {actionLabel && targetTab && (
+                        <button
+                          onClick={() => setActiveTab(targetTab!)}
+                          className="mt-2 block bg-indigo-600 hover:bg-indigo-700 text-white font-black px-3.5 py-1.5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer text-[10px] uppercase tracking-wide"
+                        >
+                          {actionLabel}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => dismissStep(stepKey)}
+                    className="text-slate-400 hover:text-slate-650 font-bold text-xs p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                    title="Đóng gợi ý này"
+                  >
+                    ✕
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Split logic between Teacher tabs */}
             {activeTab === "student-mgmt" ? (
@@ -2634,6 +2748,7 @@ export default function TeacherDashboard() {
                 handleTagQuestion={(question) => setTaggingQuestionId(question.id)}
                 setEditingNode={setEditingNode}
                 formatDate={formatDate}
+                handleLoadDemoQuestions={handleLoadDemoQuestions}
               />
             ) : (
               <MonitoringTab
