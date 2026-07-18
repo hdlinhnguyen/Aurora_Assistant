@@ -794,6 +794,7 @@ export default function TeacherDashboard() {
   };
 
   const handleImportMockTree = async () => {
+    console.log("[DEBUG] handleImportMockTree triggered. selectedSubject:", selectedSubject);
     if (!selectedSubject) {
       toast.warning("Vui lòng chọn hoặc tạo môn học trước khi nạp cây mẫu!");
       return;
@@ -801,23 +802,38 @@ export default function TeacherDashboard() {
     try {
       setLoading(true);
       setLoadingMessage("Đang nạp Sơ đồ Cây Mẫu...");
+      console.log("[DEBUG] Fetching /mock_knowledge_tree.json...");
       const res = await fetch("/mock_knowledge_tree.json");
       const mockGraph = await res.json();
+      console.log("[DEBUG] Fetched mock graph:", mockGraph);
 
-      await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/save-tree`, {
+      console.log("[DEBUG] Calling /save-tree API endpoint...");
+      const saveTreeResult = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/save-tree`, {
         method: "POST",
         body: JSON.stringify({
           nodes: mockGraph.nodes,
           edges: mockGraph.edges
         })
       });
+      console.log("[DEBUG] save-tree API result:", saveTreeResult);
 
       toast.success(`🎉 Đã nạp thành công Cây Tri Thức Mẫu vào môn "${selectedSubject}"!`);
+      
+      console.log("[DEBUG] Reloading subjects list...");
       await loadSubjects(selectedSubject);
+      
+      console.log("[DEBUG] Reloading tree data...");
       await loadTreeData();
+      
+      console.log("[DEBUG] Reloading subject questions...");
       await loadSubjectQuestions();
+      
+      console.log("[DEBUG] Reloading exams status...");
       await loadExamsStatus();
+      
+      console.log("[DEBUG] handleImportMockTree completed successfully.");
     } catch (err: any) {
+      console.error("[DEBUG] Error inside handleImportMockTree:", err);
       toast.error("Lỗi khi nạp Cây Mẫu: " + (err.message || err));
     } finally {
       setLoading(false);
