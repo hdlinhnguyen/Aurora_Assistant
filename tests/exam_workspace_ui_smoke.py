@@ -34,13 +34,20 @@ def main():
         page.locator("button:has(svg.lucide-clipboard-check)").first.click()
         scoring_workspace = page.get_by_test_id("scoring-workspace")
         scoring_workspace.wait_for()
-        assert scoring_workspace.locator("aside").count() == 1
-        assert scoring_workspace.locator("section").count() >= 1
+        page.get_by_test_id("scoring-exam-step").wait_for()
+        page.get_by_test_id("scoring-student-step").wait_for()
+        assert page.get_by_test_id("scoring-grading-step").get_attribute("aria-disabled") == "true"
+        assert scoring_workspace.locator("aside").count() == 2
         assert scoring_workspace.locator("main").count() == 1
-        if scoring_workspace.locator("aside button").count() > 0:
-            scoring_workspace.locator("aside button").first.click()
+        exam_step = page.get_by_test_id("scoring-exam-step")
+        if exam_step.locator("button").count() > 0:
+            exam_step.locator("button").first.click()
             page.wait_for_timeout(700)
-            assert scoring_workspace.locator("section button").count() > 0
+            student_step = page.get_by_test_id("scoring-student-step")
+            if student_step.locator("button").count() > 0:
+                student_step.locator("button").first.click()
+                page.wait_for_timeout(700)
+                assert page.get_by_test_id("scoring-grading-step").get_attribute("aria-disabled") == "false"
         browser.close()
         print("Exam workspace UI smoke passed")
 
