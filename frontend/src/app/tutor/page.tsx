@@ -52,7 +52,21 @@ import {
   RefreshCw,
   Lock,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  ClipboardList,
+  CornerDownLeft,
+  RotateCcw,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Rocket,
+  Lightbulb,
+  HelpCircle,
+  AlertTriangle,
+  Library,
+  Key,
+  ArrowRight,
+  Check
 } from "lucide-react";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
@@ -1195,7 +1209,10 @@ export default function TutorHubPage() {
                       boxShadow: reviewLeftSubTab === "practice" ? "0 4px 10px -4px rgba(124,70,232,0.2)" : "none",
                     }}
                   >
-                    📝 Luyện tập
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <ClipboardList size={14} />
+                      Luyện tập
+                    </span>
                   </button>
                   <button
                     onClick={() => setReviewLeftSubTab("theory")}
@@ -1213,7 +1230,10 @@ export default function TutorHubPage() {
                       boxShadow: reviewLeftSubTab === "theory" ? "0 4px 10px -4px rgba(124,70,232,0.2)" : "none",
                     }}
                   >
-                    📖 Tóm tắt lý thuyết
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <BookOpen size={14} />
+                      Tóm tắt lý thuyết
+                    </span>
                   </button>
                 </div>
 
@@ -1265,7 +1285,7 @@ export default function TutorHubPage() {
                         {traversalStack.length > 1 && (
                           <div style={{ marginBottom: 16, background: "linear-gradient(135deg, #1e1b4b, #312e81)", borderRadius: 14, padding: "12px 16px", border: "1px solid #6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, color: "#a5b4fc" }}>
-                              <span style={{ fontSize: 16 }}>📍</span>
+                              <CornerDownLeft size={16} style={{ color: "#f87171" }} />
                               <span>Đang lùi Cây Tri thức về Nút Cha tiên quyết: <strong style={{ color: "#fbbf24" }}>"{currentNode?.name}"</strong></span>
                             </div>
                             <button
@@ -1299,7 +1319,10 @@ export default function TutorHubPage() {
                                 cursor: "pointer",
                               }}
                             >
-                              Về nút gốc ↩
+                              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                                <RotateCcw size={13} />
+                                Về nút gốc
+                              </span>
                             </button>
                           </div>
                         )}
@@ -1370,7 +1393,11 @@ export default function TutorHubPage() {
 
                         {answered && (
                           <div style={{ marginTop: 18, padding: 14, borderRadius: 16, background: isCorrect ? "#F3FBF9" : "#FEF2F2", border: isCorrect ? "1px solid #d4f2ea" : "1px solid #fecaca", display: "flex", gap: 10, alignItems: "flex-start", animation: "ah-pop .3s ease" }}>
-                            <span style={{ fontSize: 20 }}>{isCorrect ? "🎉" : "😅"}</span>
+                            {isCorrect ? (
+                              <CheckCircle2 size={20} style={{ color: "#10b981", marginTop: 2, flexShrink: 0 }} />
+                            ) : (
+                              <AlertCircle size={20} style={{ color: "#ef4444", marginTop: 2, flexShrink: 0 }} />
+                            )}
                             <div>
                               <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13.5, color: isCorrect ? "#0d7a6c" : "#991b1b" }}>
                                 {isCorrect ? "Đúng rồi! Tuyệt vời quá!" : "Chưa chính xác rồi em ơi."}
@@ -1387,7 +1414,8 @@ export default function TutorHubPage() {
                         {bridgeText && (
                           <div style={{ marginTop: 14, background: "linear-gradient(135deg, #047857, #065f46)", border: "1px solid #10b981", borderRadius: 16, padding: "16px 18px", color: "#fff", boxShadow: "0 10px 25px -5px rgba(6,95,70,0.3)" }}>
                             <div style={{ fontSize: 13, fontWeight: 800, color: "#6ee7b7", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                              <span>✨ Cầu nối Tư duy Socratic (First Principles Bridge)</span>
+                              <Sparkles size={14} style={{ color: "#fbbf24" }} />
+                              <span>Cầu nối Tư duy Socratic (First Principles Bridge)</span>
                             </div>
                             <p style={{ fontSize: 13.5, lineHeight: 1.6, margin: "0 0 14px", color: "#ecfdf5", fontWeight: 600 }}>
                               {bridgeText}
@@ -1408,7 +1436,7 @@ export default function TutorHubPage() {
                                   setIsCorrect(false);
                                   resetChat(orig.name);
                                   loadQuestions(orig.id);
-                                  toast.success(`🚀 Đã chuyển tới Bài toán ban đầu "${orig.name}"!`);
+                                  toast.success(`🚀 Quay lại Nút gốc "${orig.name}"!`);
                                 }
                               }}
                               style={{
@@ -1423,15 +1451,19 @@ export default function TutorHubPage() {
                                 boxShadow: "0 8px 16px -4px rgba(245,158,11,0.5)",
                               }}
                             >
-                              🚀 Quay trở lại thử sức Bài toán gốc "{traversalStack[0]?.name}"
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                <Rocket size={15} />
+                                Quay trở lại thử sức Bài toán gốc "{traversalStack[0]?.name}"
+                              </span>
                             </button>
                           </div>
                         )}
 
                         {cantDoOptions && (
                           <div style={{ marginTop: 14, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 16, padding: "16px 18px" }}>
-                            <div style={{ ...POPPINS, fontSize: 13, fontWeight: 800, color: "#5b2fc0", marginBottom: 8 }}>
-                              💡 Đề xuất từ {COMPANION.name}:
+                            <div style={{ ...POPPINS, fontSize: 13, fontWeight: 800, color: "#5b2fc0", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                              <Lightbulb size={16} style={{ color: "#fbbf24" }} />
+                              <span>Đề xuất từ {COMPANION.name}:</span>
                             </div>
                             <p style={{ fontSize: 12.5, color: "#5b6072", lineHeight: 1.5, margin: "0 0 12px" }}>
                               Em gặp khó khăn ở phần này ư? Đừng lo nhé, em có thể chọn giải pháp dưới đây để củng cố thêm:
@@ -1453,7 +1485,10 @@ export default function TutorHubPage() {
                                     boxShadow: "0 6px 12px -4px rgba(15,185,166,.4)",
                                   }}
                                 >
-                                  🟢 Làm câu nhận biết (Dễ hơn)
+                                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <Sparkles size={13} />
+                                    Làm câu nhận biết (Dễ hơn)
+                                  </span>
                                 </button>
                               )}
                               {cantDoOptions.parents && cantDoOptions.parents.map((p) => (
@@ -1491,7 +1526,10 @@ export default function TutorHubPage() {
                                     cursor: "pointer",
                                   }}
                                 >
-                                  📚 Ôn bài nền tảng: {p.name}
+                                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                    <Library size={13} />
+                                    Ôn bài nền tảng: {p.name}
+                                  </span>
                                 </button>
                               ))}
                             </div>
@@ -1514,9 +1552,13 @@ export default function TutorHubPage() {
                               fontSize: 13,
                               cursor: (submitting || answered) ? "not-allowed" : "pointer",
                               opacity: (submitting || answered) ? 0.6 : 1,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
                             }}
                           >
-                            ⚠️ Gặp khó khăn / Không biết làm
+                            <AlertTriangle size={15} />
+                            Gặp khó khăn / Không biết làm
                           </button>
 
                           <div style={{ display: "flex", gap: 10 }}>
@@ -1534,9 +1576,13 @@ export default function TutorHubPage() {
                                 fontWeight: 800,
                                 fontSize: 13,
                                 cursor: answered ? "not-allowed" : "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
                               }}
                             >
-                              💡 Xem gợi ý ({Math.min(hintPress, 3)}/3)
+                              <Lightbulb size={15} style={{ color: "#fbbf24" }} />
+                              Xem gợi ý ({Math.min(hintPress, 3)}/3)
                             </button>
 
                             {answered ? (
@@ -1554,9 +1600,13 @@ export default function TutorHubPage() {
                                   fontSize: 13,
                                   cursor: "pointer",
                                   boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
                                 }}
                               >
-                                Tiếp tục
+                                <span>Tiếp tục</span>
+                                <ArrowRight size={15} />
                               </button>
                             ) : (
                               <button
@@ -1574,8 +1624,12 @@ export default function TutorHubPage() {
                                   fontSize: 13,
                                   cursor: selected === null ? "not-allowed" : "pointer",
                                   boxShadow: selected === null ? "none" : "0 8px 16px -6px rgba(15,185,166,.5)",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
                                 }}
                               >
+                                <Check size={16} />
                                 Kiểm tra
                               </button>
                             )}
@@ -1586,7 +1640,10 @@ export default function TutorHubPage() {
                   </div>
                 ) : (
                   <div className="ah-panel" style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 22, padding: 24, flex: 1 }}>
-                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 17, marginBottom: 12 }}>Ý tưởng chính 🍰</div>
+                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 17, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      <Key size={18} style={{ color: "#eab308" }} />
+                      <span>Ý tưởng chính</span>
+                    </div>
                     <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: "#4b5060", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
                       {currentNode?.theory?.trim() || "Nội dung lý thuyết cho bài này đang được cập nhật. Em có thể trò chuyện với Nova hoặc luyện tập trắc nghiệm nhé!"}
                     </p>
@@ -1608,7 +1665,11 @@ export default function TutorHubPage() {
                           boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)",
                         }}
                       >
-                        Mình hiểu rồi → Luyện tập
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, justifyContent: "center", width: "100%" }}>
+                          Mình hiểu rồi
+                          <ArrowRight size={16} />
+                          Luyện tập
+                        </span>
                       </button>
                     </div>
                   </div>
