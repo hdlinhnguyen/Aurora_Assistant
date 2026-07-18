@@ -41,9 +41,11 @@ scratch/
 *.doc
 *.docx
 *.pdf
+backend/data/exam-exports/
 
 # Python scratch logs & scripts
 generate_log.py
 proposal_analysis.md
 reusable_modules.md
 run.ps1
+.worktrees/
