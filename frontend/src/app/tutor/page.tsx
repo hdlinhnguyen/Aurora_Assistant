@@ -35,6 +35,7 @@ import {
   type RoadmapStep,
 } from "./hub/api";
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
+import { SafeHtml } from "@/components/ui/safe-html";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
@@ -1502,7 +1503,7 @@ export default function TutorHubPage() {
           )}
 
           {/* ===== EXAMS PANEL ===== */}
-          {activeTab === "exams" && (
+          {activeTab === "exams" && !needsDiagnostic && (
             <div className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
               {/* Nếu học sinh đang làm bài thi */}
               {activeExam ? (
@@ -1512,7 +1513,8 @@ export default function TutorHubPage() {
                   let options: string[] = [];
                   if (currentQuestion && currentQuestion.choicesJson) {
                     try {
-                      options = JSON.parse(currentQuestion.choicesJson).map((c: any) => c.content);
+                      const parsed = JSON.parse(currentQuestion.choicesJson);
+                      options = parsed.map((c: any) => (typeof c === "object" && c !== null && "content" in c) ? c.content : String(c));
                     } catch (e) {
                       console.error(e);
                     }
@@ -1635,7 +1637,7 @@ export default function TutorHubPage() {
                         {currentQuestion ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                             <div style={{ fontSize: 16, fontWeight: 700, background: "#f4f6f9", borderRadius: 16, padding: 18, color: "#16161F", border: "1px solid #eef1f4", lineHeight: 1.6 }}>
-                              {currentQuestion.content}
+                              <SafeHtml text={currentQuestion.content} />
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
                               {options.map((opt, oIdx) => {
@@ -1673,7 +1675,7 @@ export default function TutorHubPage() {
                                     >
                                       {["A", "B", "C", "D", "E"][oIdx] ?? oIdx}
                                     </span>
-                                    <span>{opt}</span>
+                                    <SafeHtml as="span" text={opt} style={{ flex: 1 }} />
                                   </div>
                                 );
                               })}
@@ -1963,7 +1965,7 @@ export default function TutorHubPage() {
       </div>
       )}
       {/* ===== ONBOARDING DIAGNOSTIC MODAL OVERLAY ===== */}
-      {needsDiagnostic && !activeExam && (
+      {needsDiagnostic && (
         <div
           style={{
             position: "fixed",
@@ -1977,129 +1979,327 @@ export default function TutorHubPage() {
             padding: 24,
           }}
         >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 28,
-              maxWidth: 580,
-              width: "100%",
-              padding: "40px 36px 32px",
-              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
-              textAlign: "center",
-              animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)",
-            }}
-          >
-            <div style={{ fontSize: 56, marginBottom: 12, animation: "ah-float 3s ease-in-out infinite" }}>📐</div>
-            <div style={{ ...BALOO, fontWeight: 800, fontSize: 26, color: "#16161F", marginBottom: 10 }}>
-              Yêu cầu đánh giá chẩn đoán!
-            </div>
-            <p style={{ fontSize: 14, color: "#4b5060", lineHeight: 1.6, marginBottom: 26 }}>
-              Chào mừng em đến với <b>Aurora Socratic Tutor</b>. Lộ trình học tập của em tạm thời bị khóa. Em cần hoàn thành bài khảo sát/kiểm tra đầu vào để hệ thống chẩn đoán và xác định lỗ hổng kiến thức nền tảng của em.
-            </p>
+          {activeExam ? (
+            /* ================= Focus Exam Card ================= */
+            (() => {
+              const currentQuestion = examQuestions[examQIndex];
+              const isAdaptive = activeExam && activeExam.title.includes("Đánh giá chẩn đoán thích ứng");
+              let options: string[] = [];
+              if (currentQuestion && currentQuestion.choicesJson) {
+                try {
+                  const parsed = JSON.parse(currentQuestion.choicesJson);
+                  options = parsed.map((c: any) => (typeof c === "object" && c !== null && "content" in c) ? c.content : String(c));
+                } catch (e) {
+                  console.error(e);
+                }
+              }
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, textAlign: "left" }}>
-              {/* Cách 1: Đề thi được giao sẵn */}
-              {examsList.length > 0 ? (
-                <div>
-                  <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
-                    Đề thi được giao cho em:
+              const minutes = Math.floor(examTimeRemaining / 60);
+              const seconds = examTimeRemaining % 60;
+              const formattedTime = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+              return (
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: 28,
+                    maxWidth: 820,
+                    width: "100%",
+                    padding: 32,
+                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
+                    animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)",
+                    display: "flex",
+                    gap: 24,
+                    alignItems: "stretch",
+                  }}
+                >
+                  {/* Left: Progress bar */}
+                  <div style={{ width: 180, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 20, padding: 18, display: "flex", flexDirection: "column", flexShrink: 0, justifyContent: "center" }}>
+                    <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #ece5fb", paddingBottom: 10, marginBottom: 14, textAlign: "center" }}>
+                      Chẩn đoán thích ứng
+                    </div>
+                    <div style={{ textAlign: "center", padding: "10px 0" }}>
+                      <div style={{ fontSize: 36, fontWeight: 850, color: "#16161F", ...POPPINS }}>
+                        {examQuestions.length} <span style={{ fontSize: 15, color: "#9aa1b0", fontWeight: 700 }}>/ 25</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#5b6072", marginTop: 4, fontWeight: 600 }}>câu hỏi đã làm</div>
+                    </div>
+                    <div style={{ height: 6, background: "#eef1f4", borderRadius: 6, width: "100%", marginTop: 10 }}>
+                      <div style={{ height: 6, background: "#7C46E8", borderRadius: 6, width: `${Math.min(100, (examQuestions.length / 25) * 100)}%` }} />
+                    </div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
-                    {examsList.map((ex) => (
-                      <div
-                        key={ex.id}
-                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "12px 16px" }}
-                      >
-                        <div style={{ minWidth: 0, flex: 1, paddingRight: 10 }}>
-                          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#16161F", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</span>
-                          <span style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600, display: "block", marginTop: 2 }}>Thời gian: {ex.durationMinutes} phút</span>
-                        </div>
-                        <button
-                          onClick={() => handleStartExam(ex.id)}
+
+                  {/* Right: Question card */}
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f2f4f7", paddingBottom: 14, marginBottom: 18 }}>
+                      <div>
+                        <span style={{ ...POPPINS, fontSize: 10.5, background: "#EFE9FD", color: "#7C46E8", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
+                          {activeExam.title}
+                        </span>
+                        <div style={{ ...BALOO, fontWeight: 800, fontSize: 18, marginTop: 5 }}>Câu hỏi {examQIndex + 1}</div>
+                      </div>
+                      {examTimerActive && (
+                        <div
                           style={{
                             ...POPPINS,
-                            border: "none",
-                            borderRadius: 12,
-                            padding: "9px 16px",
-                            background: "linear-gradient(135deg,#7C46E8,#6D28D9)",
-                            color: "#fff",
-                            fontWeight: 800,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "6px 12px",
+                            borderRadius: 10,
                             fontSize: 12,
-                            cursor: "pointer",
-                            boxShadow: "0 6px 12px -4px rgba(109,40,217,.4)",
+                            fontWeight: 800,
+                            fontFamily: "monospace",
+                            border: examTimeRemaining < 60 ? "1px solid #f8d3da" : "1px solid #ece5fb",
+                            background: examTimeRemaining < 60 ? "#fef3f5" : "#faf7ff",
+                            color: examTimeRemaining < 60 ? "#c23a54" : "#7C46E8",
                           }}
                         >
-                          Vào thi
-                        </button>
+                          ⏱️ {formattedTime}
+                        </div>
+                      )}
+                    </div>
+
+                    {currentQuestion ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14, flex: 1 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, background: "#f4f6f9", borderRadius: 16, padding: 18, color: "#16161F", border: "1px solid #eef1f4", lineHeight: 1.6 }}>
+                          <SafeHtml text={currentQuestion.content} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                          {options.map((opt, oIdx) => {
+                            const isSel = examAnswers[currentQuestion.id] === String(oIdx);
+                            return (
+                              <div
+                                key={oIdx}
+                                onClick={() => setExamAnswers((prev) => ({ ...prev, [currentQuestion.id]: String(oIdx) }))}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 12,
+                                  border: isSel ? "2px solid #7C46E8" : "1px solid #eef1f4",
+                                  background: isSel ? "#faf7ff" : "#fff",
+                                  color: isSel ? "#5b2fc0" : "#4b5060",
+                                  borderRadius: 14,
+                                  padding: "12px 14px",
+                                  cursor: "pointer",
+                                  fontSize: 14,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    height: 26,
+                                    width: 26,
+                                    borderRadius: 8,
+                                    display: "grid",
+                                    placeItems: "center",
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    background: isSel ? "#7C46E8" : "#f4f6f9",
+                                    color: isSel ? "#fff" : "#9aa1b0",
+                                  }}
+                                >
+                                  {["A", "B", "C", "D", "E"][oIdx] ?? oIdx}
+                                </span>
+                                <SafeHtml as="span" text={opt} style={{ flex: 1 }} />
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ))}
+                    ) : (
+                      <div style={{ color: "#9aa1b0", textAlign: "center", padding: 20 }}>Không tìm thấy nội dung câu hỏi.</div>
+                    )}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, borderTop: "1px solid #f2f4f7", paddingTop: 16 }}>
+                      <button
+                        onClick={handleAdaptiveAnswer}
+                        disabled={submittingExam}
+                        style={{
+                          ...POPPINS,
+                          border: "none",
+                          borderRadius: 12,
+                          padding: "11px 24px",
+                          background: "linear-gradient(135deg,#7C46E8,#5b2fc0)",
+                          color: "#fff",
+                          fontWeight: 800,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          marginLeft: "auto",
+                          boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
+                        }}
+                      >
+                        {submittingExam ? "Đang gửi..." : "Gửi câu trả lời & Tiếp tục"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "16px 10px", fontSize: 12.5, color: "#9aa1b0", fontWeight: 600, border: "1px dashed #eef1f4", borderRadius: 16, background: "#fcfdfe", fontStyle: "italic", marginBottom: 6 }}>
-                  Chưa có đề thi được giao sẵn cho lớp của em.
-                </div>
-              )}
-
-              {/* Cách 2: Nhập mã đề thi tự do */}
-              <div style={{ borderTop: "1px solid #f2f4f7", paddingTop: 18, marginTop: 4 }}>
-                <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
-                  Hoặc nhập mã đề thi (Exam ID) khác:
-                </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <input
-                    type="text"
-                    placeholder="Nhập mã đề thi (UUID)..."
-                    value={customExamCode}
-                    onChange={(e) => setCustomExamCode(e.target.value)}
-                    style={{ flex: 1, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 650, color: "#16161F", outline: "none" }}
-                  />
-                  <button
-                    onClick={() => handleStartExam(customExamCode)}
-                    disabled={loadingExam}
-                    style={{
-                      ...POPPINS,
-                      border: "none",
-                      borderRadius: 14,
-                      padding: "12px 20px",
-                      background: "#16161F",
-                      color: "#fff",
-                      fontWeight: 800,
-                      fontSize: 13,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {loadingExam ? "Tải..." : "Bắt đầu"}
-                  </button>
+              );
+            })()
+          ) : examFinishedScore ? (
+            /* ================= Onboarding Complete Card ================= */
+            <div style={{ background: "#fff", borderRadius: 28, maxWidth: 500, width: "100%", padding: "34px 40px", textAlign: "center", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)", animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)" }}>
+              <div style={{ fontSize: 60, marginBottom: 12 }}>🎉</div>
+              <div style={{ ...BALOO, fontWeight: 800, fontSize: 24, marginBottom: 8 }}>Hoàn thành bài kiểm tra!</div>
+              <p style={{ fontSize: 13.5, color: "#5b6072", lineHeight: 1.6, marginBottom: 20 }}>
+                Chúc mừng em đã hoàn thành bài làm. Kết quả chi tiết đã được gửi đến hệ thống để ghi nhận.
+              </p>
+              <div style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 18, padding: 18, width: 260, margin: "0 auto 24px" }}>
+                <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Trạng thái chẩn đoán</div>
+                <div style={{ ...POPPINS, fontWeight: 850, fontSize: 22, color: "#16161F" }}>
+                  Đã ghi nhận năng lực 🎉
                 </div>
               </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 32, borderTop: "1px solid #f2f4f7", paddingTop: 20 }}>
               <button
-                onClick={() => {
-                  localStorage.clear();
-                  router.push("/");
+                onClick={async () => {
+                  setExamFinishedScore(null);
+                  setActiveExam(null);
+                  setExamQuestions([]);
+                  setExamAnswers({});
+                  loadAll();
                 }}
                 style={{
                   ...POPPINS,
-                  border: "1px solid #f8d3da",
+                  border: "none",
                   borderRadius: 14,
-                  padding: "11px 24px",
-                  background: "#fef3f5",
-                  color: "#c23a54",
+                  padding: "13px 28px",
+                  background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
+                  color: "#fff",
                   fontWeight: 800,
-                  fontSize: 13,
+                  fontSize: 14,
                   cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
+                  boxShadow: "0 8px 16px -6px rgba(15,185,166,.5)",
                 }}
               >
-                🚪 Đăng xuất tài khoản
+                Tiếp tục học tập
               </button>
             </div>
-          </div>
+          ) : (
+            /* ================= Onboarding Select Exam Panel ================= */
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 28,
+                maxWidth: 580,
+                width: "100%",
+                padding: "40px 36px 32px",
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
+                textAlign: "center",
+                animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)",
+              }}
+            >
+              <div style={{ fontSize: 56, marginBottom: 12, animation: "ah-float 3s ease-in-out infinite" }}>📐</div>
+              <div style={{ ...BALOO, fontWeight: 800, fontSize: 26, color: "#16161F", marginBottom: 10 }}>
+                Yêu cầu đánh giá chẩn đoán!
+              </div>
+              <p style={{ fontSize: 14, color: "#4b5060", lineHeight: 1.6, marginBottom: 26 }}>
+                Chào mừng em đến với <b>Aurora Socratic Tutor</b>. Lộ trình học tập của em tạm thời bị khóa. Em cần hoàn thành bài khảo sát/kiểm tra đầu vào để hệ thống chẩn đoán và xác định lỗ hổng kiến thức nền tảng của em.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, textAlign: "left" }}>
+                {/* Cách 1: Đề thi được giao sẵn */}
+                {examsList.length > 0 ? (
+                  <div>
+                    <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
+                      Đề thi được giao cho em:
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
+                      {examsList.map((ex) => (
+                        <div
+                          key={ex.id}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "12px 16px" }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1, paddingRight: 10 }}>
+                            <span style={{ fontSize: 13.5, fontWeight: 800, color: "#16161F", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</span>
+                            <span style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600, display: "block", marginTop: 2 }}>Thời gian: {ex.durationMinutes} phút</span>
+                          </div>
+                          <button
+                            onClick={() => handleStartExam(ex.id)}
+                            style={{
+                              ...POPPINS,
+                              border: "none",
+                              borderRadius: 12,
+                              padding: "9px 16px",
+                              background: "linear-gradient(135deg,#7C46E8,#6D28D9)",
+                              color: "#fff",
+                              fontWeight: 800,
+                              fontSize: 12,
+                              cursor: "pointer",
+                              boxShadow: "0 6px 12px -4px rgba(109,40,217,.4)",
+                            }}
+                          >
+                            Vào thi
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "16px 10px", fontSize: 12.5, color: "#9aa1b0", fontWeight: 600, border: "1px dashed #eef1f4", borderRadius: 16, background: "#fcfdfe", fontStyle: "italic", marginBottom: 6 }}>
+                    Chưa có đề thi được giao sẵn cho lớp của em.
+                  </div>
+                )}
+
+                {/* Cách 2: Nhập mã đề thi tự do */}
+                <div style={{ borderTop: "1px solid #f2f4f7", paddingTop: 18, marginTop: 4 }}>
+                  <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
+                    Hoặc nhập mã đề thi (Exam ID) khác:
+                  </div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <input
+                      type="text"
+                      placeholder="Nhập mã đề thi (UUID)..."
+                      value={customExamCode}
+                      onChange={(e) => setCustomExamCode(e.target.value)}
+                      style={{ flex: 1, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 650, color: "#16161F", outline: "none" }}
+                    />
+                    <button
+                      onClick={() => handleStartExam(customExamCode)}
+                      disabled={loadingExam}
+                      style={{
+                        ...POPPINS,
+                        border: "none",
+                        borderRadius: 14,
+                        padding: "12px 20px",
+                        background: "#16161F",
+                        color: "#fff",
+                        fontWeight: 800,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {loadingExam ? "Tải..." : "Bắt đầu"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 32, borderTop: "1px solid #f2f4f7", paddingTop: 20 }}>
+                <button
+                  onClick={() => {
+                    localStorage.clear();
+                    router.push("/");
+                  }}
+                  style={{
+                    ...POPPINS,
+                    border: "1px solid #f8d3da",
+                    borderRadius: 14,
+                    padding: "11px 24px",
+                    background: "#fef3f5",
+                    color: "#c23a54",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  🚪 Đăng xuất tài khoản
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
