@@ -1,0 +1,1116 @@
+{
+  "nguon": "Yêu cầu cần đạt trích nguyên văn từ Chương trình GDPT môn Toán 2018 (Thông tư 32/2018/TT-BGDĐT). Bao gồm mạch Số và Đại số (lớp 4–12) và mạch Thống kê & Xác suất (lớp 4–7).",
+  "nodes": [
+    {
+      "id": "l4-khai-niem-phan-so",
+      "ten": "Khái niệm phân số",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Khái niệm ban đầu về phân số",
+      "yccd": [
+        "Nhận biết được khái niệm ban đầu về phân số, tử số, mẫu số.",
+        "Đọc, viết được các phân số."
+      ],
+      "tienQuyet": [],
+      "mo": false,
+      "x": 70,
+      "y": 60
+    },
+    {
+      "id": "l4-tinh-chat-phan-so",
+      "ten": "Tính chất phân số — rút gọn, quy đồng",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Tính chất cơ bản của phân số",
+      "yccd": [
+        "Nhận biết được tính chất cơ bản của phân số.",
+        "Thực hiện được việc rút gọn phân số trong những trường hợp đơn giản.",
+        "Thực hiện được việc quy đồng mẫu số hai phân số trong trường hợp có một mẫu số chia hết cho mẫu số còn lại."
+      ],
+      "tienQuyet": [
+        "l4-khai-niem-phan-so",
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 150
+    },
+    {
+      "id": "l4-so-sanh-phan-so",
+      "ten": "So sánh phân số",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "So sánh phân số",
+      "yccd": [
+        "So sánh và sắp xếp được thứ tự các phân số trong những trường hợp sau: các phân số có cùng mẫu số; có một mẫu số chia hết cho các mẫu số còn lại.",
+        "Xác định được phân số lớn nhất, bé nhất (trong một nhóm có không quá 4 phân số) trong những trường hợp sau: các phân số có cùng mẫu số; có một mẫu số chia hết cho các mẫu số còn lại."
+      ],
+      "tienQuyet": [
+        "l4-tinh-chat-phan-so",
+        "l4-khai-niem-phan-so"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 240
+    },
+    {
+      "id": "l4-phep-tinh-phan-so",
+      "ten": "Cộng, trừ, nhân, chia phân số",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với phân số",
+      "chuDeCon": "Các phép tính cộng, trừ, nhân, chia với phân số",
+      "yccd": [
+        "Thực hiện được phép cộng, phép trừ phân số trong những trường hợp sau: các phân số có cùng mẫu số; có một mẫu số chia hết cho các mẫu số còn lại.",
+        "Thực hiện được phép nhân, phép chia hai phân số.",
+        "Giải quyết được một số vấn đề gắn với việc giải các bài toán (có đến hai hoặc ba bước tính) liên quan đến 4 phép tính với phân số (ví dụ: bài toán liên quan đến tìm phân số của một số)."
+      ],
+      "tienQuyet": [
+        "l4-tinh-chat-phan-so",
+        "l4-khai-niem-phan-so"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 330
+    },
+    {
+      "id": "l4-nhan-chia-so-tu-nhien",
+      "ten": "Nhân, chia số tự nhiên",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với số tự nhiên",
+      "chuDeCon": "Phép nhân, phép chia",
+      "yccd": [
+        "Tính được số trung bình cộng của hai hay nhiều số.",
+        "Thực hiện được phép nhân với các số có không quá hai chữ số.",
+        "Thực hiện được phép chia cho số có không quá hai chữ số.",
+        "Thực hiện được phép nhân với 10; 100; 1000;... và phép chia cho 10; 100; 1000;...",
+        "Vận dụng được tính chất giao hoán, tính chất kết hợp của phép nhân và mối quan hệ giữa phép nhân với phép chia trong thực hành tính toán."
+      ],
+      "tienQuyet": [],
+      "mo": false,
+      "x": 70,
+      "y": 420
+    },
+    {
+      "id": "l4-bieu-thuc-chu",
+      "ten": "Biểu thức số & biểu thức chữ",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với số tự nhiên",
+      "chuDeCon": "Biểu thức số và biểu thức chữ",
+      "yccd": [
+        "Làm quen với biểu thức chứa một, hai, ba chữ và tính được giá trị của biểu thức chứa một, hai, hoặc ba chữ (trường hợp đơn giản).",
+        "Vận dụng được tính chất phân phối của phép nhân đối với phép cộng trong tính giá trị của biểu thức."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 510
+    },
+    {
+      "id": "l5-quy-dong-phan-so",
+      "ten": "Quy đồng mẫu số & phép tính phân số khác mẫu",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số và các phép tính với phân số",
+      "chuDeCon": "Ôn tập về phân số và các phép tính với phân số",
+      "yccd": [
+        "Rút gọn được phân số.",
+        "Quy đồng, so sánh, xếp thứ tự được các phân số trong trường hợp có một mẫu số chia hết cho các mẫu số còn lại.",
+        "Thực hiện được phép cộng, phép trừ các phân số trong trường hợp có một mẫu số chia hết cho các mẫu số còn lại và nhân, chia phân số.",
+        "Thực hiện được phép cộng, phép trừ hai phân số bằng cách lấy mẫu số chung là tích của hai mẫu số.",
+        "Nhận biết được phân số thập phân và cách viết phân số thập phân ở dạng hỗn số.",
+        "Giải quyết được vấn đề gắn với việc giải các bài toán (có một hoặc một vài bước tính) liên quan đến các phép tính về phân số."
+      ],
+      "tienQuyet": [
+        "l4-phep-tinh-phan-so",
+        "l4-so-sanh-phan-so"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 60
+    },
+    {
+      "id": "l5-so-thap-phan",
+      "ten": "Số thập phân",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thập phân",
+      "chuDeCon": "Số thập phân",
+      "yccd": [
+        "Đọc, viết được số thập phân.",
+        "Nhận biết được số thập phân gồm phần nguyên, phần thập phân và hàng của số thập phân.",
+        "Thể hiện được các số đo đại lượng bằng cách dùng số thập phân.",
+        "Nhận biết được cách so sánh hai số thập phân.",
+        "Thực hiện được việc sắp xếp các số thập phân theo thứ tự (từ bé đến lớn hoặc ngược lại) trong một nhóm có không quá 4 số thập phân.",
+        "Làm tròn được một số thập phân tới số tự nhiên gần nhất hoặc tới số thập phân có một hoặc hai chữ số ở phần thập phân."
+      ],
+      "tienQuyet": [
+        "l5-quy-dong-phan-so"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 150
+    },
+    {
+      "id": "l5-phep-tinh-so-thap-phan",
+      "ten": "Phép tính với số thập phân",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với số thập phân",
+      "chuDeCon": "Các phép tính cộng, trừ, nhân, chia với số thập phân",
+      "yccd": [
+        "Thực hiện được phép cộng, phép trừ hai số thập phân.",
+        "Thực hiện được phép nhân một số với số thập phân có không quá hai chữ số ở dạng: a,b và 0,ab.",
+        "Thực hiện được phép chia một số với số thập phân có không quá hai chữ số khác không ở dạng: a,b và 0,ab.",
+        "Vận dụng được tính chất của các phép tính với số thập phân và quan hệ giữa các phép tính đó trong thực hành tính toán.",
+        "Thực hiện được phép nhân, chia nhẩm một số thập phân với (cho) 10; 100; 1000;... hoặc với (cho) 0,1; 0,01; 0,001;...",
+        "Giải quyết vấn đề gắn với việc giải các bài toán (có một hoặc một vài bước tính) liên quan đến các phép tính với các số thập phân."
+      ],
+      "tienQuyet": [
+        "l5-so-thap-phan"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 240
+    },
+    {
+      "id": "l5-ti-so-phan-tram",
+      "ten": "Tỉ số & tỉ số phần trăm",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Tỉ số. Tỉ số phần trăm",
+      "chuDeCon": "Tỉ số. Tỉ số phần trăm",
+      "yccd": [
+        "Nhận biết được tỉ số, tỉ số phần trăm của hai đại lượng cùng loại.",
+        "Giải quyết được một số vấn đề gắn với việc giải các bài toán liên quan đến: tìm hai số khi biết tổng (hoặc hiệu) và tỉ số của hai số đó; tính tỉ số phần trăm của hai số; tìm giá trị phần trăm của một số cho trước.",
+        "Nhận biết được tỉ lệ bản đồ. Vận dụng được tỉ lệ bản đồ để giải quyết một số tình huống thực tiễn."
+      ],
+      "tienQuyet": [
+        "l5-quy-dong-phan-so"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 330
+    },
+    {
+      "id": "l6-luy-thua",
+      "ten": "Phép tính số tự nhiên & luỹ thừa",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số tự nhiên",
+      "chuDeCon": "Các phép tính với số tự nhiên. Phép tính luỹ thừa với số mũ tự nhiên",
+      "yccd": [
+        "Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số tự nhiên.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng trong tính toán.",
+        "Thực hiện được phép tính luỹ thừa với số mũ tự nhiên; thực hiện được các phép nhân và phép chia hai luỹ thừa cùng cơ số với số mũ tự nhiên.",
+        "Nhận biết được thứ tự thực hiện các phép tính.",
+        "Vận dụng được các tính chất của phép tính (kể cả phép tính luỹ thừa với số mũ tự nhiên) để tính nhẩm, tính nhanh một cách hợp lí.",
+        "Giải quyết được những vấn đề thực tiễn gắn với thực hiện các phép tính (ví dụ: tính tiền mua sắm, tính lượng hàng mua được từ số tiền đã có,...)."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 60
+    },
+    {
+      "id": "l6-uoc-boi",
+      "ten": "Chia hết, số nguyên tố, ƯC–BC",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số tự nhiên",
+      "chuDeCon": "Tính chia hết trong tập hợp các số tự nhiên. Số nguyên tố. Ước chung và bội chung",
+      "yccd": [
+        "Nhận biết được quan hệ chia hết, khái niệm ước và bội.",
+        "Vận dụng được dấu hiệu chia hết cho 2, 5, 9, 3 để xác định một số đã cho có chia hết cho 2, 5, 9, 3 hay không.",
+        "Nhận biết được khái niệm số nguyên tố, hợp số.",
+        "Thực hiện được việc phân tích một số tự nhiên lớn hơn 1 thành tích của các thừa số nguyên tố trong những trường hợp đơn giản.",
+        "Xác định được ước chung, ước chung lớn nhất; xác định được bội chung, bội chung nhỏ nhất của hai hoặc ba số tự nhiên; nhận biết được phân số tối giản; thực hiện được phép cộng, phép trừ phân số bằng cách sử dụng ước chung lớn nhất, bội chung nhỏ nhất.",
+        "Nhận biết được phép chia có dư, định lí về phép chia có dư.",
+        "Vận dụng được kiến thức số học vào giải quyết những vấn đề thực tiễn (ví dụ: tính toán tiền hay lượng hàng hoá khi mua sắm, xác định số đồ vật cần thiết để sắp xếp chúng theo những quy tắc cho trước,...)."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 150
+    },
+    {
+      "id": "l6-khai-niem-so-nguyen",
+      "ten": "Số nguyên âm — khái niệm & thứ tự",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số nguyên",
+      "chuDeCon": "Số nguyên âm và tập hợp các số nguyên. Thứ tự trong tập hợp các số nguyên",
+      "yccd": [
+        "Nhận biết được số nguyên âm, tập hợp các số nguyên.",
+        "Biểu diễn được số nguyên trên trục số.",
+        "Nhận biết được số đối của một số nguyên.",
+        "Nhận biết được thứ tự trong tập hợp các số nguyên. So sánh được hai số nguyên cho trước.",
+        "Nhận biết được ý nghĩa của số nguyên âm trong một số bài toán thực tiễn."
+      ],
+      "tienQuyet": [],
+      "mo": true,
+      "x": 330,
+      "y": 240
+    },
+    {
+      "id": "l6-phep-tinh-so-nguyen",
+      "ten": "Phép tính với số nguyên",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số nguyên",
+      "chuDeCon": "Các phép tính với số nguyên. Tính chia hết trong tập hợp các số nguyên",
+      "yccd": [
+        "Thực hiện được các phép tính: cộng, trừ, nhân, chia (chia hết) trong tập hợp các số nguyên.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc trong tập hợp các số nguyên trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+        "Nhận biết được quan hệ chia hết, khái niệm ước và bội trong tập hợp các số nguyên.",
+        "Giải quyết được những vấn đề thực tiễn gắn với thực hiện các phép tính về số nguyên (ví dụ: tính lỗ lãi khi buôn bán,...)."
+      ],
+      "tienQuyet": [
+        "l4-nhan-chia-so-tu-nhien",
+        "l6-khai-niem-so-nguyen"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 330
+    },
+    {
+      "id": "l6-phan-so-tinh-chat",
+      "ten": "Phân số tử/mẫu nguyên & so sánh",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Phân số. Tính chất cơ bản của phân số. So sánh phân số",
+      "yccd": [
+        "Nhận biết được phân số với tử số hoặc mẫu số là số nguyên âm.",
+        "Nhận biết được khái niệm hai phân số bằng nhau và nhận biết được quy tắc bằng nhau của hai phân số.",
+        "Nêu được hai tính chất cơ bản của phân số.",
+        "So sánh được hai phân số cho trước.",
+        "Nhận biết được số đối của một phân số.",
+        "Nhận biết được hỗn số dương."
+      ],
+      "tienQuyet": [
+        "l5-quy-dong-phan-so",
+        "l6-phep-tinh-so-nguyen",
+        "l6-uoc-boi"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 420
+    },
+    {
+      "id": "l6-phep-tinh-phan-so",
+      "ten": "Phép tính với phân số (mở rộng)",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phân số",
+      "chuDeCon": "Các phép tính với phân số",
+      "yccd": [
+        "Thực hiện được các phép tính cộng, trừ, nhân, chia với phân số.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với phân số trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+        "Tính được giá trị phân số của một số cho trước và tính được một số biết giá trị phân số của số đó.",
+        "Giải quyết được một số vấn đề thực tiễn gắn với các phép tính về phân số (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí,...)."
+      ],
+      "tienQuyet": [
+        "l6-phan-so-tinh-chat",
+        "l6-uoc-boi"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 510
+    },
+    {
+      "id": "l7-so-huu-ti-khai-niem",
+      "ten": "Số hữu tỉ — khái niệm & thứ tự",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số hữu tỉ",
+      "chuDeCon": "Số hữu tỉ và tập hợp các số hữu tỉ. Thứ tự trong tập hợp các số hữu tỉ",
+      "yccd": [
+        "Nhận biết được số hữu tỉ và lấy được ví dụ về số hữu tỉ.",
+        "Nhận biết được tập hợp các số hữu tỉ.",
+        "Biểu diễn được số hữu tỉ trên trục số.",
+        "Nhận biết được số đối của một số hữu tỉ.",
+        "Nhận biết được thứ tự trong tập hợp các số hữu tỉ. So sánh được hai số hữu tỉ."
+      ],
+      "tienQuyet": [
+        "l6-phan-so-tinh-chat",
+        "l6-phep-tinh-so-nguyen"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 60
+    },
+    {
+      "id": "l7-phep-tinh-so-huu-ti",
+      "ten": "Phép tính với số hữu tỉ",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số hữu tỉ",
+      "chuDeCon": "Các phép tính với số hữu tỉ",
+      "yccd": [
+        "Thực hiện được các phép tính: cộng, trừ, nhân, chia trong tập hợp số hữu tỉ.",
+        "Mô tả được phép tính luỹ thừa với số mũ tự nhiên của một số hữu tỉ và một số tính chất của phép tính đó (tích và thương của hai luỹ thừa cùng cơ số, luỹ thừa của luỹ thừa).",
+        "Mô tả được thứ tự thực hiện các phép tính, quy tắc dấu ngoặc, quy tắc chuyển vế trong tập hợp số hữu tỉ.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với số hữu tỉ trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+        "Giải quyết được một số vấn đề thực tiễn gắn với các phép tính về số hữu tỉ (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí, trong đo đạc,...)."
+      ],
+      "tienQuyet": [
+        "l7-so-huu-ti-khai-niem",
+        "l6-phep-tinh-phan-so",
+        "l6-luy-thua",
+        "l6-phep-tinh-so-nguyen",
+        "l5-phep-tinh-so-thap-phan"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 150
+    },
+    {
+      "id": "l7-can-bac-hai",
+      "ten": "Căn bậc hai số học",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Căn bậc hai số học",
+      "yccd": [
+        "Nhận biết được khái niệm căn bậc hai số học của một số không âm.",
+        "Tính được giá trị (đúng hoặc gần đúng) căn bậc hai số học của một số nguyên dương bằng máy tính cầm tay."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": true,
+      "x": 460,
+      "y": 240
+    },
+    {
+      "id": "l7-so-thuc",
+      "ten": "Số vô tỉ & số thực",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Số vô tỉ. Số thực",
+      "yccd": [
+        "Nhận biết được số thập phân hữu hạn và số thập phân vô hạn tuần hoàn.",
+        "Nhận biết được số vô tỉ, số thực, tập hợp các số thực.",
+        "Nhận biết được trục số thực và biểu diễn được số thực trên trục số trong trường hợp thuận lợi.",
+        "Nhận biết được số đối của một số thực.",
+        "Nhận biết được thứ tự trong tập hợp các số thực.",
+        "Nhận biết được giá trị tuyệt đối của một số thực.",
+        "Thực hiện được ước lượng và làm tròn số căn cứ vào độ chính xác cho trước."
+      ],
+      "tienQuyet": [
+        "l7-can-bac-hai"
+      ],
+      "mo": true,
+      "x": 460,
+      "y": 330
+    },
+    {
+      "id": "l7-ti-le-thuc",
+      "ten": "Tỉ lệ thức & dãy tỉ số bằng nhau",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Tỉ lệ thức và dãy tỉ số bằng nhau",
+      "yccd": [
+        "Nhận biết được tỉ lệ thức và các tính chất của tỉ lệ thức.",
+        "Vận dụng được tính chất của tỉ lệ thức trong giải toán.",
+        "Nhận biết được dãy tỉ số bằng nhau.",
+        "Vận dụng được tính chất của dãy tỉ số bằng nhau trong giải toán (ví dụ: chia một số thành các phần tỉ lệ với các số cho trước,...)."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti",
+        "l5-ti-so-phan-tram"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 420
+    },
+    {
+      "id": "l7-dai-luong-ti-le",
+      "ten": "Giải toán về đại lượng tỉ lệ",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Giải toán về đại lượng tỉ lệ",
+      "yccd": [
+        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ thuận (ví dụ: bài toán về tổng sản phẩm thu được và năng suất lao động,...).",
+        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ nghịch (ví dụ: bài toán về thời gian hoàn thành kế hoạch và năng suất lao động,...)."
+      ],
+      "tienQuyet": [
+        "l7-ti-le-thuc",
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 690
+    },
+    {
+      "id": "l7-bieu-thuc-dai-so",
+      "ten": "Biểu thức đại số",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Biểu thức đại số",
+      "yccd": [
+        "Nhận biết được biểu thức số.",
+        "Nhận biết được biểu thức đại số.",
+        "Tính được giá trị của một biểu thức đại số."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti",
+        "l4-bieu-thuc-chu"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 510
+    },
+    {
+      "id": "l7-da-thuc-mot-bien",
+      "ten": "Đa thức một biến",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Đa thức một biến",
+      "yccd": [
+        "Nhận biết được định nghĩa đa thức một biến.",
+        "Nhận biết được cách biểu diễn đa thức một biến; xác định được bậc của đa thức một biến.",
+        "Tính được giá trị của đa thức khi biết giá trị của biến.",
+        "Nhận biết được khái niệm nghiệm của đa thức một biến.",
+        "Thực hiện được các phép tính: phép cộng, phép trừ, phép nhân, phép chia trong tập hợp các đa thức một biến; vận dụng được những tính chất của các phép tính đó trong tính toán."
+      ],
+      "tienQuyet": [
+        "l7-bieu-thuc-dai-so"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 600
+    },
+    {
+      "id": "l8-da-thuc-nhieu-bien",
+      "ten": "Đa thức nhiều biến",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Đa thức nhiều biến. Các phép toán cộng, trừ, nhân, chia các đa thức nhiều biến",
+      "yccd": [
+        "Nhận biết được các khái niệm về đơn thức, đa thức nhiều biến.",
+        "Tính được giá trị của đa thức khi biết giá trị của các biến.",
+        "Thực hiện được việc thu gọn đơn thức, đa thức.",
+        "Thực hiện được phép nhân đơn thức với đa thức và phép chia hết một đơn thức cho một đơn thức.",
+        "Thực hiện được các phép tính: phép cộng, phép trừ, phép nhân các đa thức nhiều biến trong những trường hợp đơn giản.",
+        "Thực hiện được phép chia hết một đa thức cho một đơn thức trong những trường hợp đơn giản."
+      ],
+      "tienQuyet": [
+        "l7-da-thuc-mot-bien"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 240
+    },
+    {
+      "id": "l8-hang-dang-thuc",
+      "ten": "Hằng đẳng thức đáng nhớ",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Hằng đẳng thức đáng nhớ",
+      "yccd": [
+        "Nhận biết được các khái niệm: đồng nhất thức, hằng đẳng thức.",
+        "Mô tả được các hằng đẳng thức: bình phương của tổng và hiệu; hiệu hai bình phương; lập phương của tổng và hiệu; tổng và hiệu hai lập phương.",
+        "Vận dụng được các hằng đẳng thức để phân tích đa thức thành nhân tử ở dạng: vận dụng trực tiếp hằng đẳng thức; vận dụng hằng đẳng thức thông qua nhóm hạng tử và đặt nhân tử chung."
+      ],
+      "tienQuyet": [
+        "l8-da-thuc-nhieu-bien"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 330
+    },
+    {
+      "id": "l8-phan-thuc-dai-so",
+      "ten": "Phân thức đại số",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Biểu thức đại số",
+      "chuDeCon": "Phân thức đại số. Tính chất cơ bản của phân thức đại số. Các phép toán cộng, trừ, nhân, chia các phân thức đại số",
+      "yccd": [
+        "Nhận biết được các khái niệm cơ bản về phân thức đại số: định nghĩa; điều kiện xác định; giá trị của phân thức đại số; hai phân thức bằng nhau.",
+        "Mô tả được những tính chất cơ bản của phân thức đại số.",
+        "Thực hiện được các phép tính: phép cộng, phép trừ, phép nhân, phép chia đối với hai phân thức đại số.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với phân thức đại số trong tính toán."
+      ],
+      "tienQuyet": [
+        "l8-da-thuc-nhieu-bien",
+        "l6-phep-tinh-phan-so"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 420
+    },
+    {
+      "id": "l8-phuong-trinh-bac-nhat",
+      "ten": "Phương trình bậc nhất",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phương trình",
+      "chuDeCon": "Phương trình bậc nhất",
+      "yccd": [
+        "Hiểu được khái niệm phương trình bậc nhất một ẩn và cách giải.",
+        "Giải quyết được một số vấn đề thực tiễn gắn với phương trình bậc nhất (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí, các bài toán liên quan đến Hoá học,...)."
+      ],
+      "tienQuyet": [
+        "l7-phep-tinh-so-huu-ti",
+        "l7-da-thuc-mot-bien",
+        "l6-phep-tinh-phan-so"
+      ],
+      "mo": false,
+      "x": 590,
+      "y": 60
+    },
+    {
+      "id": "l8-ham-so-bac-nhat",
+      "ten": "Hàm số bậc nhất",
+      "lop": 8,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Hàm số bậc nhất y = ax + b (a ≠ 0) và đồ thị. Hệ số góc của đường thẳng y = ax + b (a ≠ 0).",
+      "yccd": [
+        "Thiết lập được bảng giá trị của hàm số bậc nhất y = ax + b (a ≠ 0).",
+        "Vẽ được đồ thị của hàm số bậc nhất y = ax + b (a ≠ 0).",
+        "Nhận biết được khái niệm hệ số góc của đường thẳng y = ax + b (a ≠ 0).",
+        "Sử dụng được hệ số góc của đường thẳng để nhận biết và giải thích được sự cắt nhau hoặc song song của hai đường thẳng cho trước.",
+        "Vận dụng được hàm số bậc nhất và đồ thị vào giải quyết một số bài toán thực tiễn (ví dụ: bài toán về chuyển động đều trong Vật lí,...)."
+      ],
+      "tienQuyet": [
+        "l8-phuong-trinh-bac-nhat",
+        "l7-ti-le-thuc",
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": true,
+      "x": 590,
+      "y": 150
+    },
+    {
+      "id": "l9-can-thuc",
+      "ten": "Căn thức",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Căn thức",
+      "chuDeCon": "Căn bậc hai và căn bậc ba của số thực",
+      "yccd": [
+        "Nhận biết được khái niệm về căn bậc hai của số thực không âm, căn bậc ba của một số thực.",
+        "Tính được giá trị (đúng hoặc gần đúng) căn bậc hai, căn bậc ba của một số hữu tỉ bằng máy tính cầm tay.",
+        "Thực hiện được một số phép tính đơn giản về căn bậc hai của số thực không âm (căn bậc hai của một bình phương, căn bậc hai của một tích, căn bậc hai của một thương, đưa thừa số ra ngoài dấu căn bậc hai, đưa thừa số vào trong dấu căn bậc hai)."
+      ],
+      "tienQuyet": [
+        "l7-can-bac-hai",
+        "l7-so-thuc"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 60
+    },
+    {
+      "id": "l9-ham-so-y-ax2",
+      "ten": "Hàm số y = ax²",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Hàm số y = ax2 (a ≠ 0) và đồ thị",
+      "yccd": [
+        "Thiết lập được bảng giá trị của hàm số y = ax2 (a ≠ 0).",
+        "Vẽ được đồ thị của hàm số y = ax2 (a ≠ 0).",
+        "Nhận biết được tính đối xứng (trục) và trục đối xứng của đồ thị hàm số y = ax2 (a ≠ 0).",
+        "Giải quyết được một số vấn đề thực tiễn gắn với hàm số y = ax2 (a ≠ 0) và đồ thị (ví dụ: các bài toán liên quan đến chuyển động trong Vật lí,...)."
+      ],
+      "tienQuyet": [
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 150
+    },
+    {
+      "id": "l9-he-phuong-trinh",
+      "ten": "Hệ phương trình bậc nhất hai ẩn",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phương trình và hệ phương trình",
+      "chuDeCon": "Phương trình và hệ phương trình bậc nhất hai ẩn",
+      "yccd": [
+        "Nhận biết được khái niệm phương trình bậc nhất hai ẩn, hệ hai phương trình bậc nhất hai ẩn.",
+        "Nhận biết được khái niệm nghiệm của hệ hai phương trình bậc nhất hai ẩn.",
+        "Giải được hệ hai phương trình bậc nhất hai ẩn.",
+        "Tính được nghiệm của hệ hai phương trình bậc nhất hai ẩn bằng máy tính cầm tay.",
+        "Giải quyết được một số vấn đề thực tiễn gắn với hệ hai phương trình bậc nhất hai ẩn (ví dụ: các bài toán liên quan đến cân bằng phản ứng trong Hoá học,...)."
+      ],
+      "tienQuyet": [
+        "l8-phuong-trinh-bac-nhat",
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 240
+    },
+    {
+      "id": "l9-phuong-trinh-bac-hai",
+      "ten": "Phương trình bậc hai",
+      "lop": 9,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Phương trình và hệ phương trình",
+      "chuDeCon": "Phương trình bậc hai một ẩn. Định lí Viète",
+      "yccd": [
+        "Nhận biết được khái niệm phương trình bậc hai một ẩn. Giải được phương trình bậc hai một ẩn.",
+        "Tính được nghiệm phương trình bậc hai một ẩn bằng máy tính cầm tay.",
+        "Giải thích được định lí Viète và ứng dụng (ví dụ: tính nhẩm nghiệm của phương trình bậc hai, tìm hai số biết tổng và tích của chúng,...).",
+        "Vận dụng được phương trình bậc hai vào giải quyết bài toán thực tiễn."
+      ],
+      "tienQuyet": [
+        "l8-phuong-trinh-bac-nhat",
+        "l8-hang-dang-thuc",
+        "l9-can-thuc",
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": true,
+      "x": 720,
+      "y": 330
+    },
+    {
+      "id": "l10-ham-so",
+      "ten": "Hàm số & đồ thị",
+      "lop": 10,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Khái niệm cơ bản về hàm số và đồ thị",
+      "yccd": [
+        "Nhận biết được những mô hình thực tế (dạng bảng, biểu đồ, công thức) dẫn đến khái niệm hàm số.",
+        "Mô tả được các khái niệm cơ bản về hàm số: định nghĩa hàm số, tập xác định, tập giá trị, hàm số đồng biến, hàm số nghịch biến, đồ thị của hàm số.",
+        "Mô tả được các đặc trưng hình học của đồ thị hàm số đồng biến, hàm số nghịch biến.",
+        "Vận dụng được kiến thức của hàm số vào giải quyết bài toán thực tiễn (ví dụ: xây dựng hàm số bậc nhất trên những khoảng khác nhau để tính số tiền y (phải trả) theo số phút gọi x đối với một gói cước điện thoại,...)."
+      ],
+      "tienQuyet": [
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 850,
+      "y": 60
+    },
+    {
+      "id": "l10-ham-so-bac-hai",
+      "ten": "Hàm số bậc hai",
+      "lop": 10,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số và đồ thị",
+      "chuDeCon": "Hàm số bậc hai, đồ thị hàm số bậc hai và ứng dụng",
+      "yccd": [
+        "Thiết lập được bảng giá trị của hàm số bậc hai.",
+        "Vẽ được Parabola (parabol) là đồ thị hàm số bậc hai.",
+        "Nhận biết được các tính chất cơ bản của Parabola như đỉnh, trục đối xứng.",
+        "Nhận biết và giải thích được các tính chất của hàm số bậc hai thông qua đồ thị.",
+        "Vận dụng được kiến thức về hàm số bậc hai và đồ thị vào giải quyết bài toán thực tiễn (ví dụ: xác định độ cao của cầu, cổng có hình dạng Parabola,...)."
+      ],
+      "tienQuyet": [
+        "l10-ham-so",
+        "l9-phuong-trinh-bac-hai",
+        "l9-ham-so-y-ax2",
+        "l8-ham-so-bac-nhat"
+      ],
+      "mo": true,
+      "x": 850,
+      "y": 150
+    },
+    {
+      "id": "l11-ham-so-mu-log",
+      "ten": "Hàm số mũ & lôgarit",
+      "lop": 11,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Hàm số mũ và hàm số lôgarit",
+      "chuDeCon": "Hàm số mũ. Hàm số lôgarit",
+      "yccd": [
+        "Nhận biết được hàm số mũ và hàm số lôgarit. Nêu được một số ví dụ thực tế về hàm số mũ, hàm số lôgarit.",
+        "Nhận dạng được đồ thị của các hàm số mũ, hàm số lôgarit.",
+        "Giải thích được các tính chất của hàm số mũ, hàm số lôgarit thông qua đồ thị của chúng.",
+        "Giải quyết được một số vấn đề có liên quan đến môn học khác hoặc có liên quan đến thực tiễn gắn với hàm số mũ và hàm số lôgarit (ví dụ: lãi suất, sự tăng trưởng,...)."
+      ],
+      "tienQuyet": [
+        "l10-ham-so"
+      ],
+      "mo": true,
+      "x": 980,
+      "y": 60
+    },
+    {
+      "id": "l11-dao-ham",
+      "ten": "Đạo hàm",
+      "lop": 11,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Đạo hàm",
+      "chuDeCon": "Khái niệm đạo hàm. Ý nghĩa hình học của đạo hàm",
+      "yccd": [
+        "Nhận biết được một số bài toán dẫn đến khái niệm đạo hàm như: xác định vận tốc tức thời của một vật chuyển động không đều, xác định tốc độ thay đổi của nhiệt độ.",
+        "Nhận biết được định nghĩa đạo hàm. Tính được đạo hàm của một số hàm đơn giản bằng định nghĩa.",
+        "Nhận biết được ý nghĩa hình học của đạo hàm.",
+        "Thiết lập được phương trình tiếp tuyến của đồ thị hàm số tại một điểm thuộc đồ thị.",
+        "Nhận biết được số e thông qua bài toán mô hình hoá lãi suất ngân hàng."
+      ],
+      "tienQuyet": [
+        "l10-ham-so",
+        "l10-ham-so-bac-hai"
+      ],
+      "mo": true,
+      "x": 980,
+      "y": 150
+    },
+    {
+      "id": "l12-khao-sat-ham-so",
+      "ten": "Khảo sát hàm số",
+      "lop": 12,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Ứng dụng đạo hàm để khảo sát và vẽ đồ thị của hàm số",
+      "chuDeCon": "Tính đơn điệu của hàm số",
+      "yccd": [
+        "Nhận biết được tính đồng biến, nghịch biến của một hàm số trên một khoảng dựa vào dấu của đạo hàm cấp một của nó.",
+        "Thể hiện được tính đồng biến, nghịch biến của hàm số trong bảng biến thiên.",
+        "Nhận biết được tính đơn điệu, điểm cực trị, giá trị cực trị của hàm số thông qua bảng biến thiên hoặc thông qua hình ảnh hình học của đồ thị hàm số."
+      ],
+      "tienQuyet": [
+        "l11-dao-ham"
+      ],
+      "mo": true,
+      "x": 1110,
+      "y": 60
+    },
+    {
+      "id": "l12-tich-phan",
+      "ten": "Tích phân",
+      "lop": 12,
+      "cap": "THPT",
+      "mach": "Số và Đại số",
+      "chuDe": "Nguyên hàm. Tích phân",
+      "chuDeCon": "Tích phân. Ứng dụng hình học của tích phân",
+      "yccd": [
+        "Nhận biết được định nghĩa và các tính chất của tích phân.",
+        "Tính được tích phân trong những trường hợp đơn giản.",
+        "Sử dụng được tích phân để tính diện tích của một số hình phẳng, thể tích của một số hình khối.",
+        "Vận dụng được tích phân để giải một số bài toán có liên quan đến thực tiễn."
+      ],
+      "tienQuyet": [
+        "l11-dao-ham"
+      ],
+      "mo": true,
+      "x": 1110,
+      "y": 150
+    },
+    {
+      "id": "l4-so-tu-nhien",
+      "ten": "Số tự nhiên — cấu tạo thập phân, so sánh, làm tròn",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Số tự nhiên",
+      "chuDeCon": "Số và cấu tạo thập phân của một số. So sánh các số. Làm tròn số",
+      "yccd": [
+        "Đọc, viết được các số có nhiều chữ số (đến lớp triệu).",
+        "Nhận biết được cấu tạo thập phân của một số và giá trị theo vị trí của từng chữ số trong mỗi số.",
+        "Nhận biết được số chẵn, số lẻ.",
+        "Làm quen với dãy số tự nhiên và đặc điểm.",
+        "Nhận biết được cách so sánh hai số trong phạm vi lớp triệu.",
+        "Thực hiện được việc sắp xếp các số theo thứ tự (từ bé đến lớn hoặc ngược lại) trong một nhóm có không quá 4 số (trong phạm vi lớp triệu).",
+        "Làm tròn được số đến tròn chục, tròn trăm, tròn nghìn, tròn mười nghìn, tròn trăm nghìn (ví dụ: làm tròn số 12 345 đến hàng trăm thì được số 12 300)."
+      ],
+      "tienQuyet": [],
+      "mo": false,
+      "x": 70,
+      "y": 600
+    },
+    {
+      "id": "l4-cong-tru-so-tu-nhien",
+      "ten": "Phép cộng, phép trừ số tự nhiên",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Số và Đại số",
+      "chuDe": "Các phép tính với số tự nhiên",
+      "chuDeCon": "Phép cộng, phép trừ",
+      "yccd": [
+        "Thực hiện được các phép cộng, phép trừ các số tự nhiên có nhiều chữ số (có nhớ không quá ba lượt và không liên tiếp).",
+        "Vận dụng được tính chất giao hoán, tính chất kết hợp của phép cộng và quan hệ giữa phép cộng và phép trừ trong thực hành tính toán."
+      ],
+      "tienQuyet": [
+        "l4-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 70,
+      "y": 690
+    },
+    {
+      "id": "l6-so-tu-nhien-tap-hop",
+      "ten": "Số tự nhiên & tập hợp — thứ tự",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số tự nhiên",
+      "chuDeCon": "Số tự nhiên và tập hợp các số tự nhiên. Thứ tự trong tập hợp các số tự nhiên",
+      "yccd": [
+        "Sử dụng được thuật ngữ tập hợp, phần tử thuộc (không thuộc) một tập hợp; sử dụng được cách cho tập hợp.",
+        "Nhận biết được tập hợp các số tự nhiên.",
+        "Biểu diễn được số tự nhiên trong hệ thập phân.",
+        "Biểu diễn được các số tự nhiên từ 1 đến 30 bằng cách sử dụng các chữ số La Mã.",
+        "Nhận biết được (quan hệ) thứ tự trong tập hợp các số tự nhiên; so sánh được hai số tự nhiên cho trước."
+      ],
+      "tienQuyet": [
+        "l4-so-tu-nhien"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 600
+    },
+    {
+      "id": "l6-so-thap-phan",
+      "ten": "Số thập phân (mở rộng) & tỉ số phần trăm",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thập phân",
+      "chuDeCon": "Số thập phân và các phép tính với số thập phân. Tỉ số và tỉ số phần trăm",
+      "yccd": [
+        "Nhận biết được số thập phân âm, số đối của một số thập phân.",
+        "So sánh được hai số thập phân cho trước.",
+        "Thực hiện được các phép tính cộng, trừ, nhân, chia với số thập phân.",
+        "Vận dụng được các tính chất giao hoán, kết hợp, phân phối của phép nhân đối với phép cộng, quy tắc dấu ngoặc với số thập phân trong tính toán (tính viết và tính nhẩm, tính nhanh một cách hợp lí).",
+        "Thực hiện được ước lượng và làm tròn số thập phân.",
+        "Tính được tỉ số và tỉ số phần trăm của hai đại lượng.",
+        "Tính được giá trị phần trăm của một số cho trước và tính được một số biết giá trị phần trăm của số đó.",
+        "Giải quyết được một số vấn đề thực tiễn gắn với các phép tính về số thập phân, tỉ số và tỉ số phần trăm (ví dụ: các bài toán liên quan đến lãi suất tín dụng, liên quan đến thành phần các chất trong Hoá học,...)."
+      ],
+      "tienQuyet": [
+        "l5-phep-tinh-so-thap-phan",
+        "l5-ti-so-phan-tram",
+        "l6-phep-tinh-so-nguyen"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 690
+    },
+    {
+      "id": "l4-thong-ke",
+      "ten": "Thống kê — biểu đồ cột",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố thống kê",
+      "chuDeCon": "Thu thập, phân loại, sắp xếp số liệu. Biểu đồ cột",
+      "yccd": [
+        "Nhận biết được về dãy số liệu thống kê.",
+        "Nhận biết được cách sắp xếp dãy số liệu thống kê theo các tiêu chí cho trước.",
+        "Đọc và mô tả được các số liệu ở dạng biểu đồ cột.",
+        "Sắp xếp được số liệu vào biểu đồ cột (không yêu cầu học sinh vẽ biểu đồ).",
+        "Nêu được một số nhận xét đơn giản từ biểu đồ cột.",
+        "Tính được giá trị trung bình của các số liệu trong bảng hay biểu đồ cột.",
+        "Làm quen với việc phát hiện vấn đề hoặc quy luật đơn giản dựa trên quan sát các số liệu từ biểu đồ cột.",
+        "Giải quyết được những vấn đề đơn giản liên quan đến các số liệu thu được từ biểu đồ cột."
+      ],
+      "tienQuyet": [],
+      "mo": false,
+      "x": 70,
+      "y": 850
+    },
+    {
+      "id": "l5-thong-ke",
+      "ten": "Thống kê — biểu đồ hình quạt tròn",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố thống kê",
+      "chuDeCon": "Thu thập, sắp xếp số liệu. Biểu đồ hình quạt tròn",
+      "yccd": [
+        "Thực hiện được việc thu thập, phân loại, so sánh, sắp xếp số liệu thống kê theo các tiêu chí cho trước.",
+        "Đọc và mô tả được các số liệu ở dạng biểu đồ hình quạt tròn.",
+        "Sắp xếp được số liệu vào biểu đồ hình quạt tròn (không yêu cầu học sinh vẽ hình).",
+        "Lựa chọn được cách biểu diễn (bằng dãy số liệu, bảng số liệu, hoặc bằng biểu đồ) các số liệu thống kê.",
+        "Nêu được một số nhận xét đơn giản từ biểu đồ hình quạt tròn.",
+        "Làm quen với việc phát hiện vấn đề hoặc quy luật đơn giản dựa trên quan sát các số liệu từ biểu đồ hình quạt tròn.",
+        "Giải quyết được những vấn đề đơn giản liên quan đến các số liệu thu được từ biểu đồ hình quạt tròn.",
+        "Nhận biết được mối liên hệ giữa thống kê với các kiến thức khác trong môn Toán và trong thực tiễn (ví dụ: số thập phân, tỉ số phần trăm,...)."
+      ],
+      "tienQuyet": [
+        "l4-thong-ke",
+        "l5-ti-so-phan-tram"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 850
+    },
+    {
+      "id": "l6-thong-ke",
+      "ten": "Thống kê — biểu đồ cột/cột kép",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố thống kê",
+      "chuDeCon": "Thu thập, tổ chức, biểu diễn, phân tích dữ liệu. Bảng thống kê, biểu đồ tranh, biểu đồ cột/cột kép",
+      "yccd": [
+        "Thực hiện được việc thu thập, phân loại dữ liệu theo các tiêu chí cho trước từ những nguồn: bảng biểu, kiến thức trong các môn học khác.",
+        "Nhận biết được tính hợp lí của dữ liệu theo các tiêu chí đơn giản.",
+        "Đọc và mô tả thành thạo các dữ liệu ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart).",
+        "Lựa chọn và biểu diễn được dữ liệu vào bảng, biểu đồ thích hợp ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart).",
+        "Nhận ra được vấn đề hoặc quy luật đơn giản dựa trên phân tích các số liệu thu được ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart).",
+        "Giải quyết được những vấn đề đơn giản liên quan đến các số liệu thu được ở dạng: bảng thống kê; biểu đồ tranh; biểu đồ dạng cột/cột kép (column chart)."
+      ],
+      "tienQuyet": [
+        "l5-thong-ke"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 850
+    },
+    {
+      "id": "l7-thong-ke",
+      "ten": "Thống kê — biểu đồ quạt tròn & đoạn thẳng",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố thống kê",
+      "chuDeCon": "Thu thập, biểu diễn, phân tích dữ liệu. Biểu đồ hình quạt tròn, biểu đồ đoạn thẳng",
+      "yccd": [
+        "Thực hiện và lí giải được việc thu thập, phân loại dữ liệu theo các tiêu chí cho trước từ những nguồn: văn bản, bảng biểu, kiến thức trong các môn học khác và trong thực tiễn.",
+        "Giải thích được tính hợp lí của dữ liệu theo các tiêu chí toán học đơn giản (ví dụ: tính hợp lí, tính đại diện của một kết luận trong phỏng vấn; tính hợp lí của các quảng cáo;...).",
+        "Đọc và mô tả thành thạo các dữ liệu ở dạng biểu đồ thống kê: biểu đồ hình quạt tròn (pie chart); biểu đồ đoạn thẳng (line graph).",
+        "Lựa chọn và biểu diễn được dữ liệu vào bảng, biểu đồ thích hợp ở dạng: biểu đồ hình quạt tròn (cho sẵn) (pie chart); biểu đồ đoạn thẳng (line graph).",
+        "Nhận biết được những dạng biểu diễn khác nhau cho một tập dữ liệu.",
+        "Nhận ra được vấn đề hoặc quy luật đơn giản dựa trên phân tích các số liệu thu được ở dạng: biểu đồ hình quạt tròn (cho sẵn) (pie chart); biểu đồ đoạn thẳng (line graph).",
+        "Giải quyết được những vấn đề đơn giản liên quan đến các số liệu thu được ở dạng: biểu đồ hình quạt tròn (cho sẵn) (pie chart); biểu đồ đoạn thẳng (line graph)."
+      ],
+      "tienQuyet": [
+        "l6-thong-ke"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 850
+    },
+    {
+      "id": "l4-xac-suat",
+      "ten": "Xác suất — kiểm đếm số lần xảy ra",
+      "lop": 4,
+      "cap": "TH",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố xác suất",
+      "chuDeCon": "Kiểm đếm số lần lặp lại của một khả năng xảy ra của một sự kiện",
+      "yccd": [
+        "Kiểm đếm được số lần lặp lại của một khả năng xảy ra (nhiều lần) của một sự kiện khi thực hiện (nhiều lần) thí nghiệm, trò chơi đơn giản (ví dụ: trong một vài trò chơi như tung đồng xu, lấy bóng từ hộp kín,...)."
+      ],
+      "tienQuyet": [],
+      "mo": false,
+      "x": 70,
+      "y": 940
+    },
+    {
+      "id": "l5-xac-suat",
+      "ten": "Xác suất — tỉ số mô tả số lần xảy ra",
+      "lop": 5,
+      "cap": "TH",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố xác suất",
+      "chuDeCon": "Tỉ số mô tả số lần lặp lại của một khả năng xảy ra của một sự kiện",
+      "yccd": [
+        "Sử dụng được tỉ số để mô tả số lần lặp lại của một khả năng xảy ra (nhiều lần) của một sự kiện trong một thí nghiệm so với tổng số lần thực hiện thí nghiệm đó ở những trường hợp đơn giản (ví dụ: sử dụng tỉ số 2/5 để mô tả 2 lần xảy ra khả năng “mặt sấp đồng xu xuất hiện” khi tung đồng xu 5 lần)."
+      ],
+      "tienQuyet": [
+        "l4-xac-suat"
+      ],
+      "mo": false,
+      "x": 200,
+      "y": 940
+    },
+    {
+      "id": "l6-xac-suat",
+      "ten": "Xác suất — mô hình & mô tả thực nghiệm bằng phân số",
+      "lop": 6,
+      "cap": "THCS",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố xác suất",
+      "chuDeCon": "Làm quen với mô hình xác suất. Mô tả xác suất (thực nghiệm) bằng phân số",
+      "yccd": [
+        "Làm quen với mô hình xác suất trong một số trò chơi, thí nghiệm đơn giản (ví dụ: ở trò chơi tung đồng xu thì mô hình xác suất gồm hai khả năng ứng với mặt xuất hiện của đồng xu,...).",
+        "Làm quen với việc mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần của một sự kiện trong một số mô hình xác suất đơn giản.",
+        "Sử dụng được phân số để mô tả xác suất (thực nghiệm) của khả năng xảy ra nhiều lần thông qua kiểm đếm số lần lặp lại của khả năng đó trong một số mô hình xác suất đơn giản."
+      ],
+      "tienQuyet": [
+        "l5-xac-suat",
+        "l6-phep-tinh-phan-so"
+      ],
+      "mo": false,
+      "x": 330,
+      "y": 940
+    },
+    {
+      "id": "l7-xac-suat",
+      "ten": "Xác suất — biến cố ngẫu nhiên & xác suất của biến cố",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Thống kê và Xác suất",
+      "chuDe": "Một số yếu tố xác suất",
+      "chuDeCon": "Làm quen với biến cố ngẫu nhiên. Làm quen với xác suất của biến cố ngẫu nhiên",
+      "yccd": [
+        "Làm quen với các khái niệm mở đầu về biến cố ngẫu nhiên và xác suất của biến cố ngẫu nhiên trong các ví dụ đơn giản.",
+        "Nhận biết được xác suất của một biến cố ngẫu nhiên trong một số ví dụ đơn giản (ví dụ: lấy bóng trong túi, tung xúc xắc,...)."
+      ],
+      "tienQuyet": [
+        "l6-xac-suat"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 940
+    }
+  ]
+}
