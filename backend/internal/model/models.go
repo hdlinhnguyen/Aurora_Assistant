@@ -109,7 +109,7 @@ type Question struct {
 	QuestionType       string         `gorm:"type:varchar(20);not null;default:'multiple_choice'" json:"questionType"`
 	GradeLevel         string         `gorm:"type:varchar(50)" json:"gradeLevel"`
 	DistractorMappings string         `gorm:"type:text" json:"distractorMappings"` // JSON map, e.g. {"option_b": "node-uuid"}
-	Sig                string         `gorm:"type:varchar(255);index" json:"sig"` // Signature for dedup (from master_bank)
+	Sig                string         `gorm:"type:varchar(255);index" json:"sig"`  // Signature for dedup (from master_bank)
 	CreatedAt          time.Time      `json:"createdAt"`
 	UpdatedAt          time.Time      `json:"updatedAt"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
@@ -202,6 +202,7 @@ type GuardrailEvent struct {
 
 type LearningPath struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	TeacherID uuid.UUID `gorm:"type:uuid;not null;index" json:"teacherId"`
 	StudentID uuid.UUID `gorm:"type:uuid;not null;index" json:"studentId"`
 	ClassID   string    `gorm:"type:varchar(100);not null" json:"classId"`
 	ThreadID  string    `gorm:"type:varchar(100);not null" json:"threadId"`

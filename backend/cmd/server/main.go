@@ -269,6 +269,7 @@ func main() {
 	teacherGroup.Put("/topics/:id", tutorHandler.UpdateTopic)
 	teacherGroup.Delete("/topics/:id", tutorHandler.DeleteTopic)
 	teacherGroup.Post("/learning-path", tutorHandler.CreateLearningPath)
+	teacherGroup.Get("/learning-path/suggestions", tutorHandler.GetLearningPathSuggestions)
 	teacherGroup.Post("/learning-path/:threadId/approve", tutorHandler.ApproveLearningPath)
 	teacherGroup.Get("/guardrail-events", tutorHandler.GetGuardrailEvents)
 	teacherGroup.Put("/guardrail-events/:id/handled", tutorHandler.MarkGuardrailEventHandled)
