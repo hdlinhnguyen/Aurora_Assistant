@@ -735,6 +735,34 @@ func (h *TutorHandler) GetMonitoringData(c fiber.Ctx) error {
 	return c.JSON(stats)
 }
 
+func (h *TutorHandler) GetClassInterventionGroups(c fiber.Ctx) error {
+	token, ok := c.Locals("user").(*jwt.Token)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	role, _ := claims["role"].(string)
+	if role != "teacher" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem dữ liệu"})
+	}
+
+	subjectRaw := c.Params("subject")
+	subject, err := url.PathUnescape(subjectRaw)
+	if err != nil {
+		subject = subjectRaw
+	}
+
+	groups, err := h.svc.GetClassInterventionGroups(subject)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(groups)
+}
+
+
 func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	token, ok := c.Locals("user").(*jwt.Token)
 	if !ok {

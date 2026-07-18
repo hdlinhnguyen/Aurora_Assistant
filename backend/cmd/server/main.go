@@ -320,8 +320,9 @@ func main() {
 
 	api.Get("/teacher/students-progress", tutorHandler.GetStudentsProgress)
 	api.Get("/teacher/monitoring/:subject", tutorHandler.GetMonitoringData)
-	api.Get("/teacher/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)
 	api.Post("/teacher/students/:studentId/re-diagnostic", tutorHandler.RequestReDiagnostic)
+	api.Get("/teacher/classes/intervention-groups/:subject", tutorHandler.GetClassInterventionGroups)
+
 
 	port := os.Getenv("PORT")
 	if port == "" {
