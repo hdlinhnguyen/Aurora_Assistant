@@ -52,5 +52,17 @@
     "node": "l10-ham-so-bac-hai",
     "canCu": "Yêu cầu cần đạt của 'l8-ham-so-bac-nhat': \"Thiết lập được bảng giá trị của hàm số bậc nhất... · Vẽ được đồ thị của hàm số bậc nhất...\" và của 'l10-ham-so-bac-hai': \"Thiết lập được bảng giá trị của hàm số bậc hai. · Vẽ được Parabola...\"",
     "lyDo": "Các kỹ năng cơ bản về hàm số như lập bảng giá trị và vẽ đồ thị được giới thiệu và thực hành với hàm số bậc nhất. Đây là nền tảng để học sinh tiếp cận và thực hiện các kỹ năng tương tự đối với hàm số bậc hai phức tạp hơn."
+  },
+  {
+    "tienQuyet": "l7-ti-le-thuc",
+    "node": "l7-dai-luong-ti-le",
+    "canCu": "Tính chất của tỉ lệ thức và dãy tỉ số bằng nhau được vận dụng trực tiếp khi giải các bài toán đại lượng tỉ lệ.",
+    "lyDo": "Học sinh cần thiết lập và biến đổi tỉ lệ thức trước khi giải bài toán tỉ lệ thuận hoặc tỉ lệ nghịch."
+  },
+  {
+    "tienQuyet": "l7-phep-tinh-so-huu-ti",
+    "node": "l7-dai-luong-ti-le",
+    "canCu": "Các bài toán đại lượng tỉ lệ yêu cầu thực hiện phép nhân, chia và biến đổi trên các số hữu tỉ.",
+    "lyDo": "Kĩ năng tính toán với số hữu tỉ là điều kiện để tính hệ số tỉ lệ và đại lượng chưa biết."
   }
 ]

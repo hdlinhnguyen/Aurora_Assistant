@@ -457,6 +457,26 @@
       "y": 420
     },
     {
+      "id": "l7-dai-luong-ti-le",
+      "ten": "Giải toán về đại lượng tỉ lệ",
+      "lop": 7,
+      "cap": "THCS",
+      "mach": "Số và Đại số",
+      "chuDe": "Số thực",
+      "chuDeCon": "Giải toán về đại lượng tỉ lệ",
+      "yccd": [
+        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ thuận.",
+        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ nghịch."
+      ],
+      "tienQuyet": [
+        "l7-ti-le-thuc",
+        "l7-phep-tinh-so-huu-ti"
+      ],
+      "mo": false,
+      "x": 460,
+      "y": 690
+    },
+    {
       "id": "l7-bieu-thuc-dai-so",
       "ten": "Biểu thức đại số",
       "lop": 7,
