@@ -122,7 +122,7 @@ function LoginForm() {
         <div className="mb-6 grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => handleDemoLogin("student@aurora.edu.vn", "student")}
+            onClick={() => handleDemoLogin("synthetic.student.b@aurora.local", "student")}
             className="flex flex-col items-center justify-center p-3 rounded-2xl border border-border bg-muted hover:bg-accent transition-all text-center text-foreground shadow-sm"
           >
             {/* Custom Student SVG Icon */}
@@ -130,11 +130,11 @@ function LoginForm() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
             <span className="text-xs font-bold">Học sinh Demo</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">student@aurora.edu.vn</span>
+            <span className="text-[9px] text-muted-foreground mt-0.5">synthetic.student.b@aurora.local</span>
           </button>
           <button
             type="button"
-            onClick={() => handleDemoLogin("teacher@aurora.edu.vn", "teacher")}
+            onClick={() => handleDemoLogin("synthetic.teacher@aurora.local", "teacher")}
             className="flex flex-col items-center justify-center p-3 rounded-2xl border border-border bg-muted hover:bg-accent transition-all text-center text-foreground shadow-sm"
           >
             {/* Custom Teacher SVG Icon */}
@@ -142,7 +142,7 @@ function LoginForm() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2zm12-5a2 2 0 11-4 0 2 2 0 014 0zM9 20h12" />
             </svg>
             <span className="text-xs font-bold">Giáo viên Demo</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">teacher@aurora.edu.vn</span>
+            <span className="text-[9px] text-muted-foreground mt-0.5">synthetic.teacher@aurora.local</span>
           </button>
         </div>
       )}
