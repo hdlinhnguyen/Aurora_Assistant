@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"backend/internal/model"
@@ -14,6 +15,18 @@ import (
 )
 
 var DB *gorm.DB
+
+func ExamExportDir() string {
+	dir := os.Getenv("EXAM_EXPORT_DIR")
+	if dir == "" {
+		dir = "./data/exam-exports"
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(".", dir)
+	}
+	_ = os.MkdirAll(dir, 0o700)
+	return dir
+}
 
 func ConnectDB() {
 	host := os.Getenv("DB_HOST")
