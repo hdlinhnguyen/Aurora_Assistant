@@ -1579,6 +1579,20 @@ export default function TeacherDashboard() {
         <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
           <button
             onClick={() => {
+              setSelectedSubject("");
+              setActiveTab("graph-designer");
+              setSelectedStudent(null);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${!selectedSubject && activeTab === "graph-designer"
+                ? "bg-foreground border-foreground text-background shadow-md"
+                : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <BookOpen size={16} /> Quản lý Môn học
+          </button>
+
+          <button
+            onClick={() => {
               setActiveTab("student-mgmt");
               setSelectedStudent(null);
             }}
