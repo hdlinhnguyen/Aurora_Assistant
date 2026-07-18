@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { GraduationCap, BookOpen, Layers, Users, ShieldAlert, CheckCircle } from "lucide-react";
+import TelemetryDashboard from "./components/TelemetryDashboard";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -133,6 +134,15 @@ export default function AdminDashboard() {
           <p>• Việc kích hoạt tài khoản Giáo viên mới sẽ cho phép họ đăng nhập và truy cập vào công cụ biên soạn giáo án, quản lý học sinh và xem cảnh báo hành vi (Guardrails).</p>
         </div>
       </div>
+
+      <section className="space-y-5 pt-2">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--purple)]">Quan sát & cải tiến</p>
+          <h2 className="mt-2 text-3xl font-extrabold font-[var(--font-display)] tracking-tight">Metrics & EDA</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Giá trị trung bình theo thời gian và các bước khám phá dữ liệu sẵn ngay trên trang quản trị.</p>
+        </div>
+        <TelemetryDashboard />
+      </section>
     </div>
   );
 }

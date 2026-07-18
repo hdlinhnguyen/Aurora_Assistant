@@ -121,7 +121,7 @@ export default function TelemetryDashboard() {
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[var(--purple)]/20 bg-[var(--purple)]/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--purple)]">
               <Activity className="h-3.5 w-3.5" /> Tín hiệu học tập trực tiếp
             </div>
-            <h2 className="font-[var(--font-display)] text-3xl font-extrabold tracking-tight">Metrics & EDA</h2>
+            <h3 className="font-[var(--font-display)] text-3xl font-extrabold tracking-tight">Bảng tín hiệu vận hành</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Theo dõi hành vi học tập, chất lượng dữ liệu và sức khỏe API trên cùng một nhịp thời gian.
             </p>
