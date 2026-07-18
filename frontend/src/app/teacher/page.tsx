@@ -180,6 +180,8 @@ export default function TeacherDashboard() {
   const [qOptions, setQOptions] = useState<string[]>(["", "", "", ""]);
   const [qCorrect, setQCorrect] = useState(0);
   const [qDifficulty, setQDifficulty] = useState("medium");
+  const [qDistractors, setQDistractors] = useState<Record<string, string>>({});
+  const [pendingDiff, setPendingDiff] = useState<{ newNodes: any[]; suggestedEdges: any[] } | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem("aurora_user");
@@ -928,15 +930,39 @@ export default function TeacherDashboard() {
       edges: mergedEdges,
     };
 
-    // 4. Save tree layout and default questions
-    setLoadingMessage("Đang tính toán bố cục phân tầng và lưu sơ đồ cây kiến thức...");
-    await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/save-tree`, {
-      method: "POST",
-      body: JSON.stringify(finalGraph),
-      signal: ctrl.signal,
+    // 4. Calculate Diff
+    const nodeIdToName = (id: string) => {
+      const found = nodes.find((n) => n.id === id);
+      return found ? found.name : "";
+    };
+
+    const newNodes = finalGraph.nodes.filter(
+      (fn: any) => !nodes.some((n) => n.name.toLowerCase() === fn.name.toLowerCase())
+    );
+
+    const suggestedEdges = finalGraph.edges.filter((fe: any) => {
+      const alreadyExists = edges.some((e) => {
+        const srcName = nodeIdToName(e.sourceId);
+        const tgtName = nodeIdToName(e.targetId);
+        return (
+          srcName.toLowerCase() === fe.sourceNodeName.toLowerCase() &&
+          tgtName.toLowerCase() === fe.targetNodeName.toLowerCase()
+        );
+      });
+      return !alreadyExists;
     });
 
-    toast.success("Dựng cây kiến thức thành công!");
+    if (newNodes.length === 0 && suggestedEdges.length === 0) {
+      toast.success("Đồ thị nạp trùng khớp hoàn toàn với sơ đồ hiện tại. Không có thay đổi nào cần duyệt.");
+      setExtractedChunks([]);
+      setParsedGraphsCache([]);
+      setFailedChunkIndex(null);
+      setParseErrorDetail("");
+      return true;
+    }
+
+    setPendingDiff({ newNodes, suggestedEdges });
+    toast.success("Phân tích tài liệu hoàn tất! Vui lòng duyệt các thay đổi xuất hiện.");
     setExtractedChunks([]);
     setParsedGraphsCache([]);
     setFailedChunkIndex(null);
@@ -968,6 +994,57 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleApplyDiff = async (approvedNodes: any[], approvedEdges: any[], asDraft: boolean = false) => {
+    setLoading(true);
+    setLoadingMessage("Đang tích hợp các thay đổi vào sơ đồ cây...");
+    try {
+      const nameToIdMap: Record<string, string> = {};
+      nodes.forEach((n) => {
+        nameToIdMap[n.name.toLowerCase()] = n.id;
+      });
+
+      for (const node of approvedNodes) {
+        const res = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/nodes`, {
+          method: "POST",
+          body: JSON.stringify({
+            name: node.name,
+            theory: node.theory || "Chưa có lý thuyết",
+            topicGroup: node.topicGroup || "Chủ đề chung",
+            isRoot: node.isRoot || false,
+            status: "active",
+          }),
+        });
+        if (res && (res as any).id) {
+          nameToIdMap[node.name.toLowerCase()] = (res as any).id;
+        }
+      }
+
+      for (const edge of approvedEdges) {
+        const srcId = nameToIdMap[edge.sourceNodeName.toLowerCase()];
+        const tgtId = nameToIdMap[edge.targetNodeName.toLowerCase()];
+        if (srcId && tgtId) {
+          await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/edges`, {
+            method: "POST",
+            body: JSON.stringify({
+              sourceId: srcId,
+              targetId: tgtId,
+              status: asDraft ? "draft" : "active",
+              sourceType: "llm",
+            }),
+          });
+        }
+      }
+
+      toast.success("Tích hợp sơ đồ thành công!");
+      setPendingDiff(null);
+      loadTreeData();
+    } catch (err: any) {
+      toast.error("Lỗi khi tích hợp sơ đồ: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadNodeQuestions = async (nodeId: string) => {
     try {
       const data = await apiFetch(`/nodes/${nodeId}/questions`);
@@ -984,6 +1061,7 @@ export default function TeacherDashboard() {
     setQOptions(["", "", "", ""]);
     setQCorrect(0);
     setQDifficulty("medium");
+    setQDistractors({});
     if (nodes.length > 0) {
       setEditingNode(nodes[0]);
     } else {
@@ -1001,6 +1079,11 @@ export default function TeacherDashboard() {
     setQOptions(opts);
     setQCorrect(q.correctOption);
     setQDifficulty(q.difficulty);
+    try {
+      setQDistractors(JSON.parse((q as any).distractorMappings || "{}"));
+    } catch (e) {
+      setQDistractors({});
+    }
   };
 
   const handleSaveQuestion = async (e: React.FormEvent) => {
@@ -1017,6 +1100,7 @@ export default function TeacherDashboard() {
       optionsJson: JSON.stringify(qOptions),
       correctOption: qCorrect,
       difficulty: qDifficulty,
+      distractorMappings: JSON.stringify(qDistractors),
     };
 
     setLoading(true);
@@ -2029,24 +2113,56 @@ export default function TeacherDashboard() {
                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                   Các phương án trả lời
                 </label>
-                {qOptions.map((opt, oIdx) => (
-                  <div key={oIdx} className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-400 font-mono w-5">
-                      {String.fromCharCode(65 + oIdx)}.
-                    </span>
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) => {
-                        const nextOpts = [...qOptions];
-                        nextOpts[oIdx] = e.target.value;
-                        setQOptions(nextOpts);
-                      }}
-                      placeholder={`Nội dung phương án ${String.fromCharCode(65 + oIdx)}...`}
-                      className="flex-1 rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-semibold text-foreground"
-                    />
-                  </div>
-                ))}
+                {qOptions.map((opt, oIdx) => {
+                  const isCorrect = oIdx === qCorrect;
+                  return (
+                    <div key={oIdx} className="flex flex-col gap-1 border border-border/30 p-2 rounded-xl bg-slate-50/20">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-slate-400 font-mono w-5">
+                          {String.fromCharCode(65 + oIdx)}.
+                        </span>
+                        <input
+                          type="text"
+                          value={opt}
+                          onChange={(e) => {
+                            const nextOpts = [...qOptions];
+                            nextOpts[oIdx] = e.target.value;
+                            setQOptions(nextOpts);
+                          }}
+                          placeholder={`Nội dung phương án ${String.fromCharCode(65 + oIdx)}...`}
+                          className="flex-1 rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-semibold text-foreground"
+                        />
+                      </div>
+                      
+                      {/* Mapping select for incorrect options */}
+                      {!isCorrect && (
+                        <div className="pl-7 flex items-center gap-2">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Nếu chọn sai, chẩn đoán hổng kiến thức nền tảng tại:</span>
+                          <select
+                            value={qDistractors[oIdx.toString()] || ""}
+                            onChange={(e) => {
+                              const nextDists = { ...qDistractors };
+                              if (e.target.value) {
+                                nextDists[oIdx.toString()] = e.target.value;
+                              } else {
+                                delete nextDists[oIdx.toString()];
+                              }
+                              setQDistractors(nextDists);
+                            }}
+                            className="bg-card border border-border rounded-lg text-[10px] py-1 px-2 font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-[var(--mint)]"
+                          >
+                            <option value="">-- Không ánh xạ (Mặc định) --</option>
+                            {nodes.map((n) => (
+                              <option key={n.id} value={n.id}>
+                                {n.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="flex gap-2 justify-end pt-3 border-t border-border mt-4">
@@ -2111,6 +2227,147 @@ export default function TeacherDashboard() {
                 className="px-4 py-3.5 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
                 Hủy bỏ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Diff Review Modal/Panel */}
+      {pendingDiff && (
+        <div className="fixed inset-0 bg-foreground/60 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-card p-6 rounded-3xl border border-border shadow-2xl flex flex-col gap-4 max-w-2xl w-full max-h-[85vh] overflow-hidden">
+            <div>
+              <h3 className="font-[var(--font-display)] font-black text-foreground text-sm uppercase tracking-wider">
+                Duyệt Thay Đổi Sơ Đồ Cây Kiến Thức (Diff Review Panel)
+              </h3>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Các thay đổi được phát hiện từ tài liệu so với sơ đồ hiện tại. Chọn các mục muốn tích hợp.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-auto flex flex-col gap-4 pr-1">
+              {/* New Nodes */}
+              {pendingDiff.newNodes.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
+                    🟢 Chủ đề kiến thức mới ({pendingDiff.newNodes.length})
+                  </h4>
+                  <div className="border border-border rounded-2xl overflow-hidden divide-y divide-border bg-slate-50/30">
+                    {pendingDiff.newNodes.map((n: any, idx: number) => (
+                      <div key={idx} className="p-3 text-xs flex items-start gap-3 hover:bg-slate-100/40">
+                        <input
+                          type="checkbox"
+                          defaultChecked
+                          id={`new-node-${idx}`}
+                          className="mt-0.5 rounded border-border text-[var(--mint)] focus:ring-[var(--mint)] shrink-0"
+                          data-node-index={idx}
+                        />
+                        <div className="space-y-0.5">
+                          <div className="font-extrabold text-foreground">{n.name}</div>
+                          <div className="text-[10px] text-muted-foreground font-semibold">
+                            Chóm: {n.topicGroup || "Chủ đề chung"} | Lý thuyết: {n.theory ? `${n.theory.substring(0, 100)}...` : "Chưa biên soạn"}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Suggested Edges */}
+              {pendingDiff.suggestedEdges.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-[11px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
+                    🔵 Liên kết tiên quyết đề xuất ({pendingDiff.suggestedEdges.length})
+                  </h4>
+                  <div className="border border-border rounded-2xl overflow-hidden divide-y divide-border bg-slate-50/30">
+                    {pendingDiff.suggestedEdges.map((e: any, idx: number) => (
+                      <div key={idx} className="p-3 text-xs flex items-start gap-3 hover:bg-slate-100/40">
+                        <input
+                          type="checkbox"
+                          defaultChecked
+                          id={`sug-edge-${idx}`}
+                          className="mt-0.5 rounded border-border text-[var(--mint)] focus:ring-[var(--mint)] shrink-0"
+                          data-edge-index={idx}
+                        />
+                        <div className="space-y-0.5">
+                          <div className="font-extrabold text-foreground flex items-center gap-2">
+                            <span>{e.sourceNodeName}</span>
+                            <span className="text-indigo-500 font-black">➔</span>
+                            <span>{e.targetNodeName}</span>
+                          </div>
+                          {e.reason && (
+                            <p className="text-[10px] font-semibold text-muted-foreground italic leading-relaxed">
+                              Lý do: {e.reason}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 justify-end pt-3 border-t border-border mt-2">
+              <button
+                type="button"
+                onClick={() => setPendingDiff(null)}
+                className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!pendingDiff) return;
+                  // Gather approved nodes/edges by reading checkbox states from DOM
+                  const approvedNodes: any[] = [];
+                  pendingDiff.newNodes.forEach((n, idx) => {
+                    const el = document.getElementById(`new-node-${idx}`) as HTMLInputElement;
+                    if (el && el.checked) {
+                      approvedNodes.push(n);
+                    }
+                  });
+                  const approvedEdges: any[] = [];
+                  pendingDiff.suggestedEdges.forEach((e, idx) => {
+                    const el = document.getElementById(`sug-edge-${idx}`) as HTMLInputElement;
+                    if (el && el.checked) {
+                      approvedEdges.push(e);
+                    }
+                  });
+
+                  await handleApplyDiff(approvedNodes, approvedEdges, false);
+                }}
+                className="px-5 py-2.5 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground text-xs font-black rounded-xl transition-all shadow-[var(--shadow-card)] cursor-pointer"
+              >
+                Chấp nhận tích hợp (Active)
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!pendingDiff) return;
+                  const approvedNodes: any[] = [];
+                  pendingDiff.newNodes.forEach((n, idx) => {
+                    const el = document.getElementById(`new-node-${idx}`) as HTMLInputElement;
+                    if (el && el.checked) {
+                      approvedNodes.push(n);
+                    }
+                  });
+                  const approvedEdges: any[] = [];
+                  pendingDiff.suggestedEdges.forEach((e, idx) => {
+                    const el = document.getElementById(`sug-edge-${idx}`) as HTMLInputElement;
+                    if (el && el.checked) {
+                      approvedEdges.push(e);
+                    }
+                  });
+
+                  await handleApplyDiff(approvedNodes, approvedEdges, true);
+                }}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-[var(--shadow-card)] cursor-pointer"
+              >
+                Tích hợp liên kết nháp (Draft)
               </button>
             </div>
           </div>
