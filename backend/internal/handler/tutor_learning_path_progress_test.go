@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"backend/internal/learningpath"
+	"backend/internal/model"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,15 @@ import (
 
 type recordingProgressUpdater struct {
 	inputs []learningpath.ApplyEvidenceInput
+}
+
+type recordingProgressInitializer struct {
+	pathID uuid.UUID
+}
+
+func (i *recordingProgressInitializer) Initialize(_ context.Context, path *model.LearningPath) error {
+	i.pathID = path.ID
+	return nil
 }
 
 func (u *recordingProgressUpdater) ApplyEvidence(_ context.Context, input learningpath.ApplyEvidenceInput) (learningpath.ProgressStepView, error) {
@@ -31,4 +41,13 @@ func TestRecordLearningPathEvidenceUsesStudentTopicAndKind(t *testing.T) {
 	require.Equal(t, topicID, updater.inputs[0].TopicID)
 	require.Equal(t, learningpath.EvidenceAnswer, updater.inputs[0].Kind)
 	require.True(t, updater.inputs[0].Correct)
+}
+
+func TestInitializeApprovedLearningPathDelegatesToProgressService(t *testing.T) {
+	initializer := &recordingProgressInitializer{}
+	handler := NewTutorHandler(nil, WithLearningPathProgressInitializer(initializer))
+	path := &model.LearningPath{ID: uuid.New()}
+
+	require.NoError(t, handler.initializeApprovedLearningPath(path))
+	require.Equal(t, path.ID, initializer.pathID)
 }

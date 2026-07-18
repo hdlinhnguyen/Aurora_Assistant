@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -29,13 +30,23 @@ import (
 )
 
 type TutorHandler struct {
-	svc       service.TutorService
-	telemetry telemetry.ActorPublisher
-	progress  LearningPathProgressUpdater
+	svc                 service.TutorService
+	telemetry           telemetry.ActorPublisher
+	progress            LearningPathProgressUpdater
+	progressReader      LearningPathProgressReader
+	progressInitializer LearningPathProgressInitializer
 }
 
 type LearningPathProgressUpdater interface {
 	ApplyEvidence(context.Context, learningpath.ApplyEvidenceInput) (learningpath.ProgressStepView, error)
+}
+
+type LearningPathProgressReader interface {
+	GetStudentProgress(context.Context, uuid.UUID) (learningpath.LearningPathProgressView, error)
+}
+
+type LearningPathProgressInitializer interface {
+	Initialize(context.Context, *model.LearningPath) error
 }
 
 type TutorHandlerOption func(*TutorHandler)
@@ -49,6 +60,18 @@ func WithTutorTelemetry(publisher telemetry.ActorPublisher) TutorHandlerOption {
 func WithLearningPathProgress(updater LearningPathProgressUpdater) TutorHandlerOption {
 	return func(handler *TutorHandler) {
 		handler.progress = updater
+	}
+}
+
+func WithLearningPathProgressReader(reader LearningPathProgressReader) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.progressReader = reader
+	}
+}
+
+func WithLearningPathProgressInitializer(initializer LearningPathProgressInitializer) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.progressInitializer = initializer
 	}
 }
 
@@ -1629,7 +1652,12 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		config.DB.Create(&newPath)
+		if err := config.DB.Create(&newPath).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể lưu lộ trình đã duyệt"})
+		}
+		if err := h.initializeApprovedLearningPath(&newPath); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể khởi tạo tiến độ lộ trình"})
+		}
 	}
 	config.DB.Where("thread_id = ? AND teacher_id = ? AND status = ?", threadID, teacherID, "Draft").Delete(&model.LearningPath{})
 	h.publishLearningPathApproved(teacherID, threadID, req.Approve, req.Note, len(pathsToSave))
@@ -1646,6 +1674,17 @@ func (h *TutorHandler) GetStudentLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
 	}
 
+	if h.progressReader != nil {
+		view, progressErr := h.progressReader.GetStudentProgress(context.Background(), studentID)
+		if errors.Is(progressErr, learningpath.ErrPathNotFound) {
+			return c.JSON(emptyStudentLearningPath())
+		}
+		if progressErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải tiến độ lộ trình"})
+		}
+		return c.JSON(studentLearningPathResponse(view))
+	}
+
 	var path model.LearningPath
 	err = config.DB.Where("student_id = ? AND status = 'Approved'", studentID).Order("created_at desc").First(&path).Error
 	if err != nil {
@@ -1659,6 +1698,27 @@ func (h *TutorHandler) GetStudentLearningPath(c fiber.Ctx) error {
 	}
 
 	return c.JSON(parsedPath)
+}
+
+func emptyStudentLearningPath() fiber.Map {
+	return fiber.Map{
+		"ordered_steps": []interface{}{},
+		"progress": fiber.Map{
+			"completedSteps": 0, "totalSteps": 0, "completionPercent": 0,
+			"nextStep": nil, "blockedSteps": []interface{}{}, "steps": []interface{}{},
+		},
+	}
+}
+
+func studentLearningPathResponse(view learningpath.LearningPathProgressView) fiber.Map {
+	return fiber.Map{
+		"id": view.ID, "classId": view.ClassID, "ordered_steps": view.OrderedSteps,
+		"progress": fiber.Map{
+			"completedSteps": view.CompletedSteps, "totalSteps": view.TotalSteps,
+			"completionPercent": view.CompletionPercent, "nextStep": view.NextStep,
+			"blockedSteps": view.BlockedSteps, "steps": view.Steps,
+		},
+	}
 }
 
 func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
@@ -1763,6 +1823,13 @@ func (h *TutorHandler) recordLearningPathEvidence(studentID, topicID uuid.UUID, 
 	}); err != nil {
 		log.Printf("learning path progress update failed: %v", err)
 	}
+}
+
+func (h *TutorHandler) initializeApprovedLearningPath(path *model.LearningPath) error {
+	if h.progressInitializer == nil {
+		return nil
+	}
+	return h.progressInitializer.Initialize(context.Background(), path)
 }
 
 func (h *TutorHandler) publishLearningPathGenerated(teacherID uuid.UUID, threadID string, pathCount int) {

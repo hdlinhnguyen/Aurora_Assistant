@@ -19,6 +19,7 @@ import (
 	"backend/internal/exam"
 	"backend/internal/gamification"
 	"backend/internal/handler"
+	"backend/internal/learningpath"
 	masteryprofile "backend/internal/mastery"
 	"backend/internal/middleware"
 	"backend/internal/model"
@@ -93,12 +94,22 @@ func main() {
 		config.DB, masteryRepo, masteryClient,
 		masteryprofile.WithTelemetryPublisher(telemetryPublisher),
 	)
+	learningPathProgressSvc := learningpath.NewService(
+		config.DB, telemetryPublisher, learningpath.NewDatabaseMasteryReader(config.DB),
+	)
 	gamificationRepo := gamification.NewRepository(config.DB)
 	gamificationSvc := gamification.NewService(config.DB, gamificationRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
-	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher))
+	tutorHandler := handler.NewTutorHandler(
+		tutorSvc,
+		handler.WithTutorTelemetry(telemetryPublisher),
+		handler.WithLearningPathProgress(learningPathProgressSvc),
+		handler.WithLearningPathProgressReader(learningPathProgressSvc),
+		handler.WithLearningPathProgressInitializer(learningPathProgressSvc),
+	)
+	learningPathProgressHandler := handler.NewLearningPathProgressHandler(learningPathProgressSvc)
 	adminHandler := handler.NewAdminHandler(config.DB)
 	adminMetricsHandler := handler.NewAdminMetricsHandler(adminmetrics.NewService(config.DB))
 	studentMgmtHandler := handler.NewStudentMgmtHandler(config.DB)
@@ -245,6 +256,7 @@ func main() {
 	api.Post("/nodes/:nodeId/cant-do", tutorHandler.SubmitCantDo)
 	api.Post("/nodes/:nodeId/adaptive-downgrade", tutorHandler.AdaptiveDowngrade)
 	api.Get("/student/learning-path", tutorHandler.GetStudentLearningPath)
+	api.Post("/student/learning-path/steps/:topicId/start", learningPathProgressHandler.StartStep)
 	api.Post("/student/hints", tutorHandler.RequestHint)
 	api.Post("/nodes/:nodeId/chat-theory", tutorHandler.ChatNodeTheory)
 
@@ -271,6 +283,7 @@ func main() {
 	teacherGroup.Post("/learning-path", tutorHandler.CreateLearningPath)
 	teacherGroup.Get("/learning-path/suggestions", tutorHandler.GetLearningPathSuggestions)
 	teacherGroup.Post("/learning-path/:threadId/approve", tutorHandler.ApproveLearningPath)
+	teacherGroup.Get("/students/:studentId/learning-path/progress", learningPathProgressHandler.GetTeacherProgress)
 	teacherGroup.Get("/guardrail-events", tutorHandler.GetGuardrailEvents)
 	teacherGroup.Put("/guardrail-events/:id/handled", tutorHandler.MarkGuardrailEventHandled)
 	teacherGroup.Get("/students-progress", tutorHandler.GetStudentsProgress)

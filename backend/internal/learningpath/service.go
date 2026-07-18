@@ -21,6 +21,26 @@ type Service struct {
 	mastery   MasteryReader
 }
 
+type DatabaseMasteryReader struct {
+	db *gorm.DB
+}
+
+func NewDatabaseMasteryReader(db *gorm.DB) *DatabaseMasteryReader {
+	return &DatabaseMasteryReader{db: db}
+}
+
+func (r *DatabaseMasteryReader) TopicMastery(ctx context.Context, studentID, topicID uuid.UUID) (float64, float64, bool, error) {
+	var row model.StudentTopicMastery
+	result := r.db.WithContext(ctx).Where("student_id = ? AND topic_id = ?", studentID, topicID).First(&row)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return 0, 0, false, nil
+	}
+	if result.Error != nil {
+		return 0, 0, false, result.Error
+	}
+	return row.MasteryProbability, row.ConfidenceScore, true, nil
+}
+
 type pathPayload struct {
 	OrderedSteps []pathStepPayload `json:"ordered_steps"`
 }
@@ -274,16 +294,14 @@ func (s *Service) getProgressForPath(ctx context.Context, path *model.LearningPa
 	if err := s.db.WithContext(ctx).Where("learning_path_id = ?", path.ID).Order("step_order").Find(&rows).Error; err != nil {
 		return LearningPathProgressView{}, err
 	}
-	var payload pathPayload
+	var payload struct {
+		OrderedSteps []map[string]any `json:"ordered_steps"`
+	}
 	if err := json.Unmarshal([]byte(path.StepsJSON), &payload); err != nil {
 		return LearningPathProgressView{}, err
 	}
-	orderedSteps := make([]map[string]any, 0, len(payload.OrderedSteps))
-	for _, step := range payload.OrderedSteps {
-		orderedSteps = append(orderedSteps, map[string]any{"order": step.Order, "topic_id": step.TopicID})
-	}
 	view := LearningPathProgressView{
-		ID: path.ID, ClassID: path.ClassID, OrderedSteps: orderedSteps,
+		ID: path.ID, ClassID: path.ClassID, OrderedSteps: payload.OrderedSteps,
 		TotalSteps: len(rows), Steps: make([]ProgressStepView, 0, len(rows)), BlockedSteps: []ProgressStepView{},
 	}
 	for _, row := range rows {

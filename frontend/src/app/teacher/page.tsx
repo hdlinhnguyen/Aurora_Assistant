@@ -30,6 +30,7 @@ import QuestionBankTab from "./components/QuestionBankTab";
 import QuestionTaggingPanel from "./components/QuestionTaggingPanel";
 import MonitoringTab from "./components/MonitoringTab";
 import LearningPathTab from "./components/LearningPathTab";
+import { buildLearningPathRequest } from "./components/learningPathRequest";
 import StudentsProgressTab from "./components/StudentsProgressTab";
 import StudentMasteryMatrix from "./components/StudentMasteryMatrix";
 import StudentMgmtTab from "./components/StudentMgmtTab";
@@ -1011,10 +1012,10 @@ export default function TeacherDashboard() {
     try {
       const res = await apiFetch("/teacher/learning-path", {
         method: "POST",
-        body: JSON.stringify({
-          classId: "class-demo",
-          targetTopicIds: selectedTargetTopics,
-        }),
+        body: JSON.stringify(buildLearningPathRequest(
+          studentsProgress.map((student) => student.studentId),
+          selectedTargetTopics,
+        )),
       });
       setActiveThreadId(res.thread_id);
       setInsights(res.class_insight);

@@ -105,6 +105,7 @@ func TestGetStudentProgressLazilyInitializesAndReturnsNextStep(t *testing.T) {
 	require.Equal(t, topics[0], got.NextStep.TopicID)
 	require.Equal(t, StatusInProgress, got.NextStep.Status)
 	require.Len(t, got.Steps, 2)
+	require.Equal(t, "Bổ sung nền tảng", got.OrderedSteps[0]["inclusion_reason"])
 }
 
 func TestStartStepRejectsPendingStepAndIsIdempotentForActiveStep(t *testing.T) {
@@ -214,6 +215,23 @@ func TestApplyEvidenceLoadsLatestMasteryWhenSnapshotsAreOmitted(t *testing.T) {
 	require.NotNil(t, got.ConfidenceAfter)
 }
 
+func TestDatabaseMasteryReaderReturnsPersistedTopicState(t *testing.T) {
+	db := setupLearningPathDB(t)
+	studentID, topicID := uuid.New(), uuid.New()
+	require.NoError(t, db.AutoMigrate(&model.StudentTopicMastery{}))
+	require.NoError(t, db.Create(&model.StudentTopicMastery{
+		ID: uuid.New(), StudentID: studentID, TopicID: topicID,
+		MasteryProbability: .82, ConfidenceScore: .67, MasteryStatus: "mastered",
+		EvidenceSummaryJSON: "{}", SourceBreakdownJSON: "{}", Version: 1,
+	}).Error)
+
+	mastery, confidence, found, err := NewDatabaseMasteryReader(db).TopicMastery(context.Background(), studentID, topicID)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, .82, mastery)
+	require.Equal(t, .67, confidence)
+}
+
 func setupLearningPathDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := testutil.OpenPostgres(t)
@@ -233,7 +251,7 @@ func seedApprovedPath(t *testing.T, db *gorm.DB, count int) (uuid.UUID, model.Le
 	for i := 0; i < count; i++ {
 		topicID := uuid.New()
 		topics = append(topics, topicID)
-		steps = append(steps, map[string]any{"order": i, "topic_id": topicID.String()})
+		steps = append(steps, map[string]any{"order": i, "topic_id": topicID.String(), "inclusion_reason": "Bổ sung nền tảng"})
 	}
 	payload := map[string]any{"ordered_steps": steps}
 	raw, err := json.Marshal(payload)
