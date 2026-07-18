@@ -8,6 +8,22 @@ sys.path.append(str(root_dir / "learning-path" / "src"))
 
 from learning_path.adapters import load_chac_goc_graph
 from learning_path.hints import HintLadder
+import random
+
+SCENES = [
+    "TexTransformExample",
+    "AnimatingMethods",
+    "CoordinateSystemExample",
+    "GraphExample",
+    "OpeningManimExample"
+]
+
+def simulate_visualization(level):
+    if level == 1:
+        return "[VISUALIZATION]: 🍕 SVG Animation (Hình vẽ thuần với hiệu ứng cơ bản)"
+    else:
+        scene = random.choice(SCENES)
+        return f"[VISUALIZATION]: 🎬 Sẽ trình chiếu Manim Animation (Cảnh: {scene}.mp4)"
 
 def main():
     print("=== DEMO: AI SOCRATIC GUIDANCE ANIMATION SCRIPT ===")
@@ -36,17 +52,20 @@ def main():
     # Level 1: Socratic Nudge
     print("--- [BẬC 1: Socratic Nudge - Câu hỏi gợi mở] ---")
     hint_1 = ladder.request_hint(topic_id, press_count=1, chosen_misconception="cộng nhầm dấu")
-    print(f"AI: {hint_1.text}\n")
+    print(f"AI: {hint_1.text}")
+    print(f"{simulate_visualization(1)}\n")
     
     # Level 2: First-principles
     print("--- [BẬC 2: First-principles - Gợi nhắc nguyên lý nền tảng] ---")
     hint_2 = ladder.request_hint(topic_id, press_count=2)
-    print(f"AI: {hint_2.text}\n")
+    print(f"AI: {hint_2.text}")
+    print(f"{simulate_visualization(2)}\n")
     
     # Level 3: Bottom-out
     print("--- [BẬC 3: Bottom-out - Hướng dẫn chi tiết bằng ví dụ nhỏ nhất] ---")
     hint_3 = ladder.request_hint(topic_id, press_count=3)
-    print(f"AI: {hint_3.text}\n")
+    print(f"AI: {hint_3.text}")
+    print(f"{simulate_visualization(3)}\n")
     
     # Quá giới hạn (Cần ôn lại)
     print("--- [QUÁ GIỚI HẠN: Chẩn đoán lỗ hổng và đề xuất học lại] ---")
