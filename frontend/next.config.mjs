@@ -16,6 +16,10 @@ const nextConfig = {
         source: "/api/hint",
         destination: "http://127.0.0.1:8089/api/hint", // Proxy to Python FastAPI service
       },
+      {
+        source: "/media/:path*",
+        destination: "http://127.0.0.1:8089/media/:path*", // Proxy static video media files
+      },
     ];
   },
 };

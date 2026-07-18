@@ -62,7 +62,7 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 	}
 
 	var nodes []model.Node
-	if err := tx.Unscoped().Where("subject = ?", config.Subject).Find(&nodes).Error; err != nil {
+	if err := tx.Unscoped().Where("subject IN ?", []string{config.Subject, "Synthetic - Toán đại số", "Toán đại số"}).Find(&nodes).Error; err != nil {
 		return err
 	}
 	nodeIDs := make([]uuid.UUID, 0, len(nodes))
@@ -104,7 +104,7 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 		if err := tx.Where("topic_id IN ?", nodeIDs).Delete(&model.StudentTopicMastery{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("subject = ?", config.Subject).Delete(&model.Edge{}).Error; err != nil {
+		if err := tx.Where("subject IN ?", []string{config.Subject, "Synthetic - Toán đại số", "Toán đại số"}).Delete(&model.Edge{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Unscoped().Where("id IN ?", nodeIDs).Delete(&model.Node{}).Error; err != nil {

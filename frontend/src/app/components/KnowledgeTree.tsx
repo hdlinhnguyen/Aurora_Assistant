@@ -210,6 +210,36 @@ export default function KnowledgeTree({
   // Zoom helpers
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.15, 2.5));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.15, 0.4));
+
+  // Wheel zoom: zoom toward cursor position for natural feel
+  // Uses a native non-passive listener so preventDefault() works to block page scroll
+  const wheelCallbackRef = useRef<(e: WheelEvent) => void>(() => {});
+  wheelCallbackRef.current = (e: WheelEvent) => {
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const cursorX = e.clientX - rect.left;
+    const cursorY = e.clientY - rect.top;
+
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = Math.max(0.4, Math.min(scale * zoomFactor, 2.5));
+
+    const newPanX = cursorX - (cursorX - pan.x) * (newScale / scale);
+    const newPanY = cursorY - (cursorY - pan.y) * (newScale / scale);
+
+    setScale(newScale);
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+  };
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handler = (e: WheelEvent) => wheelCallbackRef.current(e);
+    container.addEventListener("wheel", handler, { passive: false });
+    return () => container.removeEventListener("wheel", handler);
+  }, []);
   const handleResetZoom = () => {
     const container = containerRef.current;
     if (!container || displayNodes.length === 0) {
@@ -257,6 +287,46 @@ export default function KnowledgeTree({
       return () => clearTimeout(timer);
     }
   }, [nodes]);
+
+  // Re-center when switching between focused/overview mode
+  useEffect(() => {
+    if (!containerRef.current || localNodes.length === 0) return;
+
+    const timer = setTimeout(() => {
+      if (isFocusedView && activeSelectedNodeId) {
+        // Center the selected node in the viewport
+        const container = containerRef.current;
+        if (!container) return;
+
+        // Find the selected node from displayNodes (which has focused-view coords)
+        // Since displayNodes is recalculated during render, we need to find position
+        // from the focused layout. The node's position in focused view is deterministic.
+        const selectedNode = displayNodes.find(n => n.id === activeSelectedNodeId);
+        if (!selectedNode) {
+          handleResetZoom();
+          return;
+        }
+
+        const nodeWidth = 230;
+        const nodeHeight = 85;
+        const nodeCenterX = selectedNode.posX + nodeWidth / 2;
+        const nodeCenterY = selectedNode.posY + nodeHeight / 2;
+
+        const containerWidth = container.clientWidth || 800;
+        const containerHeight = container.clientHeight || 500;
+
+        const targetScale = 1.0;
+        const panX = containerWidth / 2 - nodeCenterX * targetScale;
+        const panY = containerHeight / 2 - nodeCenterY * targetScale;
+
+        setScale(targetScale);
+        setPan({ x: Math.round(panX), y: Math.round(panY) });
+      } else {
+        handleResetZoom();
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [isFocusedView, activeSelectedNodeId]);
 
   // Auto-layout: matches backend algorithm (global topological levels, centered)
   const handleAutoLayout = async () => {

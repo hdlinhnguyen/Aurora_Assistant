@@ -103,3 +103,40 @@ class HintLadder:
             )
 
         return Hint(topic_id=topic_id, level=level, text=text)
+
+    def get_remedial_parent_info(self, topic_id: str) -> dict:
+        """Returns parent prerequisite node info for downward remediation traversal."""
+        try:
+            topic = self.curriculum.topics[topic_id]
+            prereqs = self._prerequisites(topic_id)
+            if prereqs:
+                parent = prereqs[0]
+                return {
+                    "has_parent": True,
+                    "original_topic_id": topic_id,
+                    "original_topic_name": topic.name,
+                    "parent_topic_id": parent.topic_id,
+                    "parent_topic_name": parent.name,
+                    "parent_learning_outcomes": parent.learning_outcomes,
+                    "reason": f"Duyệt lùi Cây tri thức từ '{topic.name}' xuống Nút cha tiên quyết '{parent.name}'."
+                }
+            return {
+                "has_parent": False,
+                "original_topic_id": topic_id,
+                "original_topic_name": topic.name,
+                "parent_topic_id": topic_id,
+                "parent_topic_name": topic.name,
+                "parent_learning_outcomes": topic.learning_outcomes,
+                "reason": f"Nút '{topic.name}' là Nút gốc nền tảng của Cây tri thức."
+            }
+        except KeyError:
+            return {
+                "has_parent": False,
+                "original_topic_id": topic_id,
+                "original_topic_name": topic_id,
+                "parent_topic_id": topic_id,
+                "parent_topic_name": topic_id,
+                "parent_learning_outcomes": [],
+                "reason": "Chủ đề tự do."
+            }
+

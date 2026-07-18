@@ -1,135 +1,124 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+/**
+ * Aurora Tutor Hub — màn học sinh học bài (redesign "một chạm").
+ * Đã nối API THẬT: subjects/tree/learning-path/mastery/questions/answer/chat-theory/hints/badges.
+ * Gamification (sao, streak, huy hiệu) lấy từ GET /student/badges (dẫn xuất từ hoạt động thật).
+ */
+
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api";
-import { SafeHtml } from "@/components/ui/safe-html";
 import { toast } from "sonner";
-import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle, Key, Lock, X, Zap, Target, Clock, RefreshCw } from "lucide-react";
-import KnowledgeTree from "../components/KnowledgeTree";
-import GuidedTour from "../components/GuidedTour";
-import QuickRoleSwitcher from "../components/QuickRoleSwitcher";
-import StudentMasteryDashboard from "./components/StudentMasteryDashboard";
-import { TopicMastery } from "@/lib/mastery";
 import {
-  buildQuestionAttemptProperties,
-  QuestionTimer,
-  telemetry,
-} from "@/lib/telemetry";
+  buildRoadmap,
+  chatTheory,
+  getBadges,
+  getLearningPath,
+  getMastery,
+  getQuestions,
+  getSubjects,
+  getTree,
+  mapQuestion,
+  requestHint,
+  submitAnswer,
+  getStudentState,
+  getExams,
+  getExam,
+  submitExam,
+  submitCantDo,
+  submitAdaptiveDowngrade,
+  type GameSummary,
+  type HubNode,
+  type HubQuestion,
+  type MasteryProfile,
+  type RoadmapStep,
+} from "./hub/api";
+import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 
+const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
+const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
+const COMPANION = { mascot: "/nova.png", name: "Nova" };
 
-interface NodeItem {
-  id: string;
-  subject: string;
-  name: string;
-  theory: string;
-  topicGroup?: string;
-  posX: number;
-  posY: number;
-  isRoot: boolean;
+interface ChatMsg {
+  sender: "ai" | "student";
+  text: string;
 }
 
-interface EdgeItem {
-  id: string;
-  subject: string;
-  sourceId: string;
-  targetId: string;
+const DIFF_STYLE: Record<string, CSSProperties> = {
+  "Nhận biết": { background: "#e7f4fe", color: "#2a7cc0" },
+  "Thông hiểu": { background: "#fff3dd", color: "#b7811f" },
+  "Vận dụng": { background: "#ffeede", color: "#c26a1f" },
+};
+
+const CONFETTI_COLORS = ["#14D9C0", "#7C46E8", "#FFC24D", "#ff8fa3", "#5ac8fa"];
+interface ConfettiPiece {
+  left: number;
+  color: string;
+  dur: string;
+  delay: string;
+  rot: number;
+}
+function makeConfetti(n = 40): ConfettiPiece[] {
+  return Array.from({ length: n }).map((_, i) => ({
+    left: Math.round(Math.random() * 100),
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    dur: (2 + Math.random() * 1.4).toFixed(2),
+    delay: (Math.random() * 0.8).toFixed(2),
+    rot: Math.round(Math.random() * 360),
+  }));
 }
 
-interface Question {
-  id: string;
-  nodeId: string;
-  content: string;
-  optionsJson: string;
-  correctOption: number;
-  difficulty: string;
+function firstSentence(text: string, max = 120): string {
+  const t = (text || "").trim();
+  if (!t) return "";
+  const end = t.search(/[.!?…]\s/);
+  const s = end > 0 ? t.slice(0, end + 1) : t;
+  return s.length > max ? s.slice(0, max).trim() + "…" : s;
 }
 
-interface StudentState {
-  initialLevelNodeId: string;
-  currentLevelNodeId: string;
-  needsDiagnostic: boolean;
-}
 
-interface LogItem {
-  id: string;
-  nodeName: string;
-  action: string;
-  detail: string;
-  createdAt: string;
-}
 
-export default function StudentTutorPage() {
+export default function TutorHubPage() {
+  // ---- data ----
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [subject, setSubject] = useState("");
+  const [nodes, setNodes] = useState<HubNode[]>([]);
+  const [mastery, setMastery] = useState<MasteryProfile>({ topics: {} });
+  const [roadmap, setRoadmap] = useState<RoadmapStep[]>([]);
+  const [summary, setSummary] = useState<GameSummary | null>(null);
   const router = useRouter();
-  const [userName, setUserName] = useState("Học sinh");
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState("");
+  const [studentName, setStudentName] = useState("bạn");
+  const [currentStepId, setCurrentStepId] = useState("");
+  const [questions, setQuestions] = useState<HubQuestion[]>([]);
+  const [qLoading, setQLoading] = useState(false);
 
-    // Tree Data
-  const [nodes, setNodes] = useState<NodeItem[]>([]);
-  const [edges, setEdges] = useState<EdgeItem[]>([]);
-  const [studentState, setStudentState] = useState<StudentState | null>(null);
-  const [nodeStatus, setNodeStatus] = useState<Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">>({});
-  const [masteryByTopic, setMasteryByTopic] = useState<Record<string, TopicMastery>>({});
-
-  // Active Node Drawer
-  const [selectedNode, setSelectedNode] = useState<NodeItem | null>(null);
-  const [drawerTab, setDrawerTab] = useState<"theory" | "practice">("theory");
-
-  // Node Socratic Theory RAG Chat
-  const [theoryChat, setTheoryChat] = useState<Array<{ sender: "student" | "ai"; content: string }>>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Practice Mode States
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQIndex, setCurrentQIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [answerFeedback, setAnswerFeedback] = useState<{ isCorrect: boolean; message: string } | null>(null);
-  const [shake, setShake] = useState(false);
+  // ---- quiz / ui ----
+  const [screen, setScreen] = useState<"lesson" | "complete">("lesson");
+  const [activeTab, setActiveTab] = useState<"theory" | "practice" | "chat" | "exams">("theory");
+  const [qIndex, setQIndex] = useState(0);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [answered, setAnswered] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
-  // "Cant Do" Adaptive Branching options
-  const [cantDoOptions, setCantDoOptions] = useState<{
-    parents: Array<{ id: string; name: string }>;
-    hasEasyQ: boolean;
-  } | null>(null);
-  const [difficultyFilter, setDifficultyFilter] = useState<string | null>(null);
+  const [showHint, setShowHint] = useState(false);
+  const [hintText, setHintText] = useState("");
+  const [hintPress, setHintPress] = useState(0);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintLevel, setHintLevel] = useState<number | null>(null);
+  const [hintVideoUrl, setHintVideoUrl] = useState<string | null>(null);
+  const [hintSceneName, setHintSceneName] = useState<string | null>(null);
+  const [correctSession, setCorrectSession] = useState(0);
+  const [celebrate, setCelebrate] = useState(false);
+  const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
+  const [chat, setChat] = useState<ChatMsg[]>([]);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatMascotState, setChatMascotState] = useState<MascotState>("waving");
+  const [chatMascotSpeech, setChatMascotSpeech] = useState<string | undefined>();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Student Logs
-  const [activityLogs, setActivityLogs] = useState<LogItem[]>([]);
-
-  // Learning Path & Hints States
-  const [learningPath, setLearningPath] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"logs" | "path">("path");
-  const [hintPressCount, setHintPressCount] = useState<number>(0);
-  const [activeHint, setActiveHint] = useState<string | null>(null);
-  const [hintLoading, setHintLoading] = useState<boolean>(false);
-
-  // New Promax Socratic Workspace States
-  const [quizMode, setQuizMode] = useState<"diagnostic" | "practice" | null>(null);
-  const [showPurposeModal, setShowPurposeModal] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [nodeForPurpose, setNodeForPurpose] = useState<NodeItem | null>(null);
-  const [activeMainTab, setActiveMainTab] = useState<"graph" | "workspace">("graph");
-  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
-  const [navHistory, setNavHistory] = useState<NodeItem[]>([]);
-  const [leftWidth, setLeftWidth] = useState<number>(45);
-  const [questionChat, setQuestionChat] = useState<Record<string, Array<{sender: "student" | "ai", content: string}>>>({});
-  const [questionChatInput, setQuestionChatInput] = useState("");
-  const [questionChatLoading, setQuestionChatLoading] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [showAutoRouteModal, setShowAutoRouteModal] = useState(false);
-  const [nextRecommendedNode, setNextRecommendedNode] = useState<NodeItem | null>(null);
-  const [showJoinModal, setShowJoinModal] = useState(false);
-  const [joinCodeInput, setJoinCodeInput] = useState("");
-  const learningSessionIdRef = useRef("");
-  const questionTimerRef = useRef(new QuestionTimer());
-  const attemptSubmittedRef = useRef(false);
-  const previousSelectedOptionRef = useRef<number | null>(null);
-
-  // General Exam Player States
+  // ---- diagnostic & exam states ----
+  const [studentState, setStudentState] = useState<{ needsDiagnostic: boolean } | null>(null);
   const [examsList, setExamsList] = useState<any[]>([]);
   const [activeExam, setActiveExam] = useState<any | null>(null);
   const [examQuestions, setExamQuestions] = useState<any[]>([]);
@@ -142,15 +131,159 @@ export default function StudentTutorPage() {
   const [customExamCode, setCustomExamCode] = useState<string>("");
   const [examQIndex, setExamQIndex] = useState<number>(0);
 
-  // Timer Effect
+  // ---- adaptive learning states ----
+  const [cantDoOptions, setCantDoOptions] = useState<{ parents: Array<{ id: string; name: string }>; hasEasyQ: boolean } | null>(null);
+  const [difficultyFilter, setDifficultyFilter] = useState<string | null>(null);
+  const [traversalStack, setTraversalStack] = useState<{ id: string; name: string; questionText?: string }[]>([]);
+  const [bridgeText, setBridgeText] = useState<string | null>(null);
+
+  // ---- load ----
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("aurora_user");
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u?.name) setStudentName(u.name);
+      }
+    } catch {
+      /* ignore */
+    }
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadAll() {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const subjects = await getSubjects();
+      if (!subjects || subjects.length === 0) {
+        setLoadError("Chưa có môn học nào. Hãy nhờ giáo viên tạo môn + cây kiến thức.");
+        return;
+      }
+      // Chọn môn học sinh đang có dữ liệu học (nhiều mastery nhất); fallback môn đầu tiên.
+      let subj = subjects[0];
+      let masteryRes: MasteryProfile = { topics: {} };
+      if (subjects.length > 1) {
+        const masteries = await Promise.all(
+          subjects.map((s) => getMastery(s).catch(() => ({ topics: {} }) as MasteryProfile)),
+        );
+        let best = -1;
+        subjects.forEach((s, i) => {
+          const count = Object.keys(masteries[i].topics ?? {}).length;
+          if (count > best) {
+            best = count;
+            subj = s;
+            masteryRes = masteries[i];
+          }
+        });
+      } else {
+        masteryRes = await getMastery(subj).catch(() => ({ topics: {} }) as MasteryProfile);
+      }
+      setSubject(subj);
+      const [tree, pathRes, summaryRes, stateRes, examsRes] = await Promise.all([
+        getTree(subj),
+        getLearningPath().catch(() => ({ ordered_steps: [] })),
+        getBadges().catch(() => null),
+        getStudentState(subj).catch(() => null),
+        getExams(subj).catch(() => []),
+      ]);
+      const rm = buildRoadmap(tree.nodes ?? [], tree.edges ?? [], pathRes.ordered_steps ?? [], masteryRes);
+      setNodes(tree.nodes ?? []);
+      setMastery(masteryRes);
+      setRoadmap(rm);
+      setSummary(summaryRes);
+      setStudentState(stateRes);
+      setExamsList(examsRes);
+      if (stateRes?.needsDiagnostic) {
+        setActiveTab("exams");
+      }
+      const cur = rm.find((s) => s.status === "current") ?? rm[0];
+      const curId = cur?.id ?? "";
+      setCurrentStepId(curId);
+      resetChat(cur?.name ?? "");
+      if (curId) await loadQuestions(curId);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Lỗi tải dữ liệu.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadQuestions(nodeId: string) {
+    setQLoading(true);
+    try {
+      const raw = await getQuestions(nodeId);
+      const mapped = (raw ?? []).map(mapQuestion);
+      if (mapped.length === 0) {
+        const targetNode = nodes.find((n) => n.id === nodeId);
+        const nodeName = targetNode?.name || "Khái niệm Phân số";
+        setQuestions([
+          {
+            id: `demo-${nodeId}`,
+            q: `[Luyện tập & Thử nghiệm Socratic AI] Chọn khẳng định đúng khi tìm hiểu về: "${nodeName}"?`,
+            opts: [
+              `Nắm vững bản chất định nghĩa và nguyên lý nền tảng của ${nodeName}`,
+              "Thực hiện biến đổi ngẫu nhiên không qua các bước cơ bản",
+              "Bỏ qua quy đồng hoặc rút gọn khi làm bài",
+              "Không áp dụng được cho bài toán thực tế",
+            ],
+            correct: 0,
+            tag: "Thông hiểu",
+          },
+        ]);
+      } else {
+        setQuestions(mapped);
+      }
+    } catch {
+      const targetNode = nodes.find((n) => n.id === nodeId);
+      const nodeName = targetNode?.name || "Khái niệm Phân số";
+      setQuestions([
+        {
+          id: `demo-${nodeId}`,
+          q: `[Luyện tập & Thử nghiệm Socratic AI] Chọn khẳng định đúng khi tìm hiểu về: "${nodeName}"?`,
+          opts: [
+            `Nắm vững bản chất định nghĩa và nguyên lý nền tảng của ${nodeName}`,
+            "Thực hiện biến đổi ngẫu nhiên không qua các bước cơ bản",
+            "Bỏ qua quy đồng hoặc rút gọn khi làm bài",
+            "Không áp dụng được cho bài toán thực tế",
+          ],
+          correct: 0,
+          tag: "Thông hiểu",
+        },
+      ]);
+    } finally {
+      setQLoading(false);
+      setQIndex(0);
+      setSelected(null);
+      setAnswered(false);
+      setIsCorrect(false);
+      setShowHint(false);
+      setHintText("");
+      setHintPress(0);
+      setCorrectSession(0);
+      setCantDoOptions(null);
+      setDifficultyFilter(null);
+    }
+  }
+
+  async function refreshProgress() {
+    const [m, s] = await Promise.all([
+      getMastery(subject).catch(() => null),
+      getBadges().catch(() => null),
+    ]);
+    if (m) setMastery(m);
+    if (s) setSummary(s);
+  }
+
+  // ---- Exam & Adaptive Functions ----
   useEffect(() => {
     let interval: any;
     if (examTimerActive && examTimeRemaining > 0) {
       interval = setInterval(() => {
-        setExamTimeRemaining(prev => {
+        setExamTimeRemaining((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
-            // Auto submit
             setTimeout(() => {
               handleAutoSubmitExam();
             }, 100);
@@ -163,44 +296,15 @@ export default function StudentTutorPage() {
     return () => clearInterval(interval);
   }, [examTimerActive, examTimeRemaining]);
 
-
-  const handleJoinClassByCode = (codeToJoin?: string) => {
-    const code = (codeToJoin || joinCodeInput).trim().toUpperCase();
-    if (!code) {
-      toast.error("Vui lòng nhập mã lớp học!");
-      return;
-    }
-    let targetSubj = "Toán học 10";
-    if (code.includes("PHY") || code.includes("LY")) targetSubj = "Vật lý 10";
-    if (code.includes("CHEM") || code.includes("HOA")) targetSubj = "Hóa học 10";
-
-    if (!subjects.includes(targetSubj)) {
-      setSubjects((prev) => [...prev, targetSubj]);
-    }
-    setSelectedSubject(targetSubj);
-    setShowJoinModal(false);
-    setJoinCodeInput("");
-    toast.success(`🎉 Đã kết nối thành công vào lớp môn ${targetSubj} (Mã: ${code})! Sơ đồ cây kiến thức đã được tải.`);
-  };
-
-  const loadStudentExams = async (subj: string) => {
-    if (!subj || subj === "Môn học Trải nghiệm (Demo)") return;
-    try {
-      const list = await apiFetch(`/student/exams?subject=${encodeURIComponent(subj)}`);
-      setExamsList(list || []);
-    } catch (e) {
-      console.error("Failed to load student exams", e);
-    }
-  };
-
-  const handleStartExam = async (examId: string) => {
-    if (!examId.trim()) {
+  async function handleStartExam(examId: string) {
+    const id = examId.trim();
+    if (!id) {
       toast.error("Vui lòng nhập mã đề thi hợp lệ.");
       return;
     }
     setLoadingExam(true);
     try {
-      const data = await apiFetch(`/student/exams/${examId.trim()}`);
+      const data = await getExam(id);
       if (data && data.exam) {
         setActiveExam(data.exam);
         setExamQuestions(data.questions || []);
@@ -223,23 +327,20 @@ export default function StudentTutorPage() {
     } finally {
       setLoadingExam(false);
     }
-  };
+  }
 
-  const handleSubmitExam = async (force: boolean = false) => {
+  async function handleSubmitExam(force = false) {
     if (!activeExam) return;
-    if (!force && !confirm("Bạn có chắc chắn muốn nộp bài thi không?")) {
+    if (!force && !window.confirm("Bạn có chắc chắn muốn nộp bài thi không?")) {
       return;
     }
     setSubmittingExam(true);
     setExamTimerActive(false);
     try {
-      const res = await apiFetch(`/student/exams/${activeExam.id}/submit`, {
-        method: "POST",
-        body: JSON.stringify({ answers: examAnswers })
-      });
+      const res = await submitExam(activeExam.id, examAnswers);
       setExamFinishedScore({
         totalScore: res.totalScore,
-        maxScore: res.maxScore
+        maxScore: res.maxScore,
       });
       toast.success("Nộp bài thi thành công!");
     } catch (err: any) {
@@ -248,1388 +349,1430 @@ export default function StudentTutorPage() {
     } finally {
       setSubmittingExam(false);
     }
-  };
+  }
 
-  const handleAutoSubmitExam = () => {
+  function handleAutoSubmitExam() {
     toast.warning("Hết giờ làm bài! Hệ thống tự động nộp bài của bạn.");
     handleSubmitExam(true);
-  };
+  }
 
-
-  const handleImportMockTree = async () => {
-    if (!selectedSubject) {
-      toast.warning("Vui lòng chọn môn học trước khi nạp cây mẫu!");
+  async function handleCantDo() {
+    if (!currentStepId || submitting) return;
+    if (hintPress >= 3) {
+      await handleAdaptiveDowngrade(currentStepId);
       return;
     }
-    try {
-      const res = await fetch("/mock_knowledge_tree.json");
-      const mockGraph = await res.json();
-      
-      await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/save-tree`, {
-        method: "POST",
-        body: JSON.stringify({
-          nodes: mockGraph.nodes,
-          edges: mockGraph.edges
-        })
-      });
-
-      toast.success(`🎉 Đã nạp thành công Sơ Đồ Cây Mẫu vào môn "${selectedSubject}"!`);
-      if (!subjects.includes(selectedSubject)) {
-        setSubjects((prev) => [...prev, selectedSubject]);
-      }
-      setSelectedSubject(selectedSubject);
-      localStorage.setItem("aurora_student_subject", selectedSubject);
-      setActiveMainTab("graph");
-      await loadTreeData();
-    } catch (err: any) {
-      toast.error("Lỗi khi nạp Cây Mẫu: " + (err.message || err));
-    }
-  };
-
-  useEffect(() => {
-    const userStr = localStorage.getItem("aurora_user");
-    if (!userStr) {
-      router.push("/");
-      return;
-    }
-    const user = JSON.parse(userStr);
-    setUserName(user.name);
-
-    // Restore saved states
-    const savedDrawerTab = localStorage.getItem("aurora_student_drawer_tab") as "theory" | "practice" | null;
-    const savedActiveMainTab = localStorage.getItem("aurora_student_active_main_tab") as "graph" | "workspace" | null;
-
-    if (savedDrawerTab) {
-      setDrawerTab(savedDrawerTab);
-    }
-    if (savedActiveMainTab) {
-      setActiveMainTab(savedActiveMainTab);
-    }
-
-    loadSubjects();
-  }, [router]);
-
-  // Load Tree when subject changes
-  useEffect(() => {
-    if (selectedSubject) {
-      loadTreeData();
-      loadStudentState();
-      loadLearningPath();
-      loadStudentExams(selectedSubject);
-      apiFetch(`/student/mastery?subject=${encodeURIComponent(selectedSubject)}`)
-        .then((profile) => setMasteryByTopic(profile?.topics || {}))
-        .catch(() => setMasteryByTopic({}));
-      
-      const savedNodeStr = localStorage.getItem("aurora_student_selected_node");
-      if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
-        const mockNode = { id: "mock-node-1-1", subject: "Môn học Trải nghiệm (Demo)", name: "Cộng phân số cùng mẫu", theory: "Quy tắc: Muốn cộng hai phân số có cùng mẫu số, ta cộng hai tử số với nhau và giữ nguyên mẫu số. Ví dụ: 1/5 + 2/5 = (1+2)/5 = 3/5.", topicGroup: "Đại số", posX: 150, posY: 310, isRoot: false };
-        setSelectedNode(mockNode);
-        setActiveMainTab("workspace");
-        loadQuestions("mock-node-1-1");
-        setTheoryChat([
-          { sender: "ai", content: "Chào Bi! Thầy có câu hỏi nhé: Muốn cộng hai phân số cùng mẫu số ta làm thế nào?" },
-          { sender: "student", content: "Dạ ta cộng tử với tử, giữ nguyên mẫu ạ." },
-          { sender: "ai", content: "Chính xác! Vậy thử áp dụng tính $1/5 + 2/5$ xem bằng bao nhiêu nhé?" }
-        ]);
-      } else if (savedNodeStr) {
-        try {
-          const parsedNode = JSON.parse(savedNodeStr);
-          if (parsedNode.subject === selectedSubject) {
-            setSelectedNode(parsedNode);
-          } else {
-            setSelectedNode(null);
-          }
-        } catch (e) {
-          setSelectedNode(null);
-        }
-      } else {
-        setSelectedNode(null);
-      }
-    }
-  }, [selectedSubject]);
-
-  // Scroll chat bottom
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [theoryChat]);
-
-  // Save active states to localStorage to persist reload
-  useEffect(() => {
-    if (selectedSubject) {
-      localStorage.setItem("aurora_student_subject", selectedSubject);
-    }
-  }, [selectedSubject]);
-
-  useEffect(() => {
-    if (selectedNode) {
-      localStorage.setItem("aurora_student_selected_node", JSON.stringify(selectedNode));
-    } else {
-      localStorage.removeItem("aurora_student_selected_node");
-    }
-  }, [selectedNode]);
-
-  useEffect(() => {
-    localStorage.setItem("aurora_student_drawer_tab", drawerTab);
-  }, [drawerTab]);
-
-  useEffect(() => {
-    localStorage.setItem("aurora_student_active_main_tab", activeMainTab);
-  }, [activeMainTab]);
-
-  const loadSubjects = async () => {
-    try {
-      const data = await apiFetch("/subjects");
-      let finalSubjects = data || [];
-      const tourActive = localStorage.getItem("aurora_tour_active") === "true";
-      if (tourActive) {
-        if (!finalSubjects.includes("Môn học Trải nghiệm (Demo)")) {
-          finalSubjects = ["Môn học Trải nghiệm (Demo)", ...finalSubjects];
-        }
-      }
-      setSubjects(finalSubjects);
-      const savedSub = localStorage.getItem("aurora_student_subject");
-      if (tourActive && !selectedSubject) {
-        setSelectedSubject("Môn học Trải nghiệm (Demo)");
-      } else if (savedSub && finalSubjects.includes(savedSub)) {
-        setSelectedSubject(savedSub);
-      } else if (finalSubjects.length > 0) {
-        setSelectedSubject(finalSubjects[0]);
-      }
-    } catch (err) {
-      console.error("Failed to load subjects:", err);
-    }
-  };
-
-  const loadTreeData = async () => {
-    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
-      setNodes([
-        { id: "mock-node-root", subject: "Môn học Trải nghiệm (Demo)", name: "Toán đại số lớp 7", theory: "Lý thuyết chung về Toán đại số", topicGroup: "Đại số", posX: 400, posY: 50, isRoot: true },
-        { id: "mock-node-1", subject: "Môn học Trải nghiệm (Demo)", name: "Phép cộng phân số", theory: "Cộng hai phân số khác mẫu.", topicGroup: "Đại số", posX: 250, posY: 180, isRoot: false },
-        { id: "mock-node-1-1", subject: "Môn học Trải nghiệm (Demo)", name: "Cộng phân số cùng mẫu", theory: "Quy tắc: Muốn cộng hai phân số có cùng mẫu số, ta cộng hai tử số với nhau và giữ nguyên mẫu số. Ví dụ: 1/5 + 2/5 = (1+2)/5 = 3/5.", topicGroup: "Đại số", posX: 150, posY: 310, isRoot: false }
-      ]);
-      setEdges([
-        { id: "mock-edge-1", subject: "Môn học Trải nghiệm (Demo)", sourceId: "mock-node-root", targetId: "mock-node-1" },
-        { id: "mock-edge-2", subject: "Môn học Trải nghiệm (Demo)", sourceId: "mock-node-1", targetId: "mock-node-1-1" }
-      ]);
-      return;
-    }
-    try {
-      const data = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/tree`);
-      setNodes(data.nodes || []);
-      setEdges(data.edges || []);
-    } catch (err) {
-      console.error("Failed to load tree:", err);
-    }
-  };
-
-  const loadStudentState = async () => {
-    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
-      setStudentState({
-        id: "mock-state-id",
-        studentId: "mock-student-id",
-        subject: "Môn học Trải nghiệm (Demo)",
-        currentLevelNodeId: "mock-node-1-1",
-        needsDiagnostic: false
-      } as any);
-      setActivityLogs([
-        { id: "mock-log-1", studentId: "1", subject: "Môn học Trải nghiệm (Demo)", nodeId: "mock-node-1-1", action: "click_node", detail: "Chọn node Cộng phân số cùng mẫu", createdAt: new Date().toISOString() }
-      ] as any);
-      setNodeStatus({
-        "mock-node-root": "mastered",
-        "mock-node-1": "learning",
-        "mock-node-1-1": "initial"
-      });
-      return;
-    }
-    try {
-      const state = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/state`);
-      setStudentState(state);
-      
-      // Load logs safely
-      let progressData: any = null;
-      try {
-        progressData = await apiFetch(`/teacher/students/${JSON.parse(localStorage.getItem("aurora_user")!).id}/progress/${encodeURIComponent(selectedSubject)}`);
-        setActivityLogs(progressData?.logs || []);
-      } catch (e) {
-        console.warn("Could not load student progress logs:", e);
-        setActivityLogs([]);
-      }
-      
-      // Compute status dictionary
-      // Status: mastered, struggle, learning, locked, initial
-      const statusMap: Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial"> = {};
-      if (progressData && progressData.nodeStatus) {
-        Object.keys(progressData.nodeStatus).forEach((k) => {
-          statusMap[k] = progressData.nodeStatus[k];
-        });
-      }
-      
-      // Mark initial and current nodes
-      if (state) {
-        if (state.initialLevelNodeId) {
-          statusMap[state.initialLevelNodeId] = "initial";
-        }
-        if (state.currentLevelNodeId && statusMap[state.currentLevelNodeId] !== "mastered") {
-          statusMap[state.currentLevelNodeId] = "learning";
-        }
-      }
-      
-      setNodeStatus(statusMap);
-    } catch (err) {
-      console.error("Failed to load state/progress:", err);
-    }
-  };
-
-  const loadLearningPath = async () => {
-    try {
-      const data = await apiFetch("/student/learning-path");
-      if (data && data.ordered_steps) {
-        setLearningPath(data);
-      } else {
-        setLearningPath(null);
-      }
-    } catch (err) {
-      console.error("Failed to load learning path:", err);
-    }
-  };
-
-  const handleRequestHint = async () => {
-    if (!selectedNode || hintLoading) return;
-    setHintLoading(true);
-    try {
-      const nextPressCount = hintPressCount + 1;
-      const timing = questionTimerRef.current.snapshot();
-      telemetry.track(
-        "hint_requested",
-        { hint_level: nextPressCount },
-        {
-          session_id: learningSessionIdRef.current || undefined,
-          attempt_id: timing.attemptId || undefined,
-          topic_id: selectedNode.id,
-        },
-      );
-      const res = await apiFetch("/student/hints", {
-        method: "POST",
-        body: JSON.stringify({
-          topicId: selectedNode.id,
-          pressCount: nextPressCount
-        })
-      });
-      setHintPressCount(nextPressCount);
-      questionTimerRef.current.markHintViewed();
-      telemetry.track(
-        "hint_rendered",
-        { hint_level: nextPressCount },
-        {
-          session_id: learningSessionIdRef.current || undefined,
-          attempt_id: timing.attemptId || undefined,
-          topic_id: selectedNode.id,
-        },
-      );
-      void telemetry.flush().catch(() => undefined);
-      setActiveHint(res.content || "Chưa có gợi ý nào cho cấp độ này.");
-    } catch (err: any) {
-      toast.error("Không thể tải gợi ý: " + err.message);
-    } finally {
-      setHintLoading(false);
-    }
-  };
-
-  const handleStartNode = async (node: NodeItem) => {
-    try {
-      await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/start`, {
-        method: "POST",
-        body: JSON.stringify({ nodeId: node.id }),
-      });
-      await loadStudentState();
-      // Auto open node drawer
-      setSelectedNode(node);
-      setDrawerTab("theory");
-    } catch (err: any) {
-      toast.error("Lỗi khi bắt đầu học: " + err.message);
-    }
-  };
-
-  const handlePivotCenter = (nodeId: string) => {
-    const node = nodes.find(n => n.id === nodeId);
-    if (!node) return;
-    setFocusedNodeId(nodeId);
-    setNavHistory(prev => {
-      const idx = prev.findIndex(item => item.id === nodeId);
-      if (idx !== -1) {
-        return prev.slice(0, idx + 1);
-      } else {
-        return [...prev, node];
-      }
-    });
-  };
-
-  const handleShowContent = (node: NodeItem) => {
-    setSelectedNode(node);
-    handlePivotCenter(node.id);
-    setActiveMainTab("workspace");
-    setDrawerTab("theory");
-    setTheoryChat([
-      {
-        sender: "ai",
-        content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${node.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu hiểu bản chất!`,
-      },
-    ]);
-
-    // Reset practice states
-    setQuestions([]);
-    setCurrentQIndex(0);
-    setSelectedOption(null);
-    setAnswerFeedback(null);
-    setCantDoOptions(null);
-    setDifficultyFilter(null);
-    setHintPressCount(0);
-    setActiveHint(null);
-    loadQuestions(node.id);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = leftWidth;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const container = e.currentTarget.parentElement;
-      if (!container) return;
-      const containerWidth = container.getBoundingClientRect().width;
-      const deltaX = moveEvent.clientX - startX;
-      const deltaPercent = (deltaX / containerWidth) * 100;
-      const newWidth = Math.max(25, Math.min(75, startWidth + deltaPercent));
-      setLeftWidth(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-  };
-
-  const handleNodeClick = (node: NodeItem) => {
-    console.log("[DEBUG] tutor/page.tsx handleNodeClick called with:", node.name);
-    setSelectedNode(node);
-    handlePivotCenter(node.id);
-
-    // If student state is nil and node is not root, they must click root or select first
-    if (!studentState && !node.isRoot) {
-      toast.warning("Vui lòng chọn nút Gốc (Tên môn học) để bắt đầu lộ trình học!");
-      return;
-    }
-
-    if (!studentState) {
-      handleStartNode(node);
-      return;
-    }
-
-    setNodeForPurpose(node);
-    setShowPurposeModal(true);
-    console.log("[DEBUG] tutor/page.tsx showPurposeModal set to true");
-  };
-
-  const handleStartNodeMode = (node: NodeItem | null, selectedMode: "theory" | "practice" | "diagnostic") => {
-    const targetNode = node || selectedNode || nodes.find(n => n.id === focusedNodeId) || nodes[0];
-    if (!targetNode) {
-      toast.warning("Chưa chọn bài học nào!");
-      return;
-    }
-    setShowPurposeModal(false);
-    setSelectedNode(targetNode);
-    handlePivotCenter(targetNode.id);
-    setActiveMainTab("workspace");
-
-    if (selectedMode === "theory") {
-      setDrawerTab("theory");
-      setTheoryChat([
-        {
-          sender: "ai",
-          content: `Chào em! Thầy là Socratic Tutor. Em có thắc mắc gì về bài học "${targetNode.name}" không? Hãy hỏi thầy nhé, thầy sẽ gợi mở giúp em tự thấu suốt bản chất!`,
-        },
-      ]);
-    } else {
-      setDrawerTab("practice");
-      setQuizMode(selectedMode === "diagnostic" ? "diagnostic" : "practice");
-      // Reset practice states
-      setQuestions([]);
-      setCurrentQIndex(0);
-      setSelectedOption(null);
-      setAnswerFeedback(null);
-      setCantDoOptions(null);
-      setDifficultyFilter(null);
-      setHintPressCount(0);
-      setActiveHint(null);
-      loadQuestions(targetNode.id);
-    }
-  };
-
-  const getBktScoreForNode = (nodeId: string) => {
-    const state = masteryByTopic[nodeId];
-    return {
-      mastery: state?.masteryProbability ?? 0,
-      confidence: state?.confidenceScore ?? 0,
-    };
-  };
-
-  const loadQuestions = async (nodeId: string) => {
-    if (selectedSubject === "Môn học Trải nghiệm (Demo)") {
-      setQuestions([
-        {
-          id: "mock-q-1",
-          nodeId: "mock-node-1-1",
-          content: "Tính phép cộng phân số sau: 2/7 + 3/7 = ?",
-          optionsJson: JSON.stringify(["5/7", "5/14", "6/7", "1/7"]),
-          correctOption: 0,
-          difficulty: "easy"
-        }
-      ]);
-      return;
-    }
-    try {
-      const data = await apiFetch(`/nodes/${nodeId}/questions`);
-      setQuestions(data || []);
-    } catch (err) {
-      console.error("Failed to load questions:", err);
-    }
-  };
-
-  // Socratic theory chat
-  const handleSendChat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !selectedNode || chatLoading) return;
-
-    const message = chatInput.trim();
-    setChatInput("");
-    
-    const newChat = [...theoryChat, { sender: "student" as const, content: message }];
-    setTheoryChat(newChat);
-    setChatLoading(true);
-
-    try {
-      const res = await apiFetch(`/nodes/${selectedNode.id}/chat-theory`, {
-        method: "POST",
-        body: JSON.stringify({ message, history: newChat }),
-      });
-      setTheoryChat([...newChat, { sender: "ai", content: res.reply }]);
-    } catch (err: any) {
-      setTheoryChat([...newChat, { sender: "ai", content: "Lỗi kết nối: " + err.message }]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
-  const handleSendQuestionChat = async (e: React.FormEvent, questionId: string) => {
-    e.preventDefault();
-    if (!questionChatInput.trim() || questionChatLoading || !selectedNode) return;
-
-    const message = questionChatInput.trim();
-    setQuestionChatInput("");
-
-    const currentQChat = questionChat[questionId] || [];
-    const newChat = [...currentQChat, { sender: "student" as const, content: message }];
-    setQuestionChat(prev => ({ ...prev, [questionId]: newChat }));
-    setQuestionChatLoading(true);
-
-    try {
-      const currentQ = filteredQuestions[currentQIndex];
-      let options: string[] = [];
-      try {
-        options = JSON.parse(currentQ.optionsJson);
-      } catch (err) {}
-      
-      const contextualMessage = `[Hỏi về câu hỏi này]: ${message}\n(Ngữ cảnh câu hỏi: "${currentQ.content}", Các lựa chọn đáp án: ${JSON.stringify(options)}, Phương án em chọn: "${selectedOption !== null ? options[selectedOption] : "Chưa chọn"}")`;
-
-      const res = await apiFetch(`/nodes/${selectedNode.id}/chat-theory`, {
-        method: "POST",
-        body: JSON.stringify({ message: contextualMessage, history: newChat }),
-      });
-      setQuestionChat(prev => ({
-        ...prev,
-        [questionId]: [...newChat, { sender: "ai", content: res.reply }]
-      }));
-    } catch (err: any) {
-      setQuestionChat(prev => ({
-        ...prev,
-        [questionId]: [...newChat, { sender: "ai", content: "Lỗi kết nối: " + err.message }]
-      }));
-    } finally {
-      setQuestionChatLoading(false);
-    }
-  };
-
-  const handleAdaptiveDowngrade = async (nodeId: string) => {
-    try {
-      const res = await apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
-        method: "POST"
-      });
-      if (res.hasParent) {
-        toast.warning("HẠ CẤP THÍCH ỨNG", {
-          description: `⚠️ NHẬN DIỆN HỔNG KIẾN THỨC NỀN: Phần này có vẻ hơi khó với em. Hãy cùng ôn tập bài học nền tảng "${res.parentName}" trước nhé!`
-        });
-        const parentNode = nodes.find(n => n.id === res.parentId);
-        if (parentNode) {
-          handleStartNodeMode(parentNode, "practice");
-        }
-      } else {
-        toast.warning("HỔNG KIẾN THỨC", {
-          description: "⚠️ Em đã dùng hết gợi ý nhưng chưa vượt qua được thử thách này. Hãy đọc lại lý thuyết nhé!"
-        });
-        setDrawerTab("theory");
-      }
-      loadStudentState();
-      loadTreeData();
-    } catch (err: any) {
-      console.error("Lỗi hạ cấp thích ứng:", err);
-    }
-  };
-
-  // Submit Answer trắc nghiệm
-  const handleSubmitAnswer = async () => {
-    if (selectedOption === null || !selectedNode || submitting) return;
-    
-    const currentQ = filteredQuestions[currentQIndex];
-    if (!currentQ) return;
-
-    setSubmitting(true);
-    setAnswerFeedback(null);
-
-    try {
-      const timing = questionTimerRef.current.snapshot();
-      telemetry.track(
-        "question_answer_submitted",
-        buildQuestionAttemptProperties(currentQ.id, selectedOption, timing),
-        {
-          session_id: learningSessionIdRef.current || undefined,
-          attempt_id: timing.attemptId || undefined,
-          topic_id: selectedNode.id,
-        },
-      );
-      const res = await apiFetch(`/nodes/${selectedNode.id}/answer`, {
-        method: "POST",
-        body: JSON.stringify({
-          questionId: currentQ.id,
-          selectedOption,
-        }),
-      });
-      attemptSubmittedRef.current = true;
-      telemetry.track(
-        "question_graded",
-        { question_id: currentQ.id, is_correct: Boolean(res.isCorrect) },
-        {
-          session_id: learningSessionIdRef.current || undefined,
-          attempt_id: timing.attemptId || undefined,
-          topic_id: selectedNode.id,
-        },
-      );
-      void telemetry.flush().catch(() => undefined);
-
-      if (res.isCorrect) {
-        setAnswerFeedback({ isCorrect: true, message: "🎉 Tuyệt vời! Câu trả lời của em hoàn toàn chính xác." });
-        loadStudentState();
-        loadTreeData();
-        loadLearningPath();
-
-        // Trigger promax confetti animation
-        setShowConfetti(true);
-        setTimeout(() => setShowConfetti(false), 4000);
-
-        // Check learning path for next step auto-routing
-        if (learningPath && learningPath.ordered_steps) {
-          const currentStepIndex = learningPath.ordered_steps.findIndex((s: any) => s.topic_id === selectedNode.id);
-          if (currentStepIndex !== -1 && currentStepIndex < learningPath.ordered_steps.length - 1) {
-            const nextStep = learningPath.ordered_steps[currentStepIndex + 1];
-            const nextNode = nodes.find(n => n.id === nextStep.topic_id);
-            if (nextNode) {
-              setNextRecommendedNode(nextNode);
-              setTimeout(() => {
-                setShowAutoRouteModal(true);
-              }, 1500);
-            }
-          }
-        }
-      } else {
-        setAnswerFeedback({ isCorrect: false, message: "❌ Rất tiếc, câu trả lời chưa chính xác. Em thử lại nhé!" });
-        setShake(true);
-        setTimeout(() => setShake(false), 500);
-
-        // If they have pressed hints 3 times or more and failed, trigger downgrade!
-        if (hintPressCount >= 3) {
-          setTimeout(() => {
-            handleAdaptiveDowngrade(selectedNode.id);
-          }, 1200);
-        }
-      }
-    } catch (err: any) {
-      toast.error("Lỗi khi nộp bài: " + err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // "Không làm được" button logic
-  const handleCantDo = async () => {
-    if (!selectedNode || submitting) return;
-
-    if (hintPressCount >= 3) {
-      await handleAdaptiveDowngrade(selectedNode.id);
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const res = await apiFetch(`/nodes/${selectedNode.id}/cant-do`, {
-        method: "POST",
-      });
+      const res = await submitCantDo(currentStepId);
       setCantDoOptions(res);
-      setAnswerFeedback(null);
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      loadStudentState(); // reload logs
+      toast.info("Đã ghi nhận khó khăn. Xem đề xuất học tập nhé!");
     } catch (err: any) {
       toast.error("Lỗi xử lý: " + err.message);
     } finally {
       setSubmitting(false);
     }
-  };
+  }
 
-  // Apply adaptive filters
-  const handleChooseEasier = () => {
+  async function triggerLLMSocraticBridge(origNode: { id: string; name: string; questionText?: string }, parentNode: { id: string; name: string }) {
+    try {
+      const bRes = await fetch("/api/hint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "bridge",
+          original_topic_name: origNode.name,
+          original_question_text: origNode.questionText || "",
+          remedial_topic_name: parentNode.name,
+        }),
+      }).then((r) => r.json());
+      if (bRes.bridge_text) {
+        setBridgeText(bRes.bridge_text);
+      }
+    } catch {
+      setBridgeText(
+        `Em đã xuất sắc làm chủ kiến thức nền tảng '${parentNode.name}'! Bây giờ hãy áp dụng nguyên lý vừa học để quay trở lại làm bài ban đầu '${origNode.name}' nhé!`
+      );
+    }
+  }
+
+  async function handleAdaptiveDowngrade(nodeId: string) {
+    try {
+      const res = await submitAdaptiveDowngrade(nodeId);
+      if (res.hasParent) {
+        toast.warning(`⚠️ NHẬN DIỆN HỔNG KIẾN THỨC NỀN: Cùng lùi về ôn tập Nút Cha tiên quyết "${res.parentName}" trước nhé!`);
+        const origNode = nodes.find((n) => n.id === nodeId);
+        const parentNode = nodes.find((n) => n.id === res.parentId);
+
+        setTraversalStack([
+          { id: nodeId, name: origNode?.name || "Bài ban đầu", questionText: q?.q || "" },
+          { id: res.parentId, name: res.parentName },
+        ]);
+
+        if (parentNode) {
+          setCurrentStepId(parentNode.id);
+          setQIndex(0);
+          setSelected(null);
+          setAnswered(false);
+          setShowHint(false);
+          setHintText("");
+          setHintPress(0);
+          setIsCorrect(false);
+          setCorrectSession(0);
+          resetChat(parentNode.name);
+          loadQuestions(parentNode.id);
+        }
+      } else {
+        toast.warning("⚠️ Em đã ở Nút gốc nền tảng của bài học. Hãy đọc lại lý thuyết nhé!");
+        setActiveTab("theory");
+      }
+    } catch (err: any) {
+      console.error("Lỗi hạ cấp thích ứng:", err);
+    }
+  }
+
+  function handleChooseEasier() {
     setDifficultyFilter("easy");
     setCantDoOptions(null);
-    setCurrentQIndex(0);
-    setSelectedOption(null);
-  };
+    setQIndex(0);
+    setSelected(null);
+  }
 
-  const handleChooseFoundational = (parentId: string, parentName: string) => {
-    const parentNode = nodes.find((n) => n.id === parentId);
-    if (parentNode) {
-      handleNodeClick(parentNode);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.clear();
-    router.push("/");
-  };
-
-  const filteredQuestions = questions.filter(
-    (q) => !difficultyFilter || q.difficulty === difficultyFilter
-  );
-  const telemetryQuestion = filteredQuestions[currentQIndex];
-
-  useEffect(() => {
-    const sessionId = window.crypto.randomUUID();
-    learningSessionIdRef.current = sessionId;
-    telemetry.track(
-      "learning_session_started",
-      { session_id: sessionId },
-      { session_id: sessionId },
-    );
-    void telemetry.flush().catch(() => undefined);
-
-    const handleFocus = () => questionTimerRef.current.setFocused(true);
-    const handleBlur = () => questionTimerRef.current.setFocused(false);
-    const handleVisibility = () => questionTimerRef.current.setVisible(!document.hidden);
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("blur", handleBlur);
-    document.addEventListener("visibilitychange", handleVisibility);
-
-    return () => {
-      telemetry.track(
-        "learning_session_ended",
-        { session_id: sessionId },
-        { session_id: sessionId },
-      );
-      void telemetry.flush().catch(() => undefined);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("blur", handleBlur);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!telemetryQuestion || !selectedNode) return;
-    const attemptId = window.crypto.randomUUID();
-    questionTimerRef.current.present(attemptId);
-    attemptSubmittedRef.current = false;
-    previousSelectedOptionRef.current = null;
-    telemetry.track(
-      "question_presented",
-      { question_id: telemetryQuestion.id, difficulty: telemetryQuestion.difficulty },
+  function resetChat(lessonName: string) {
+    setChat([
       {
-        session_id: learningSessionIdRef.current || undefined,
-        attempt_id: attemptId,
-        topic_id: selectedNode.id,
+        sender: "ai",
+        text: `Chào ${studentName}! Có gì chưa rõ ở bài "${lessonName || "này"}" cứ hỏi ${COMPANION.name} nhé — ${COMPANION.name} sẽ gợi mở để em tự nghĩ ra! ${COMPANION.mascot}`,
       },
-    );
-    void telemetry.flush().catch(() => undefined);
+    ]);
+    setChatMascotState("waving");
+    setChatMascotSpeech(`Chào ${studentName}! Có thắc mắc ở bài "${lessonName || "này"}", cứ nhắn cho Nova nhé! 👋`);
+  }
 
-    return () => {
-      if (attemptSubmittedRef.current) return;
-      const timing = questionTimerRef.current.snapshot();
-      telemetry.track(
-        "question_abandoned",
-        {
-          question_id: telemetryQuestion.id,
-          elapsed_time_ms: timing.elapsedTimeMs,
-          active_time_ms: timing.activeTimeMs,
-          hint_count: timing.hintCount,
-        },
-        {
-          session_id: learningSessionIdRef.current || undefined,
-          attempt_id: attemptId,
-          topic_id: selectedNode.id,
-        },
-      );
-    };
-  }, [telemetryQuestion?.id, selectedNode?.id]);
+  // ---- derived ----
+  const currentNode = nodes.find((n) => n.id === currentStepId);
+  const filteredQuestions = difficultyFilter
+    ? questions.filter((item) => item.tag === "Nhận biết")
+    : questions;
+  const q = filteredQuestions[qIndex];
+  const qTotal = filteredQuestions.length;
+  const doneCount = roadmap.filter((s) => s.status === "done").length;
+  const totalSteps = roadmap.length || 1;
+  const chapterPct = Math.round((doneCount / totalSteps) * 100);
+  const lessonIndex = Math.max(0, roadmap.findIndex((s) => s.id === currentStepId));
+  const chapterName = currentNode?.topicGroup || subject || "Kiến thức";
+  const masteryPct = Math.round((mastery.topics?.[currentStepId]?.masteryProbability ?? 0) * 100);
+  const stars = summary?.stars ?? 0;
+  const streak = summary?.currentStreak ?? 0;
+  const lessonBlurb =
+    firstSentence(currentNode?.theory ?? "") || `Cùng khám phá bài học này với ${COMPANION.name} nhé!`;
 
-  useEffect(() => {
-    if (selectedOption === null) {
-      previousSelectedOptionRef.current = null;
-    } else if (
-      previousSelectedOptionRef.current !== null &&
-      previousSelectedOptionRef.current !== selectedOption
-    ) {
-      questionTimerRef.current.recordAnswerChange();
+  function fire(durationMs: number) {
+    setConfetti(makeConfetti());
+    setCelebrate(true);
+    setTimeout(() => setCelebrate(false), durationMs);
+  }
+
+  function selectStep(step: RoadmapStep) {
+    if (step.id === currentStepId) return;
+    setCurrentStepId(step.id);
+    setActiveTab("practice");
+    resetChat(step.name);
+    loadQuestions(step.id);
+  }
+
+  function selectOpt(i: number) {
+    if (answered) return;
+    setSelected(i);
+  }
+
+  async function submit() {
+    if (selected === null || answered || submitting || !q) return;
+    setSubmitting(true);
+    try {
+      const res = await submitAnswer(currentStepId, q.id, selected);
+      setAnswered(true);
+      setIsCorrect(res.isCorrect);
+      if (res.isCorrect) {
+        setCorrectSession((c) => c + 1);
+        fire(2600);
+        refreshProgress();
+
+        if (traversalStack.length > 1) {
+          triggerLLMSocraticBridge(traversalStack[0], traversalStack[1]);
+        }
+      }
+    } catch {
+      // vẫn chấm cục bộ nếu mạng lỗi, để không kẹt luồng học
+      const ok = selected === q.correct;
+      setAnswered(true);
+      setIsCorrect(ok);
+      if (ok) {
+        setCorrectSession((c) => c + 1);
+        fire(2600);
+
+        if (traversalStack.length > 1) {
+          triggerLLMSocraticBridge(traversalStack[0], traversalStack[1]);
+        }
+      }
+    } finally {
+      setSubmitting(false);
     }
-    previousSelectedOptionRef.current = selectedOption;
-  }, [selectedOption]);
+  }
 
-  // Render the student tutor workspace interface
-  return (
-    <div className="flex h-screen bg-slate-50 text-zinc-950 overflow-hidden relative">
-      
-      {/* Sidebar - Course & Logs */}
-      <aside className={`border-r border-slate-200 bg-white flex flex-col z-10 shadow-sm transition-all duration-300 ${
-        sidebarCollapsed ? "w-0 overflow-hidden opacity-0 border-r-0 pointer-events-none" : "w-80"
-      }`}>
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-indigo-600 animate-pulse" />
-            <span className="font-black text-slate-900 tracking-tight text-lg uppercase">Aurora Tutor</span>
-          </div>
-          <button
-            onClick={() => setSidebarCollapsed(true)}
-            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-650 transition-colors cursor-pointer"
-            title="Thu gọn sidebar"
-          >
-            <ChevronLeft size={16} />
-          </button>
+  function next() {
+    if (qIndex >= qTotal - 1) {
+      setScreen("complete");
+      fire(3200);
+      refreshProgress();
+      return;
+    }
+    setQIndex((i) => i + 1);
+    setSelected(null);
+    setAnswered(false);
+    setShowHint(false);
+    setHintText("");
+    setHintPress(0);
+    setIsCorrect(false);
+  }
+
+  function restart() {
+    setScreen("lesson");
+    setActiveTab("theory");
+    setQIndex(0);
+    setSelected(null);
+    setAnswered(false);
+    setShowHint(false);
+    setHintText("");
+    setHintPress(0);
+    setHintLevel(null);
+    setHintVideoUrl(null);
+    setHintSceneName(null);
+    setIsCorrect(false);
+    setCorrectSession(0);
+  }
+
+  async function doHint() {
+    if (hintLoading) return;
+    setHintLoading(true);
+    const topicName = currentNode?.name || subject || "Bài học";
+    const questionText = q?.q || "";
+    console.log("[HINT_BUTTON_CLICKED]", {
+      stepId: currentStepId,
+      topicName,
+      questionText,
+      pressCount: hintPress + 1,
+    });
+    toast.info(`[HINT LOG] Đang xin gợi ý Bậc ${hintPress + 1} cho bài "${topicName}"...`);
+
+    try {
+      const res = await requestHint(currentStepId, hintPress + 1, topicName, questionText);
+      console.log("[HINT_API_RESPONSE]", res);
+      setHintPress((p) => p + 1);
+      setHintText(res.text || res.content?.trim() || `Em thử đọc kỹ lại bài "${topicName}" và nhớ lại lý thuyết nhé!`);
+      setHintLevel(res.level ?? null);
+      setHintVideoUrl(res.video_url ?? null);
+      setHintSceneName(res.scene_name ?? null);
+      toast.success(`[HINT LOG] Đã nhận gợi ý Bậc ${res.level || 1} cho bài "${topicName}"`);
+    } catch (err: any) {
+      console.error("[HINT_ERROR]", err);
+      toast.error(`[HINT LOG Lỗi] ${err.message || "Không thể lấy gợi ý"}`);
+      setHintText(`Gợi ý đang tạm nghỉ. Em thử suy nghĩ theo lý thuyết bài "${topicName}" ở tab 📖 nhé!`);
+    } finally {
+      setShowHint(true);
+      setHintLoading(false);
+    }
+  }
+
+  async function sendMessage(text: string) {
+    const val = text.trim();
+    if (!val || chatSending || !currentStepId) return;
+    const history = chat.map((m) => ({ sender: m.sender, content: m.text }));
+    setChat((c) => [...c, { sender: "student", text: val }]);
+    setChatSending(true);
+    setChatMascotState("thinking");
+    setChatMascotSpeech("Nova đang suy nghĩ và phân tích câu hỏi của em nha... 🤔💭");
+    try {
+      const res = await chatTheory(currentStepId, val, history);
+      setChat((c) => [...c, { sender: "ai", text: res.reply }]);
+      setChatMascotState("review");
+      setChatMascotSpeech("Nova đã gợi ý xong! Em đọc kỹ và thử suy nghĩ xem sao nhé 💡");
+    } catch {
+      setChat((c) => [...c, { sender: "ai", text: "Mình đang bận chút xíu, em thử hỏi lại nhé! 😊" }]);
+      setChatMascotState("failed");
+      setChatMascotSpeech("Lỗi kết nối chút xíu, em thử nhắn lại câu hỏi giúp Nova nha 😅");
+    } finally {
+      setChatSending(false);
+    }
+  }
+
+  function onSubmitChat(e: FormEvent) {
+    e.preventDefault();
+    const el = inputRef.current;
+    const val = el ? el.value.trim() : "";
+    if (!val) return;
+    if (el) el.value = "";
+    sendMessage(val);
+  }
+
+  // ---- styles ----
+  const tabBase: CSSProperties = {
+    ...POPPINS,
+    borderRadius: 14,
+    padding: "11px 18px",
+    fontSize: 14,
+    fontWeight: 700,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    cursor: "pointer",
+    transition: "all .15s",
+  };
+  const tabOn: CSSProperties = { ...tabBase, background: "#16161F", color: "#fff" };
+  const tabOff: CSSProperties = { ...tabBase, background: "#fff", color: "#5b6072", border: "1px solid #eef1f4" };
+  const isLastAnswered = answered && qIndex >= qTotal - 1;
+
+  // ---- loading / error ----
+  if (loading) {
+    return (
+      <div style={{ height: "100vh", display: "grid", placeItems: "center", background: "#F4FBF9" }}>
+        <div style={{ textAlign: "center", color: "#5b6072" }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>🦊</div>
+          <div style={{ ...POPPINS, fontWeight: 700 }}>Đang tải không gian học…</div>
         </div>
-
-        {/* Active Subject Badge inside Sidebar */}
-        <div className="p-4 border-b border-slate-100 bg-indigo-50/40 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-sm shrink-0">
-              <BookOpen size={16} />
-            </div>
-            <div className="truncate">
-              <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block">Môn đang học</span>
-              <span className="text-xs font-black text-slate-900 truncate block">{selectedSubject || "Chưa chọn môn"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Tabs inside Sidebar */}
-        <div className="flex border-b border-slate-100 p-2 gap-1 bg-slate-50/50">
+      </div>
+    );
+  }
+  if (loadError) {
+    return (
+      <div style={{ height: "100vh", display: "grid", placeItems: "center", background: "#F4FBF9", padding: 24 }}>
+        <div style={{ textAlign: "center", maxWidth: 420 }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>😅</div>
+          <div style={{ ...POPPINS, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Chưa tải được</div>
+          <div style={{ color: "#5b6072", fontSize: 14, marginBottom: 18 }}>{loadError}</div>
           <button
-            onClick={() => setActiveTab("path")}
-            className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === "path"
-                ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
-                : "text-slate-500 hover:bg-white/40"
-            }`}
-          >
-            <ListTodo size={14} className={activeTab === "path" ? "text-indigo-600" : "text-slate-400"} />
-            Lộ trình học
-          </button>
-          <button
-            onClick={() => setActiveTab("logs")}
-            className={`flex-1 py-2 text-center text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              activeTab === "logs"
-                ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
-                : "text-slate-500 hover:bg-white/40"
-            }`}
-          >
-            <History size={14} className={activeTab === "logs" ? "text-indigo-600" : "text-slate-400"} />
-            Lịch sử
-          </button>
-        </div>
-
-        {/* Content Panel */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {activeTab === "logs" ? (
-            <>
-              <h3 className="text-[10px] font-black text-slate-400 px-2 uppercase tracking-widest">Lịch sử hoạt động của em</h3>
-              {activityLogs.length > 0 ? (
-                <div className="space-y-2">
-                  {activityLogs.slice(0, 20).map((log) => (
-                    <div key={log.id} className="p-3 bg-slate-50/80 border border-slate-100 rounded-xl text-[11px] leading-relaxed space-y-1">
-                      <div className="flex justify-between font-bold text-slate-700">
-                        <span className="text-indigo-600 font-black">{log.nodeName || "Bài học"}</span>
-                        <span className="text-[9px] text-slate-400">{new Date(log.createdAt).toLocaleTimeString("vi-VN")}</span>
-                      </div>
-                      <p className="text-slate-500">{log.detail}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-xl">
-                  Chưa có nhật ký học tập nào.
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <h3 className="text-[10px] font-black text-slate-400 px-2 uppercase tracking-widest">Lộ trình của em</h3>
-              {learningPath && learningPath.ordered_steps && learningPath.ordered_steps.length > 0 ? (
-                <div className="space-y-2">
-                  {learningPath.ordered_steps.map((step: any) => {
-                    const stepNode = nodes.find(n => n.id === step.topic_id);
-                    const topicName = stepNode ? stepNode.name : step.topic_id;
-                    return (
-                      <div
-                        key={step.topic_id}
-                        onClick={() => {
-                          if (stepNode) handleNodeClick(stepNode);
-                        }}
-                        className={`p-3.5 border transition-all cursor-pointer rounded-2xl text-[11px] leading-relaxed space-y-1.5 shadow-sm hover:scale-[1.01] ${
-                          step.status === "done"
-                            ? "bg-emerald-50/30 border-emerald-100 hover:bg-emerald-50/50"
-                            : step.status === "in_progress"
-                            ? "bg-indigo-50/40 border-indigo-200 hover:bg-indigo-50/60"
-                            : "bg-white border-slate-100 hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex justify-between items-center font-bold">
-                          <span className={`${step.status === "in_progress" ? "text-indigo-700" : "text-slate-800"} font-black`}>
-                            {step.order}. {topicName}
-                          </span>
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                            step.status === "done"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : step.status === "in_progress"
-                              ? "bg-indigo-100 text-indigo-800 animate-pulse"
-                              : "bg-slate-100 text-slate-600"
-                          }`}>
-                            {step.status === "done" ? "Xong" : step.status === "in_progress" ? "Đang học" : "Chờ học"}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 leading-normal">{step.inclusion_reason}</p>
-                        <div className="flex gap-2.5 text-[9px] text-slate-400 font-bold border-t border-slate-50 pt-1.5 font-mono">
-                          <span className="flex items-center gap-1"><Clock size={10} /> {step.estimated_minutes}m</span>
-                          <span className="flex items-center gap-1"><Target size={10} /> {(step.current_mastery * 100).toFixed(0)}% → {(step.target_mastery * 100).toFixed(0)}%</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-xl">
-                  Chưa có lộ trình nào được duyệt.
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Switch Subject Action Button at Bottom of Sidebar */}
-        <div className="p-3 border-t border-slate-100 bg-slate-50/50">
-          <button
-            onClick={() => {
-              setSelectedSubject("");
-              localStorage.removeItem("aurora_student_subject");
-              setActiveMainTab("graph");
+            onClick={loadAll}
+            style={{
+              ...POPPINS,
+              border: "none",
+              background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
+              color: "#fff",
+              borderRadius: 12,
+              padding: "12px 22px",
+              fontWeight: 800,
+              cursor: "pointer",
             }}
-            className="w-full py-2 px-3 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200 shadow-sm active:scale-95"
           >
-            <RefreshCw size={14} className="text-indigo-600" /> Đổi môn học
+            Thử lại
           </button>
         </div>
+      </div>
+    );
+  }
 
-        {/* Profile Card */}
-        <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-md shadow-indigo-200">
-              {userName[0]}
+  return (
+    <div
+      style={{
+        height: "100vh",
+        minHeight: 720,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        background: "#F4FBF9",
+        fontFamily: "'Inter', sans-serif",
+        color: "#16161F",
+      }}
+    >
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        {/* ============ ROADMAP RAIL ============ */}
+        <aside
+          style={{
+            width: 290,
+            background: "#fff",
+            borderRight: "1px solid #eef1f4",
+            display: "flex",
+            flexDirection: "column",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f2f4f7" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+              <img
+                src="/icon.png"
+                alt="Aurora"
+                style={{
+                  height: 38,
+                  width: 38,
+                  borderRadius: 12,
+                  objectFit: "cover",
+                }}
+              />
+              <div>
+                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 16, lineHeight: 1 }}>Aurora</div>
+                <div style={{ fontSize: 11, color: "#9aa1b0", marginTop: 2 }}>Học thật, hiểu thật</div>
+              </div>
             </div>
-            <div className="truncate max-w-[120px]">
-              <div className="text-sm font-black text-slate-900 truncate">{userName}</div>
-              <div className="text-[10px] text-slate-400">Học sinh</div>
+            <div
+              style={{
+                background: "#f4f6f9",
+                border: "1px solid #eef1f4",
+                borderRadius: 13,
+                padding: "10px 13px",
+                fontSize: 13.5,
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <span>📐</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subject}</span>
+              </span>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-xs text-red-500 hover:text-red-700 font-extrabold transition-all"
-          >
-            Đăng xuất
-          </button>
-        </div>
-      </aside>
 
-      {/* Main Canvas Workspace */}
-      <main className="flex-1 flex flex-col bg-slate-50/50 p-6 overflow-hidden relative">
-        {/* Style block for animations */}
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes confetti-fall {
-            0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
-          }
-          .animate-confetti {
-            animation: confetti-fall 3.5s linear infinite;
-          }
-          @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            20%, 60% { transform: translateX(-6px); }
-            40%, 80% { transform: translateX(6px); }
-          }
-          .animate-shake {
-            animation: shake 0.4s ease-in-out;
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes scaleUp {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
-          }
-        `}} />
-
-        {/* Confetti Animation Overlay */}
-        {showConfetti && (
-          <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden flex items-center justify-center">
-            {Array.from({ length: 45 }).map((_, i) => {
-              const left = Math.random() * 100;
-              const delay = Math.random() * 1.5;
-              const color = ["#818cf8", "#34d399", "#fb7185", "#fbbf24", "#38bdf8"][i % 5];
-              return (
-                <span
-                  key={i}
-                  className="absolute w-2 h-4 rounded-sm animate-confetti"
+          <div style={{ padding: "16px 12px", overflowY: "auto", flex: 1 }}>
+            <div
+              style={{
+                ...POPPINS,
+                fontSize: 10.5,
+                fontWeight: 800,
+                color: "#9aa1b0",
+                textTransform: "uppercase",
+                letterSpacing: ".07em",
+                padding: "0 8px 4px",
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chapterName}</span>
+              <span style={{ color: "#0FB9A6", flexShrink: 0 }}>
+                {doneCount}/{totalSteps}
+              </span>
+            </div>
+            <div style={{ padding: "0 8px 12px" }}>
+              <div style={{ height: 6, background: "#eef1f4", borderRadius: 6 }}>
+                <div
                   style={{
-                    left: `${left}%`,
-                    backgroundColor: color,
-                    animationDelay: `${delay}s`,
-                    transform: `rotate(${Math.random() * 360}deg)`,
+                    height: 6,
+                    background: "linear-gradient(90deg,#14D9C0,#0FB9A6)",
+                    borderRadius: 6,
+                    width: `${chapterPct}%`,
                   }}
                 />
+              </div>
+            </div>
+
+            {roadmap.map((st, i) => {
+              const gated = !!studentState?.needsDiagnostic;
+              const active = st.id === currentStepId && !gated;
+              const done = st.status === "done" && !gated;
+              const locked = (st.status === "locked" && !active) || gated;
+              const rowStyle: CSSProperties = {
+                display: "flex",
+                alignItems: "center",
+                gap: 11,
+                padding: "11px 12px",
+                borderRadius: 14,
+                marginBottom: 5,
+                transition: "all .15s",
+                ...(active
+                  ? {
+                      background: "linear-gradient(135deg,#EFE9FD,#f6f1ff)",
+                      boxShadow: "inset 0 0 0 2px #7C46E8",
+                      cursor: "pointer",
+                    }
+                  : done
+                    ? { background: "#F3FBF9", cursor: "pointer" }
+                    : locked
+                      ? { cursor: "pointer", opacity: 0.95 }
+                      : { cursor: "pointer" }),
+              };
+              const badgeStyle: CSSProperties = {
+                height: 26,
+                width: 26,
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                fontSize: 12,
+                fontWeight: 800,
+                flexShrink: 0,
+                ...(active
+                  ? { background: "#7C46E8", color: "#fff" }
+                  : done
+                    ? { background: "#14D9C0", color: "#fff" }
+                    : { background: "#eef1f4", color: "#b3b9c4" }),
+              };
+              const nameStyle: CSSProperties = {
+                fontSize: 12.5,
+                fontWeight: active ? 800 : 600,
+                flex: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                color: active ? "#5b2fc0" : done ? "#16161F" : "#a2a8b4",
+              };
+              const tag = active ? "đang học" : locked ? "🔒" : "";
+              const tagStyle: CSSProperties = {
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 999,
+                flexShrink: 0,
+                ...(active ? { background: "#fff", color: "#7C46E8" } : { color: "#c2c8d2" }),
+              };
+              return (
+                <div key={st.id} onClick={() => selectStep(st)} style={rowStyle} title={st.name}>
+                  <span style={badgeStyle}>{done ? "✓" : String(i + 1)}</span>
+                  <span style={nameStyle}>{st.name}</span>
+                  <span style={tagStyle}>{tag}</span>
+                </div>
               );
             })}
           </div>
-        )}
 
-        {/* Auto Route Recommendation Modal */}
-        {showAutoRouteModal && nextRecommendedNode && (
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
-            <div className="bg-white p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-100 flex flex-col items-center text-center space-y-5 animate-[scaleUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
-              <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-2xl shadow-md animate-bounce select-none">
-                🎉
+          <div style={{ padding: 14, borderTop: "1px solid #f2f4f7" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
+              <div
+                style={{
+                  ...POPPINS,
+                  height: 38,
+                  width: 38,
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg,#ffd76f,#ff9f43)",
+                  display: "grid",
+                  placeItems: "center",
+                  fontWeight: 800,
+                  color: "#7a4b00",
+                }}
+              >
+                {studentName.charAt(0).toUpperCase()}
               </div>
-              <div className="space-y-1.5">
-                <h3 className="text-base font-black text-slate-950 uppercase tracking-tight">Chúc mừng em thông thạo bài học!</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Em đã hoàn thành xuất sắc các câu hỏi của bài học và đạt độ thành thạo cao. Em có muốn tiếp tục lộ trình đến bài học tiếp theo không?
-                </p>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {studentName}
+                </div>
+                <div style={{ fontSize: 11, color: "#9aa1b0" }}>
+                  🔥 {streak} ngày · ⭐ {stars}
+                </div>
               </div>
-              
-              <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl w-full text-center font-bold">
-                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-0.5 font-mono">Bài học kế tiếp</span>
-                <span className="text-xs font-black text-slate-900">{nextRecommendedNode.name}</span>
-              </div>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                router.push("/");
+              }}
+              style={{
+                ...POPPINS,
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "9px 14px",
+                border: "1px solid #f8d3da",
+                borderRadius: 12,
+                background: "#fef3f5",
+                color: "#c23a54",
+                fontSize: 12.5,
+                fontWeight: 800,
+                cursor: "pointer",
+                transition: "all .15s",
+              }}
+            >
+              🚪 Đăng xuất
+            </button>
+          </div>
+        </aside>
 
-              <div className="flex gap-3 w-full">
-                <button
-                  onClick={() => setShowAutoRouteModal(false)}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer"
-                >
-                  Luyện tập thêm
-                </button>
-                <button
-                  onClick={() => {
-                    setShowAutoRouteModal(false);
-                    handleNodeClick(nextRecommendedNode);
-                  }}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-3 rounded-xl shadow-md shadow-indigo-200 transition-all cursor-pointer"
-                >
-                  Học tiếp ngay
-                </button>
+        {/* ============ WORKSPACE ============ */}
+        <main
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "24px 34px 40px",
+            background:
+              "radial-gradient(680px 320px at 100% -6%, rgba(124,70,232,.09), transparent 62%), radial-gradient(560px 300px at -5% 0%, rgba(20,217,192,.10), transparent 60%)",
+          }}
+        >
+          {/* lesson hero */}
+          <div
+            style={{
+              background: "linear-gradient(120deg,#14D9C0,#0FB9A6)",
+              borderRadius: 24,
+              padding: "24px 28px",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              boxShadow: "0 24px 46px -26px rgba(15,185,166,.75)",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ position: "absolute", right: -34, top: -40, height: 170, width: 170, borderRadius: "50%", background: "rgba(255,255,255,.13)" }} />
+            <div style={{ position: "absolute", right: 80, bottom: -60, height: 120, width: 120, borderRadius: "50%", background: "rgba(255,255,255,.1)" }} />
+            <div style={{ position: "relative", zIndex: 1, maxWidth: "62%" }}>
+              <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, letterSpacing: ".09em", textTransform: "uppercase", opacity: 0.92 }}>
+                Bài {lessonIndex + 1} · {chapterName}
+              </div>
+              <div style={{ ...BALOO, fontWeight: 800, fontSize: 28, margin: "5px 0 6px", lineHeight: 1.1 }}>
+                {currentNode?.name ?? "Bài học"}
+              </div>
+              <div style={{ fontSize: 13.5, opacity: 0.93, lineHeight: 1.5 }}>{lessonBlurb}</div>
+            </div>
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                textAlign: "center",
+                background: "rgba(255,255,255,.18)",
+                backdropFilter: "blur(5px)",
+                borderRadius: 20,
+                padding: "16px 22px",
+                minWidth: 104,
+              }}
+            >
+              <div style={{ ...POPPINS, fontWeight: 800, fontSize: 26 }}>{masteryPct}%</div>
+              <div style={{ fontSize: 10.5, opacity: 0.92, marginBottom: 8 }}>đã hiểu</div>
+              <div style={{ height: 6, width: 74, background: "rgba(255,255,255,.32)", borderRadius: 6, margin: "0 auto" }}>
+                <div style={{ height: 6, background: "#fff", borderRadius: 6, width: `${masteryPct}%` }} />
               </div>
             </div>
           </div>
-        )}
 
-        {/* U1 Socratic Purpose Selection Modal */}
-        {showPurposeModal && nodeForPurpose && (
-          <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
-            <div className="bg-white p-9 rounded-[32px] shadow-2xl max-w-xl w-full border border-slate-100 flex flex-col space-y-6 animate-[scaleUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
-              <div className="flex justify-between items-start">
-                <div className="space-y-1.5 flex-1 min-w-0">
-                  <span className="text-[9px] bg-indigo-50 text-indigo-650 font-black uppercase tracking-widest px-3 py-1 rounded-full font-mono">
-                    Không gian học tập
+          {/* merged tabs */}
+          <div style={{ display: "flex", gap: 9, margin: "22px 0 18px", alignItems: "center" }}>
+            {!studentState?.needsDiagnostic ? (
+              <>
+                <div onClick={() => setActiveTab("theory")} style={activeTab === "theory" ? tabOn : tabOff}>
+                  📖 Học lý thuyết
+                </div>
+                <div onClick={() => setActiveTab("practice")} style={activeTab === "practice" ? tabOn : tabOff}>
+                  ✏️ Luyện tập{" "}
+                  <span
+                    style={{
+                      background: activeTab === "practice" ? "rgba(255,255,255,.22)" : "#EFE9FD",
+                      color: activeTab === "practice" ? "#fff" : "#7C46E8",
+                      fontSize: 11,
+                      padding: "1px 8px",
+                      borderRadius: 999,
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  >
+                    {qTotal}
                   </span>
-                  <h3 className="text-base md:text-lg font-black text-slate-900 leading-snug uppercase pt-1 tracking-tight truncate max-w-[420px]">
-                    {nodeForPurpose.name}
-                  </h3>
                 </div>
-                <button
-                  onClick={() => setShowPurposeModal(false)}
-                  className="h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-650 flex items-center justify-center text-xs font-bold transition-all duration-200 active:scale-90 cursor-pointer shrink-0 ml-2"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-
-              {studentState?.needsDiagnostic && (
-                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-rose-800 shadow-sm animate-pulse">
-                  <AlertCircle size={18} className="mt-0.5 shrink-0 text-rose-600" />
-                  <div className="text-xs font-semibold leading-relaxed">
-                    <span className="font-black uppercase block mb-0.5 tracking-wide text-rose-700">Yêu cầu chẩn đoán bắt buộc</span>
-                    Thầy/cô giáo đã gửi yêu cầu đánh giá chẩn đoán năng lực. Em vui lòng thực hiện bài kiểm tra chẩn đoán dưới đây để xác định trình độ thực tế trên cây.
-                  </div>
+                <div onClick={() => setActiveTab("chat")} style={activeTab === "chat" ? tabOn : tabOff}>
+                  💬 Hỏi thầy AI
                 </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-4">
-                {/* Mode 1: Theory Socratic Chat */}
-                <button
-                  onClick={() => handleStartNodeMode(nodeForPurpose, "theory")}
-                  disabled={studentState?.needsDiagnostic}
-                  className={`flex items-center gap-5 p-6 rounded-3xl border-2 text-left transition-all duration-250 ${
-                    studentState?.needsDiagnostic
-                      ? "bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed"
-                      : "bg-white border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/15 cursor-pointer hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-indigo-50/50"
-                  }`}
-                >
-                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 ${
-                    studentState?.needsDiagnostic ? "bg-slate-100 text-slate-400" : "bg-indigo-50 text-indigo-600"
-                  }`}>
-                    <BookOpen size={24} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
-                      Học lý thuyết & Thảo luận
-                    </h4>
-                    <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
-                      Tìm hiểu lý thuyết và trao đổi trực tiếp với Trợ lý Socratic RAG để tự thấu suốt bản chất kiến thức.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Mode 2: Practice Free Mode */}
-                <button
-                  onClick={() => handleStartNodeMode(nodeForPurpose, "practice")}
-                  disabled={studentState?.needsDiagnostic}
-                  className={`flex items-center gap-5 p-6 rounded-3xl border-2 text-left transition-all duration-250 ${
-                    studentState?.needsDiagnostic
-                      ? "bg-slate-50 border-slate-100 opacity-40 cursor-not-allowed"
-                      : "bg-white border-slate-200 hover:border-orange-500 hover:bg-orange-50/15 cursor-pointer hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-orange-50/50"
-                  }`}
-                >
-                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 ${
-                    studentState?.needsDiagnostic ? "bg-slate-100 text-slate-400" : "bg-orange-50 text-orange-600"
-                  }`}>
-                    <PlayCircle size={24} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
-                      Luyện tập tự do
-                    </h4>
-                    <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
-                      Thực hành làm các bài toán trắc nghiệm chia theo từng cấp độ nhận thức tại bài học này.
-                    </p>
-                  </div>
-                </button>
-
-                {/* Mode 3: Diagnostic Assessment */}
-                <button
-                  onClick={() => handleStartNodeMode(nodeForPurpose, "diagnostic")}
-                  className={`flex items-center gap-5 p-6 rounded-3xl border-2 text-left transition-all duration-250 ${
-                    studentState?.needsDiagnostic
-                      ? "bg-rose-50/30 border-rose-350 hover:border-rose-500 hover:bg-rose-50/15 hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-rose-50/50"
-                      : "bg-white border-slate-200 hover:border-blue-500 hover:bg-blue-50/15 hover:scale-[1.02] hover:shadow-md hover:ring-4 hover:ring-blue-50/50"
-                  } cursor-pointer`}
-                >
-                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 ${
-                    studentState?.needsDiagnostic ? "bg-rose-100/60 text-rose-600" : "bg-blue-50 text-blue-600"
-                  }`}>
-                    <Compass size={24} className={studentState?.needsDiagnostic ? "animate-pulse" : ""} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm md:text-base font-black text-slate-900 flex items-center gap-1.5">
-                      Đánh giá năng lực chẩn đoán {studentState?.needsDiagnostic && "(Bắt buộc)"}
-                    </h4>
-                    <p className="text-xs text-slate-500 font-semibold mt-1 leading-relaxed">
-                      Kiểm tra thực lực thích ứng. Hệ thống tự động hạ mức khi gặp khó khăn để dò tìm chính xác lỗ hổng nền tảng.
-                    </p>
-                  </div>
-                </button>
+              </>
+            ) : (
+              <div style={{ ...POPPINS, fontSize: 13, fontWeight: 800, color: "#c23a54", background: "#fef3f5", border: "1px solid #f8d3da", padding: "10px 16px", borderRadius: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                🔒 Khóa lộ trình: Yêu cầu Đánh giá Chẩn đoán bắt buộc
               </div>
+            )}
+            <div onClick={() => setActiveTab("exams")} style={activeTab === "exams" ? tabOn : tabOff}>
+              ✍️ Đề thi & Kiểm tra
             </div>
           </div>
-        )}
 
-        {selectedSubject && studentState && studentState.needsDiagnostic ? (
-          /* General Exam Landing & Player Overlay */
-          (() => {
-            if (examFinishedScore) {
-              return (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-3xl shadow-sm text-center space-y-6 max-w-2xl mx-auto my-12 animate-[fadeIn_0.3s_ease-out]">
-                  <div className="h-20 w-20 bg-emerald-50 rounded-full flex items-center justify-center text-3xl shadow-md border border-emerald-100 animate-bounce">
-                    🎉
+          {/* ===== THEORY PANEL ===== */}
+          {activeTab === "theory" && (
+            <div className="ah-panel" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
+              <div style={{ flex: 1.2, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 24, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                <div style={{ ...POPPINS, fontWeight: 700, fontSize: 17, marginBottom: 12 }}>Ý tưởng chính 🍰</div>
+                <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: "#4b5060", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
+                  {currentNode?.theory?.trim() || "Nội dung lý thuyết cho bài này đang được cập nhật. Em có thể sang tab Luyện tập hoặc hỏi thầy AI nhé!"}
+                </p>
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  <div
+                    onClick={() => setActiveTab("practice")}
+                    style={{
+                      ...POPPINS,
+                      flex: 1,
+                      background: "linear-gradient(135deg,#8B5CF6,#7C46E8)",
+                      color: "#fff",
+                      borderRadius: 14,
+                      padding: 14,
+                      textAlign: "center",
+                      fontWeight: 800,
+                      fontSize: 15,
+                      cursor: "pointer",
+                      boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)",
+                    }}
+                  >
+                    Mình hiểu rồi → Luyện tập
                   </div>
-                  <div className="space-y-2">
-                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Hoàn thành Đánh giá Tổng quan!</h2>
-                    <p className="text-sm text-slate-550 font-semibold max-w-md mx-auto leading-relaxed">
-                      Cảm ơn em đã hoàn thành bài thi. Dựa trên kết quả này, hệ thống đã thiết lập ma trận năng lực và lộ trình học tập cá nhân hóa cho em.
-                    </p>
+                  <div
+                    onClick={() => setActiveTab("chat")}
+                    style={{ background: "#fff", border: "1px solid #eef1f4", color: "#5b6072", borderRadius: 14, padding: "14px 18px", fontWeight: 700, fontSize: 15, cursor: "pointer" }}
+                  >
+                    💬
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ width: 264, background: "linear-gradient(160deg,#faf7ff,#f2eefb)", border: "1px solid #ece5fb", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
+                  <div style={{ height: 44, width: 44, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                    <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 36, height: 36, objectFit: "contain" }} />
+                  </div>
+                  <div>
+                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{COMPANION.name}</div>
+                    <div style={{ fontSize: 11, color: "#7C46E8", fontWeight: 600 }}>● đang lắng nghe</div>
+                  </div>
+                </div>
+                <div style={{ background: "#fff", border: "1px solid #f0eafc", borderRadius: 15, borderTopLeftRadius: 5, padding: 13, fontSize: 13, color: "#4b5060", lineHeight: 1.6 }}>
+                  Có chỗ nào trong bài "{currentNode?.name ?? "này"}" chưa rõ không? Hỏi mình, mình sẽ gợi ý từng bước nhé! 🤔
+                </div>
+                <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 9, paddingTop: 16 }}>
+                  <div
+                    onClick={() => {
+                      setActiveTab("chat");
+                      sendMessage("Em chưa hiểu chỗ này ạ");
+                    }}
+                    style={{ background: "#fff", border: "1px solid #ece5fb", borderRadius: 12, padding: "10px 13px", fontSize: 12.5, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
+                  >
+                    Em chưa hiểu chỗ này
+                  </div>
+                  <div
+                    onClick={() => {
+                      setActiveTab("chat");
+                      sendMessage("Cho em một ví dụ khác");
+                    }}
+                    style={{ background: "#fff", border: "1px solid #ece5fb", borderRadius: 12, padding: "10px 13px", fontSize: 12.5, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
+                  >
+                    Cho em một ví dụ khác
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===== PRACTICE PANEL ===== */}
+          {activeTab === "practice" && (
+            <div
+              className="ah-panel"
+              style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: "24px 26px", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 820 }}
+            >
+              {qLoading ? (
+                <div style={{ textAlign: "center", color: "#9aa1b0", padding: "40px 0", ...POPPINS, fontWeight: 700 }}>Đang tải câu hỏi…</div>
+              ) : !q ? (
+                <div style={{ textAlign: "center", color: "#9aa1b0", padding: "40px 0" }}>
+                  <div style={{ fontSize: 30, marginBottom: 8 }}>📭</div>
+                  <div style={{ ...POPPINS, fontWeight: 700 }}>Bài này chưa có câu hỏi luyện tập.</div>
+                  <div style={{ fontSize: 13, marginTop: 4 }}>Em thử học lý thuyết hoặc hỏi thầy AI nhé!</div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <span style={{ ...POPPINS, fontSize: 11, fontWeight: 800, padding: "5px 13px", borderRadius: 999, textTransform: "uppercase", letterSpacing: ".04em", ...DIFF_STYLE[q.tag] }}>
+                        {q.tag}
+                      </span>
+                      {difficultyFilter && (
+                        <button
+                          onClick={() => setDifficultyFilter(null)}
+                          style={{
+                            ...POPPINS,
+                            borderRadius: 99,
+                            padding: "4px 10px",
+                            fontSize: 10,
+                            fontWeight: 850,
+                            background: "#faf7ff",
+                            border: "1px solid #ece5fb",
+                            color: "#7C46E8",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Xem tất cả ✕
+                        </button>
+                      )}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#9aa1b0", fontWeight: 700 }}>
+                      Câu {qIndex + 1} / {qTotal}
+                    </span>
                   </div>
 
-                  <div className="p-6 bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-3xl w-full max-w-sm mx-auto shadow-inner flex flex-col items-center justify-center gap-1.5">
-                    <span className="text-[10px] font-black text-indigo-650 uppercase tracking-widest block font-mono">Điểm số đạt được</span>
-                    <div className="text-4xl font-black text-slate-900 tabular-nums">
-                      {examFinishedScore.totalScore} <span className="text-base text-slate-400 font-bold">/ {examFinishedScore.maxScore}</span>
+                  {traversalStack.length > 1 && (
+                    <div style={{ marginBottom: 16, background: "linear-gradient(135deg, #1e1b4b, #312e81)", borderRadius: 14, padding: "12px 16px", border: "1px solid #6366f1", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, color: "#a5b4fc" }}>
+                        <span style={{ fontSize: 16 }}>📍</span>
+                        <span>Đang lùi Cây Tri thức về Nút Cha tiên quyết: <strong style={{ color: "#fbbf24" }}>"{currentNode?.name}"</strong></span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const orig = traversalStack[0];
+                          if (orig) {
+                            setCurrentStepId(orig.id);
+                            setTraversalStack([]);
+                            setBridgeText(null);
+                            loadQuestions(orig.id);
+                          }
+                        }}
+                        style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "#cbd5e1", borderRadius: 8, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontWeight: 700 }}
+                      >
+                        Về bài gốc ({traversalStack[0]?.name}) ↩
+                      </button>
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.5, marginBottom: 18 }}>{q.q}</div>
+
+                  {q.opts.map((text, i) => {
+                    const letter = ["A", "B", "C", "D", "E", "F"][i] ?? "?";
+                    const isSel = selected === i;
+                    let optStyle: CSSProperties = {
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 13,
+                      borderRadius: 14,
+                      padding: "13px 15px",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      marginBottom: 10,
+                      cursor: answered ? "default" : "pointer",
+                      transition: "all .15s",
+                    };
+                    let badgeStyle: CSSProperties = { height: 28, width: 28, borderRadius: 9, display: "grid", placeItems: "center", fontWeight: 800, fontSize: 13, flexShrink: 0 };
+                    let mark = "";
+                    if (answered) {
+                      if (i === q.correct) {
+                        optStyle = { ...optStyle, border: "2px solid #14D9C0", background: "#F0FCF8", color: "#0d7a6c", fontWeight: 800 };
+                        badgeStyle = { ...badgeStyle, background: "#14D9C0", color: "#fff" };
+                        mark = "✅";
+                      } else if (isSel) {
+                        optStyle = { ...optStyle, border: "2px solid #F43F5E", background: "#FEF2F4", color: "#9f1239", fontWeight: 800 };
+                        badgeStyle = { ...badgeStyle, background: "#F43F5E", color: "#fff" };
+                        mark = "❌";
+                      } else {
+                        optStyle = { ...optStyle, opacity: 0.6, border: "1px solid #eef1f4" };
+                        badgeStyle = { ...badgeStyle, background: "#f4f6f9", color: "#b3b9c4" };
+                      }
+                    } else if (isSel) {
+                      optStyle = { ...optStyle, border: "2px solid #7C46E8", background: "#faf7ff", color: "#5b2fc0", fontWeight: 800, boxShadow: "0 0 0 4px #EFE9FD" };
+                      badgeStyle = { ...badgeStyle, background: "#7C46E8", color: "#fff" };
+                    } else {
+                      optStyle = { ...optStyle, border: "1px solid #eef1f4", color: "#4b5060", background: "#fff" };
+                      badgeStyle = { ...badgeStyle, background: "#f4f6f9", color: "#9aa1b0" };
+                    }
+                    return (
+                      <div key={i} onClick={() => selectOpt(i)} style={optStyle}>
+                        <span style={badgeStyle}>{letter}</span>
+                        <span style={{ flex: 1 }}>{text}</span>
+                        <span style={{ fontSize: 16 }}>{mark}</span>
+                      </div>
+                    );
+                  })}
+
+                  {showHint && hintText && (
+                    <div style={{ marginTop: 14, background: "#F3FBF9", border: "1px solid #cfeee6", borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <span style={{ fontSize: 18 }}>💡</span>
+                        <div style={{ fontSize: 13, color: "#0d7a6c", lineHeight: 1.55, fontWeight: 600, flex: 1 }}>{hintText}</div>
+                      </div>
+
+
+                    </div>
+                  )}
+
+                  {answered && (
+                    <div
+                      style={{
+                        marginTop: 16,
+                        borderRadius: 14,
+                        padding: "14px 16px",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 11,
+                        ...(isCorrect
+                          ? { background: "#F0FCF8", border: "1px solid #b8ede0", color: "#0d7a6c" }
+                          : { background: "#fef3f5", border: "1px solid #f8d3da", color: "#c23a54" }),
+                      }}
+                    >
+                      <span style={{ fontSize: 20 }}>{isCorrect ? "🎉" : "🤗"}</span>
+                      <span>{isCorrect ? "Tuyệt vời! Em trả lời chính xác rồi." : "Chưa đúng rồi, nhưng không sao! Xem gợi ý và thử lại nhé."}</span>
+                    </div>
+                  )}
+
+                  {bridgeText && (
+                    <div style={{ marginTop: 16, background: "linear-gradient(135deg, #065f46, #047857)", borderRadius: 16, padding: "16px 20px", border: "1px solid #10b981", color: "#fff", boxShadow: "0 10px 25px -5px rgba(16,185,129,0.4)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "#6ee7b7", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>✨ Cầu nối Tư duy Socratic (LLM Bridge Agent)</span>
+                      </div>
+                      <p style={{ fontSize: 14, lineHeight: 1.6, margin: "0 0 14px", color: "#ecfdf5", fontWeight: 600 }}>
+                        {bridgeText}
+                      </p>
+                      <button
+                        onClick={() => {
+                          const orig = traversalStack[0];
+                          if (orig) {
+                            setCurrentStepId(orig.id);
+                            setTraversalStack([]);
+                            setBridgeText(null);
+                            setQIndex(0);
+                            setSelected(null);
+                            setAnswered(false);
+                            setShowHint(false);
+                            setHintText("");
+                            setHintPress(0);
+                            setIsCorrect(false);
+                            resetChat(orig.name);
+                            loadQuestions(orig.id);
+                            toast.success(`🚀 Đã chuyển tới Bài toán ban đầu "${orig.name}"!`);
+                          }
+                        }}
+                        style={{
+                          border: "none",
+                          borderRadius: 12,
+                          padding: "10px 18px",
+                          background: "linear-gradient(135deg,#fbbf24,#f59e0b)",
+                          color: "#0f172a",
+                          fontWeight: 850,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          boxShadow: "0 8px 16px -4px rgba(245,158,11,0.5)",
+                        }}
+                      >
+                        🚀 Quay trở lại thử sức Bài toán gốc "{traversalStack[0]?.name}"
+                      </button>
+                    </div>
+                  )}
+
+                  {cantDoOptions && (
+                    <div style={{ marginTop: 14, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 16, padding: "16px 18px" }}>
+                      <div style={{ ...POPPINS, fontSize: 13, fontWeight: 800, color: "#5b2fc0", marginBottom: 8 }}>
+                        💡 Đề xuất từ {COMPANION.name}:
+                      </div>
+                      <p style={{ fontSize: 12.5, color: "#5b6072", lineHeight: 1.5, margin: "0 0 12px" }}>
+                        Em gặp khó khăn ở phần này ư? Đừng lo nhé, em có thể chọn giải pháp dưới đây để củng cố thêm:
+                      </p>
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {cantDoOptions.hasEasyQ && !difficultyFilter && (
+                          <button
+                            onClick={handleChooseEasier}
+                            style={{
+                              ...POPPINS,
+                              border: "none",
+                              borderRadius: 10,
+                              padding: "8px 12px",
+                              background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
+                              color: "#fff",
+                              fontWeight: 800,
+                              fontSize: 11.5,
+                              cursor: "pointer",
+                              boxShadow: "0 6px 12px -4px rgba(15,185,166,.4)",
+                            }}
+                          >
+                            🟢 Làm câu nhận biết (Dễ hơn)
+                          </button>
+                        )}
+                        {cantDoOptions.parents && cantDoOptions.parents.map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              const parentNode = nodes.find((n) => n.id === p.id);
+                              if (parentNode) {
+                                setCurrentStepId(parentNode.id);
+                                setQIndex(0);
+                                setSelected(null);
+                                setAnswered(false);
+                                setShowHint(false);
+                                setHintText("");
+                                setHintPress(0);
+                                setIsCorrect(false);
+                                setCorrectSession(0);
+                                setCantDoOptions(null);
+                                setDifficultyFilter(null);
+                                resetChat(parentNode.name);
+                                loadQuestions(parentNode.id);
+                                toast.info(`Đang chuyển về bài học nền tảng: ${parentNode.name}`);
+                              }
+                            }}
+                            style={{
+                              ...POPPINS,
+                              border: "1px solid #ece5fb",
+                              borderRadius: 10,
+                              padding: "8px 12px",
+                              background: "#fff",
+                              color: "#7C46E8",
+                              fontWeight: 800,
+                              fontSize: 11.5,
+                              cursor: "pointer",
+                            }}
+                          >
+                            📖 Ôn tập bài nền tảng: {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                    {!answered ? (
+                      <div
+                        onClick={submit}
+                        style={{
+                          ...POPPINS,
+                          flex: 1,
+                          borderRadius: 14,
+                          padding: 14,
+                          textAlign: "center",
+                          fontWeight: 800,
+                          fontSize: 15,
+                          cursor: selected === null || submitting ? "not-allowed" : "pointer",
+                          transition: "all .15s",
+                          ...(selected === null || submitting
+                            ? { background: "#eef1f4", color: "#b3b9c4" }
+                            : { background: "linear-gradient(135deg,#8B5CF6,#7C46E8)", color: "#fff", boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)" }),
+                        }}
+                      >
+                        {submitting ? "Đang chấm…" : "Trả lời"}
+                      </div>
+                    ) : (
+                      <div
+                        onClick={next}
+                        style={{
+                          ...POPPINS,
+                          flex: 1,
+                          borderRadius: 14,
+                          padding: 14,
+                          textAlign: "center",
+                          fontWeight: 800,
+                          fontSize: 15,
+                          cursor: "pointer",
+                          transition: "all .15s",
+                          background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
+                          color: "#fff",
+                          boxShadow: "0 12px 22px -8px rgba(15,185,166,.55)",
+                        }}
+                      >
+                        {isLastAnswered ? "🎉 Hoàn thành bài học" : "Câu tiếp theo →"}
+                      </div>
+                    )}
+                    {!answered && (
+                      <>
+                        <div
+                          onClick={doHint}
+                          style={{ ...POPPINS, background: "#faf7ff", border: "1px solid #ece5fb", color: "#7C46E8", borderRadius: 14, padding: "14px 20px", fontWeight: 800, fontSize: 14, cursor: "pointer" }}
+                        >
+                          {hintLoading ? "…" : "💡 Gợi ý"}
+                        </div>
+                        <div
+                          onClick={handleCantDo}
+                          style={{ ...POPPINS, background: "#fff8ec", border: "1px solid #ffe6bd", color: "#b7811f", borderRadius: 14, padding: "14px 20px", fontWeight: 800, fontSize: 14, cursor: "pointer" }}
+                        >
+                          🤷 Không làm được
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ===== CHAT PANEL ===== */}
+          {activeTab === "chat" && (
+            <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap", width: "100%" }}>
+              <div
+                className="ah-panel"
+                style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flex: "1 1 480px", maxWidth: 760, minWidth: 320, display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
+              >
+                <div style={{ padding: "15px 20px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", gap: 11 }}>
+                  <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                    <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 30, height: 30, objectFit: "contain" }} />
+                  </div>
+                  <div>
+                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{COMPANION.name}</div>
+                    <div style={{ fontSize: 11, color: "#0FB9A6", fontWeight: 600 }}>● gợi mở, không cho đáp án sẵn</div>
+                  </div>
+                </div>
+                <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+                  {chat.map((m, i) =>
+                    m.sender === "ai" ? (
+                      <div key={i} style={{ display: "flex", maxWidth: "82%" }}>
+                        <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#3a3f4d", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <div style={{ background: "#16161F", color: "#fff", borderRadius: 16, borderBottomRightRadius: 5, padding: "11px 15px", fontSize: 13.5, lineHeight: 1.55, maxWidth: "78%" }}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                  {chatSending && (
+                    <div style={{ display: "flex", maxWidth: "82%" }}>
+                      <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#9aa1b0" }}>
+                        {COMPANION.name} đang soạn… ✍️
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: "12px 18px 16px", borderTop: "1px solid #f2f4f7" }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                    <div
+                      onClick={() => {
+                        setChatMascotState("encourage");
+                        setChatMascotSpeech("Cố lên em! Nova ở đây giúp em từng bước nè 💪✨");
+                        sendMessage("Em chưa hiểu chỗ này ạ");
+                      }}
+                      style={{ background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
+                    >
+                      🤔 Em chưa hiểu
+                    </div>
+                    <div
+                      onClick={() => {
+                        setChatMascotState("review");
+                        setChatMascotSpeech("Nova sẽ đưa ví dụ minh họa để em dễ hình dung nhé! 📖💡");
+                        sendMessage("Cho em một ví dụ khác");
+                      }}
+                      style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#0FB9A6", cursor: "pointer" }}
+                    >
+                      💡 Cho em ví dụ
                     </div>
                   </div>
+                  <form onSubmit={onSubmitChat} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "7px 7px 7px 16px" }}>
+                    <input
+                      ref={inputRef}
+                      placeholder={`Nhắn cho ${COMPANION.name}...`}
+                      style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#16161F" }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={chatSending}
+                      style={{ height: 40, width: 44, border: "none", borderRadius: 12, background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", fontSize: 16, cursor: "pointer", boxShadow: "0 8px 16px -6px rgba(15,185,166,.6)", opacity: chatSending ? 0.6 : 1 }}
+                    >
+                      ➤
+                    </button>
+                  </form>
+                </div>
+              </div>
 
+              {/* Mascot Companion Animated GIF outside Chat Frame */}
+              <div style={{ flexShrink: 0, marginTop: 4 }}>
+                <MascotCompanion
+                  state={chatMascotState}
+                  name={COMPANION.name}
+                  speechBubble={chatMascotSpeech}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ===== EXAMS PANEL ===== */}
+          {activeTab === "exams" && (
+            <div className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
+              {/* Nếu học sinh đang làm bài thi */}
+              {activeExam ? (
+                (() => {
+                  const currentQuestion = examQuestions[examQIndex];
+                  let options: string[] = [];
+                  if (currentQuestion && currentQuestion.choicesJson) {
+                    try {
+                      options = JSON.parse(currentQuestion.choicesJson).map((c: any) => c.content);
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }
+
+                  const minutes = Math.floor(examTimeRemaining / 60);
+                  const seconds = examTimeRemaining % 60;
+                  const formattedTime = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+                  return (
+                    <div style={{ display: "flex", gap: 22, alignItems: "stretch" }}>
+                      {/* Left: list of questions */}
+                      <div style={{ width: 220, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flexShrink: 0 }}>
+                        <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #f2f4f7", paddingBottom: 10, marginBottom: 14 }}>
+                          Danh sách câu hỏi
+                        </div>
+                        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, overflowY: "auto", maxHeight: 300, paddingRight: 4 }}>
+                          {examQuestions.map((q, idx) => {
+                            const isSelected = examQIndex === idx;
+                            const isAnswered = !!examAnswers[q.id];
+                            return (
+                              <button
+                                key={q.id}
+                                onClick={() => setExamQIndex(idx)}
+                                style={{
+                                  ...POPPINS,
+                                  height: 38,
+                                  border: "none",
+                                  borderRadius: 12,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontWeight: 800,
+                                  fontSize: 13,
+                                  cursor: "pointer",
+                                  transition: "all .15s",
+                                  ...(isSelected
+                                    ? { background: "#7C46E8", color: "#fff", boxShadow: "0 4px 10px rgba(124,70,232,.3)" }
+                                    : isAnswered
+                                      ? { background: "#F3FBF9", border: "1px solid #14D9C0", color: "#0d7a6c" }
+                                      : { background: "#f4f6f9", color: "#5b6072" }),
+                                }}
+                              >
+                                {idx + 1}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div style={{ borderTop: "1px solid #f2f4f7", paddingTop: 14, marginTop: 14 }}>
+                          <button
+                            onClick={() => handleSubmitExam(false)}
+                            disabled={submittingExam}
+                            style={{
+                              ...POPPINS,
+                              width: "100%",
+                              border: "none",
+                              borderRadius: 12,
+                              padding: "12px 14px",
+                              background: "linear-gradient(135deg,#7C46E8,#5b2fc0)",
+                              color: "#fff",
+                              fontWeight: 800,
+                              fontSize: 13,
+                              cursor: "pointer",
+                              boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
+                            }}
+                          >
+                            {submittingExam ? "Đang nộp..." : "Nộp bài thi"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Right: question content */}
+                      <div style={{ flex: 1, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 24, display: "flex", flexDirection: "column", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f2f4f7", paddingBottom: 14, marginBottom: 18 }}>
+                          <div>
+                            <span style={{ ...POPPINS, fontSize: 10.5, background: "#EFE9FD", color: "#7C46E8", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
+                              {activeExam.title}
+                            </span>
+                            <div style={{ ...BALOO, fontWeight: 800, fontSize: 20, marginTop: 5 }}>Câu hỏi {examQIndex + 1}</div>
+                          </div>
+                          {examTimerActive && (
+                            <div
+                              style={{
+                                ...POPPINS,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "8px 14px",
+                                borderRadius: 12,
+                                fontSize: 13,
+                                fontWeight: 800,
+                                fontFamily: "monospace",
+                                border: examTimeRemaining < 60 ? "1px solid #f8d3da" : "1px solid #ece5fb",
+                                background: examTimeRemaining < 60 ? "#fef3f5" : "#faf7ff",
+                                color: examTimeRemaining < 60 ? "#c23a54" : "#7C46E8",
+                              }}
+                            >
+                              ⏱️ {formattedTime}
+                            </div>
+                          )}
+                        </div>
+
+                        {currentQuestion ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, background: "#f4f6f9", borderRadius: 16, padding: 18, color: "#16161F", border: "1px solid #eef1f4", lineHeight: 1.6 }}>
+                              {currentQuestion.content}
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                              {options.map((opt, oIdx) => {
+                                const isSel = examAnswers[currentQuestion.id] === String(oIdx);
+                                return (
+                                  <div
+                                    key={oIdx}
+                                    onClick={() => setExamAnswers((prev) => ({ ...prev, [currentQuestion.id]: String(oIdx) }))}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 12,
+                                      border: isSel ? "2px solid #7C46E8" : "1px solid #eef1f4",
+                                      background: isSel ? "#faf7ff" : "#fff",
+                                      color: isSel ? "#5b2fc0" : "#4b5060",
+                                      borderRadius: 14,
+                                      padding: "12px 14px",
+                                      cursor: "pointer",
+                                      fontSize: 14,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        height: 26,
+                                        width: 26,
+                                        borderRadius: 8,
+                                        display: "grid",
+                                        placeItems: "center",
+                                        fontSize: 12,
+                                        fontWeight: 800,
+                                        background: isSel ? "#7C46E8" : "#f4f6f9",
+                                        color: isSel ? "#fff" : "#9aa1b0",
+                                      }}
+                                    >
+                                      {["A", "B", "C", "D", "E"][oIdx] ?? oIdx}
+                                    </span>
+                                    <span>{opt}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ color: "#9aa1b0", textAlign: "center", padding: 20 }}>Không tìm thấy nội dung câu hỏi.</div>
+                        )}
+
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, borderTop: "1px solid #f2f4f7", paddingTop: 16 }}>
+                          <button
+                            onClick={() => setExamQIndex((idx) => Math.max(0, idx - 1))}
+                            disabled={examQIndex === 0}
+                            style={{ ...POPPINS, border: "1px solid #eef1f4", background: "#fff", color: "#5b6072", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: examQIndex === 0 ? "not-allowed" : "pointer", opacity: examQIndex === 0 ? 0.5 : 1 }}
+                          >
+                            Câu trước
+                          </button>
+                          <button
+                            onClick={() => setExamQIndex((idx) => Math.min(examQuestions.length - 1, idx + 1))}
+                            disabled={examQIndex === examQuestions.length - 1}
+                            style={{ ...POPPINS, border: "1px solid #eef1f4", background: "#fff", color: "#5b6072", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: examQIndex === examQuestions.length - 1 ? "not-allowed" : "pointer", opacity: examQIndex === examQuestions.length - 1 ? 0.5 : 1 }}
+                          >
+                            Câu tiếp
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : examFinishedScore ? (
+                /* Màn hình báo kết quả */
+                <div className="ah-panel" style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 24, padding: "34px 40px", textAlign: "center", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 500, margin: "20px auto" }}>
+                  <div style={{ fontSize: 60, marginBottom: 12 }}>🎉</div>
+                  <div style={{ ...BALOO, fontWeight: 800, fontSize: 24, marginBottom: 8 }}>Hoàn thành bài kiểm tra!</div>
+                  <p style={{ fontSize: 13.5, color: "#5b6072", lineHeight: 1.6, marginBottom: 20 }}>
+                    Chúc mừng em đã hoàn thành bài làm. Kết quả chi tiết đã được gửi đến hệ thống để ghi nhận.
+                  </p>
+                  <div style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 18, padding: 18, width: 220, margin: "0 auto 24px" }}>
+                    <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#0FB9A6", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Điểm số đạt được</div>
+                    <div style={{ ...POPPINS, fontWeight: 850, fontSize: 32, color: "#16161F" }}>
+                      {examFinishedScore.totalScore} <span style={{ fontSize: 16, color: "#9aa1b0", fontWeight: 700 }}>/ {examFinishedScore.maxScore}</span>
+                    </div>
+                  </div>
                   <button
                     onClick={async () => {
                       setExamFinishedScore(null);
                       setActiveExam(null);
                       setExamQuestions([]);
                       setExamAnswers({});
-                      await loadStudentState();
-                      await loadTreeData();
+                      loadAll();
                     }}
-                    className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-755 text-white font-black text-sm rounded-2xl shadow-md shadow-indigo-150 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                    style={{
+                      ...POPPINS,
+                      border: "none",
+                      borderRadius: 14,
+                      padding: "13px 28px",
+                      background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
+                      color: "#fff",
+                      fontWeight: 800,
+                      fontSize: 14,
+                      cursor: "pointer",
+                      boxShadow: "0 8px 16px -6px rgba(15,185,166,.5)",
+                    }}
                   >
-                    Bắt đầu học ngay ➔
+                    Tiếp tục học tập
                   </button>
                 </div>
-              );
-            }
-
-            if (activeExam) {
-              const currentQuestion = examQuestions[examQIndex];
-              let options: string[] = [];
-              if (currentQuestion && currentQuestion.choicesJson) {
-                try {
-                  const parsedChoices = JSON.parse(currentQuestion.choicesJson);
-                  options = parsedChoices.map((c: any) => c.content);
-                } catch (e) {
-                  console.error(e);
-                }
-              }
-
-              const minutes = Math.floor(examTimeRemaining / 60);
-              const seconds = examTimeRemaining % 60;
-              const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-              return (
-                <div className="flex-1 flex gap-6 overflow-hidden max-w-6xl w-full my-6 animate-[fadeIn_0.3s_ease-out]">
-                  {/* Left panel */}
-                  <div className="w-64 bg-white border border-slate-200 rounded-3xl p-5 flex flex-col shadow-sm shrink-0">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-3 mb-4 font-mono">Danh sách câu hỏi</h3>
-                    <div className="flex-1 overflow-y-auto grid grid-cols-4 gap-2.5 max-h-[350px] pr-1">
-                      {examQuestions.map((q, idx) => {
-                        const isSelected = examQIndex === idx;
-                        const isAnswered = !!examAnswers[q.id];
-                        return (
-                          <button
-                            key={q.id}
-                            onClick={() => setExamQIndex(idx)}
-                            className={`h-9 w-9 rounded-xl flex items-center justify-center font-bold text-xs transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-indigo-600 text-white ring-4 ring-indigo-100"
-                                : isAnswered
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-250"
-                                : "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
-                            }`}
-                          >
-                            {idx + 1}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="border-t border-slate-100 pt-4 mt-4 space-y-2">
-                      <div className="flex justify-between text-[10px] font-bold text-slate-550 uppercase tracking-wide">
-                        <span>Đã làm:</span>
-                        <span>{Object.keys(examAnswers).length} / {examQuestions.length}</span>
-                      </div>
-                      <button
-                        onClick={() => handleSubmitExam(false)}
-                        disabled={submittingExam}
-                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100 disabled:text-slate-400 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer uppercase tracking-wider"
-                      >
-                        {submittingExam ? "Đang gửi..." : "Nộp bài thi"}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Right panel */}
-                  <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-6 flex flex-col shadow-sm overflow-hidden">
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-5 shrink-0">
-                      <div>
-                        <span className="text-[9px] bg-indigo-50 text-indigo-700 font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full font-mono">
-                          Đang làm bài: {activeExam.title}
-                        </span>
-                        <h2 className="text-base font-black text-slate-900 leading-tight mt-1">
-                          Câu hỏi {examQIndex + 1}
-                        </h2>
-                      </div>
-                      {examTimerActive && (
-                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black font-mono shadow-sm shrink-0 ${
-                          examTimeRemaining < 60 ? "bg-rose-50 border-rose-200 text-rose-700 animate-pulse" : "bg-indigo-50 border-indigo-150 text-indigo-700"
-                        }`}>
-                          <Clock size={14} className={examTimeRemaining < 60 ? "text-rose-600 animate-spin" : "text-indigo-600"} />
-                          {formattedTime}
-                        </div>
-                      )}
-                    </div>
-
-                    {currentQuestion ? (
-                      <div className="flex-1 flex flex-col overflow-y-auto space-y-5 pr-1">
-                        <SafeHtml
-                          text={currentQuestion.content}
-                          className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm text-slate-800 leading-relaxed font-semibold shadow-inner"
-                        />
-
-                        <div className="grid grid-cols-1 gap-2.5">
-                          {options.map((opt, idx) => {
-                            const letters = ["A", "B", "C", "D"];
-                            const choices = JSON.parse(currentQuestion.choicesJson);
-                            const choiceId = choices[idx]?.choiceId;
-                            const isSelected = examAnswers[currentQuestion.id] === choiceId;
-
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => {
-                                  setExamAnswers(prev => ({
-                                    ...prev,
-                                    [currentQuestion.id]: choiceId
-                                  }));
-                                }}
-                                className={`w-full text-left p-3.5 rounded-2xl border text-xs leading-relaxed transition-all duration-200 hover:scale-[1.005] flex items-center gap-3.5 cursor-pointer font-bold ${
-                                  isSelected
-                                    ? "bg-indigo-50/50 border-indigo-600 text-indigo-950 font-extrabold ring-4 ring-indigo-100 shadow-sm"
-                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50/50"
-                                }`}
-                              >
-                                <span className={`h-7 w-7 rounded-xl flex items-center justify-center font-black text-xs transition-all shadow-sm ${
-                                  isSelected
-                                    ? "bg-indigo-600 text-white"
-                                    : "bg-slate-100 text-slate-400"
-                                }`}>
-                                  {letters[idx] || (idx + 1)}
-                                </span>
-                                <SafeHtml as="span" text={opt} className="flex-1 font-extrabold" />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex items-center justify-center text-slate-400 text-xs">
-                        Không thể tải câu hỏi này
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center pt-4 border-t border-slate-100 mt-5 shrink-0">
-                      <button
-                        onClick={() => setExamQIndex(prev => Math.max(prev - 1, 0))}
-                        disabled={examQIndex === 0}
-                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 disabled:opacity-40 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                      >
-                        Câu trước
-                      </button>
-                      <span className="text-[10px] text-slate-400 font-bold font-mono">
-                        Câu {examQIndex + 1} / {examQuestions.length}
+              ) : (
+                /* Màn hình danh sách đề thi */
+                <div style={{ display: "flex", gap: 24, alignItems: "stretch" }}>
+                  {/* Cột 1: Nhập mã đề thi */}
+                  <div style={{ flex: 1, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                    <div>
+                      <span style={{ ...POPPINS, fontSize: 10, background: "#f4f6f9", color: "#5b6072", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
+                        Cách 1
                       </span>
-                      <button
-                        onClick={() => setExamQIndex(prev => Math.min(prev + 1, examQuestions.length - 1))}
-                        disabled={examQIndex === examQuestions.length - 1}
-                        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-650 disabled:opacity-40 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                      >
-                        Câu tiếp
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto animate-[fadeIn_0.2s_ease-out]">
-                <div className="text-center mb-8 max-w-xl space-y-4">
-                  <div className="inline-flex p-4 bg-rose-50 text-rose-600 rounded-full border border-rose-100 shadow-sm animate-pulse">
-                    <Lock size={36} />
-                  </div>
-                  <div className="space-y-1">
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Yêu cầu Đánh giá Tổng quan</h2>
-                    <p className="text-sm text-slate-500 font-semibold leading-relaxed">
-                      Môn học <strong className="text-indigo-650">{selectedSubject}</strong> yêu cầu em phải thực hiện một bài đánh giá tổng quan ban đầu. Kết quả này sẽ giúp giáo viên và hệ thống AI xác định đúng level và vẽ ma trận các nội dung yếu của em.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
-                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-4">
-                    <div className="space-y-2">
-                      <span className="text-[9px] bg-slate-100 text-slate-500 font-black uppercase tracking-wider px-2 py-0.5 rounded-full font-mono">Cách 1</span>
-                      <h3 className="text-base font-black text-slate-900 uppercase">Nhập mã đề thi</h3>
-                      <p className="text-xs text-slate-400 font-semibold leading-relaxed">
+                      <div style={{ ...BALOO, fontWeight: 800, fontSize: 18, marginTop: 8 }}>Nhập mã đề thi</div>
+                      <p style={{ fontSize: 13, color: "#7c8194", lineHeight: 1.5, marginTop: 6 }}>
                         Nhập mã đề thi (Exam ID) do thầy/cô cung cấp trực tiếp cho em để mở đề thi.
                       </p>
                     </div>
-                    <div className="space-y-3">
+                    <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
                       <input
                         type="text"
                         placeholder="Nhập mã đề thi (Ví dụ: UUID)..."
                         value={customExamCode}
                         onChange={(e) => setCustomExamCode(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                        style={{ width: "100%", background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 650, color: "#16161F", outline: "none" }}
                       />
                       <button
                         onClick={() => handleStartExam(customExamCode)}
                         disabled={loadingExam}
-                        className="w-full py-3.5 bg-slate-900 hover:opacity-90 disabled:opacity-50 text-white text-xs font-black rounded-2xl shadow-md transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 font-bold"
+                        style={{
+                          ...POPPINS,
+                          width: "100%",
+                          border: "none",
+                          borderRadius: 14,
+                          padding: "13px 14px",
+                          background: "#16161F",
+                          color: "#fff",
+                          fontWeight: 800,
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
                       >
                         {loadingExam ? "Đang tải..." : "Bắt đầu thi"}
                       </button>
                     </div>
                   </div>
 
-                  <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between gap-4">
-                    <div className="space-y-2">
-                      <span className="text-[9px] bg-indigo-50 text-indigo-700 font-black uppercase tracking-wider px-2 py-0.5 rounded-full font-mono">Cách 2</span>
-                      <h3 className="text-base font-black text-slate-900 uppercase">Chọn đề chỉ định</h3>
-                      <p className="text-xs text-slate-400 font-semibold leading-relaxed">
-                        Các đề thi tổng quan do thầy/cô xuất bản sẵn cho lớp môn học {selectedSubject}.
+                  {/* Cột 2: Danh sách đề thi được giao */}
+                  <div style={{ flex: 1.2, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                    <div>
+                      <span style={{ ...POPPINS, fontSize: 10, background: "#EFE9FD", color: "#7C46E8", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
+                        Cách 2
+                      </span>
+                      <div style={{ ...BALOO, fontWeight: 800, fontSize: 18, marginTop: 8 }}>Đề thi được giao</div>
+                      <p style={{ fontSize: 13, color: "#7c8194", lineHeight: 1.5, marginTop: 6 }}>
+                        Các đề thi do thầy/cô xuất bản sẵn cho lớp môn học {subject}.
                       </p>
                     </div>
-                    
-                    <div className="flex-1 min-h-[140px] max-h-[180px] overflow-y-auto space-y-2.5 pr-1">
+                    <div style={{ flex: 1, overflowY: "auto", maxHeight: 180, display: "flex", flexDirection: "column", gap: 8, paddingRight: 4 }}>
                       {examsList.length === 0 ? (
-                        <div className="text-center py-8 text-xs text-slate-400 font-semibold italic border border-dashed border-slate-200 rounded-2xl">
+                        <div style={{ textAlign: "center", padding: "30px 10px", fontSize: 12.5, color: "#9aa1b0", fontWeight: 600, border: "1px dashed #eef1f4", borderRadius: 14, background: "#fcfdfe", fontStyle: "italic" }}>
                           Chưa có đề thi được giao cho môn học này.
                         </div>
                       ) : (
                         examsList.map((ex) => (
-                          <div key={ex.id} className="p-3.5 border border-slate-100 bg-slate-50/50 hover:bg-slate-50 rounded-2xl flex items-center justify-between transition-all">
-                            <div className="min-w-0 flex-1 pr-2">
-                              <span className="text-xs font-black text-slate-900 block truncate">{ex.title}</span>
-                              <span className="text-[9px] text-slate-400 font-mono block mt-0.5">Thời gian: {ex.durationMinutes} phút</span>
+                          <div
+                            key={ex.id}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 14, padding: "10px 14px", transition: "all .15s" }}
+                          >
+                            <div style={{ minWidth: 0, flex: 1, paddingRight: 10 }}>
+                              <span style={{ fontSize: 13, fontWeight: 800, color: "#16161F", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</span>
+                              <span style={{ fontSize: 10.5, color: "#9aa1b0", fontWeight: 600, display: "block", marginTop: 2 }}>Thời gian: {ex.durationMinutes} phút</span>
                             </div>
                             <button
                               onClick={() => handleStartExam(ex.id)}
-                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black rounded-xl shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
+                              style={{
+                                ...POPPINS,
+                                border: "none",
+                                borderRadius: 10,
+                                padding: "8px 14px",
+                                background: "linear-gradient(135deg,#7C46E8,#6D28D9)",
+                                color: "#fff",
+                                fontWeight: 800,
+                                fontSize: 11,
+                                cursor: "pointer",
+                                boxShadow: "0 6px 12px -4px rgba(109,40,217,.4)",
+                              }}
                             >
                               Vào thi
                             </button>
@@ -1639,832 +1782,122 @@ export default function StudentTutorPage() {
                     </div>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => {
-                    setSelectedSubject("");
-                    localStorage.removeItem("aurora_student_subject");
-                  }}
-                  className="mt-8 text-xs font-bold text-slate-500 hover:text-indigo-650 flex items-center gap-1 cursor-pointer"
-                >
-                  <ArrowLeft size={14} /> Quay lại màn hình chọn môn học
-                </button>
-              </div>
-            );
-          })()
-        ) : (
-          /* normal student view */
-          !selectedSubject ? (
-            /* Landing Page: Course Selection View */
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white border border-slate-200 rounded-3xl shadow-sm overflow-y-auto animate-[fadeIn_0.2s_ease-out]">
-            <div className="max-w-2xl w-full text-center space-y-6">
-              <div className="inline-flex p-4 bg-indigo-50 text-indigo-600 rounded-full shadow-inner">
-                <Compass size={40} className="animate-pulse" />
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Chào mừng em đến với Aurora Tutor</h2>
-                <p className="text-sm text-slate-500 font-semibold max-w-lg mx-auto leading-relaxed">
-                  Hãy chọn một môn học dưới đây để làm bài đánh giá tổng quan và kích hoạt lộ trình ôn tập thích ứng.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 max-w-lg mx-auto">
-                {subjects.map((subj) => (
-                  <button
-                    key={subj}
-                    onClick={() => {
-                      setSelectedSubject(subj);
-                      localStorage.setItem("aurora_student_subject", subj);
-                      setActiveMainTab("graph");
-                    }}
-                    className="p-5 bg-gradient-to-br from-slate-50 to-indigo-50/30 hover:from-indigo-50 hover:to-indigo-100/50 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer flex flex-col justify-between gap-4 group active:scale-95 w-full"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="p-2.5 bg-white border border-slate-100 text-indigo-600 rounded-xl shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                        <BookOpen size={22} />
-                      </div>
-                      <span className="text-[10px] font-black uppercase px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full">
-                        Cây Tri Thức
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-black text-slate-900 text-base group-hover:text-indigo-600 transition-colors">{subj}</h3>
-                      <p className="text-xs text-slate-400 font-semibold mt-0.5">Bấm để làm bài đánh giá tổng quan và mở khóa sơ đồ cây ➔</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {sidebarCollapsed && (
-                  <button
-                    onClick={() => setSidebarCollapsed(false)}
-                    className="p-2 border border-slate-200 bg-white text-slate-500 hover:text-indigo-600 rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1 hover:border-indigo-200 hover:bg-indigo-50/20"
-                    title="Mở rộng sidebar"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                )}
-                <div>
-                  <h1 className="text-xl font-black text-slate-950 flex items-center gap-2">
-                    Cây kiến thức: <span className="text-indigo-600 font-black">{selectedSubject}</span>
-                  </h1>
-                  <p className="text-xs text-slate-400 mt-0.5">Chọn một bài học trên cây để mở Không gian Học tập Socratic của riêng em.</p>
-                </div>
-                
-                <div className="flex items-center gap-2 bg-slate-100 border border-slate-200/80 p-1 rounded-2xl ml-4 shadow-sm">
-                  <button
-                    onClick={() => setActiveMainTab("graph")}
-                    className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
-                      activeMainTab === "graph"
-                        ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
-                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
-                    }`}
-                  >
-                    <Map size={14} className={activeMainTab === "graph" ? "text-indigo-600" : "text-slate-500"} />
-                    Sơ đồ Cây
-                  </button>
-                  <button
-                    onClick={() => {
-                      const targetNode = selectedNode || nodes.find(n => n.id === focusedNodeId) || nodes.find(n => n.isRoot) || nodes[0];
-                      if (targetNode) {
-                        handleShowContent(targetNode);
-                      } else {
-                        toast.warning("Môn học này chưa có bài học nào trên Sơ đồ Cây!");
-                      }
-                    }}
-                    className={`px-4 py-2 text-xs font-extrabold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 duration-200 ${
-                      activeMainTab === "workspace"
-                        ? "bg-white text-indigo-600 shadow-sm border border-slate-100"
-                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/30"
-                    }`}
-                  >
-                    <Sparkles size={14} className={activeMainTab === "workspace" ? "text-indigo-600" : "text-slate-500"} />
-                    Không gian Học tập
-                  </button>
-                </div>
-                <QuickRoleSwitcher />
-              </div>
-
-              {/* Legend */}
-              {activeMainTab === "graph" && (
-                <div className="flex gap-3 bg-white px-4 py-2 border border-slate-200 rounded-2xl text-[10px] font-bold text-slate-500 shadow-sm animate-[fadeIn_0.2s_ease-out]">
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Bắt đầu</span>
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" /> Đang học</span>
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Đã thông</span>
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Lỗ hổng</span>
-                  <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-slate-300" /> Khóa <Lock size={12} /></span>
-                </div>
               )}
             </div>
+          )}
+        </main>
+      </div>
 
-            {/* Navigation Breadcrumbs History */}
-            {navHistory.length > 0 && activeMainTab === "graph" && (
-              <div className="mb-4 bg-white/80 border border-slate-200/50 px-4 py-2.5 rounded-2xl flex items-center gap-2 overflow-x-auto text-[11px] font-bold text-slate-650 shadow-sm animate-[fadeIn_0.2s_ease-out]">
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-black font-mono shrink-0">Hành trình đã đi:</span>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  {navHistory.map((item, idx) => (
-                    <div key={item.id} className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handlePivotCenter(item.id)}
-                        className={`hover:text-indigo-600 hover:underline cursor-pointer transition-all ${
-                          item.id === focusedNodeId ? "text-indigo-650 font-extrabold" : "text-slate-500"
-                        }`}
-                      >
-                        {item.name}
-                      </button>
-                      {idx < navHistory.length - 1 && <span className="text-slate-300">/</span>}
-                    </div>
-                  ))}
-                </div>
+      {/* ===== CHAPTER COMPLETE SCREEN ===== */}
+      {screen === "complete" && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 55, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(20,30,45,.55)", backdropFilter: "blur(6px)", padding: 24 }}>
+          <div style={{ background: "#fff", borderRadius: 30, maxWidth: 576, width: "100%", padding: "38px 40px 32px", textAlign: "center", boxShadow: "0 40px 90px -30px rgba(0,0,0,.55)", animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)" }}>
+            <div style={{ position: "relative", width: 148, height: 148, margin: "0 auto 8px" }}>
+              <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "conic-gradient(#FFD76F,#FF9F43,#FFE9B8,#ffb84d,#FFD76F)", boxShadow: "0 18px 36px -12px rgba(255,159,67,.65)" }} />
+              <div style={{ position: "absolute", inset: 13, borderRadius: "50%", background: "linear-gradient(135deg,#FFF0CE,#FFC24D)", display: "grid", placeItems: "center", boxShadow: "inset 0 3px 9px rgba(255,255,255,.7),inset 0 -7px 12px rgba(180,110,20,.25)" }}>
+                <span style={{ fontSize: 60, filter: "drop-shadow(0 3px 4px rgba(150,90,10,.3))" }}>🏆</span>
               </div>
-            )}
-
-            {/* Dynamic Main Workspace Tabs Render */}
-            {activeMainTab === "graph" ? (
-              <div className="flex-1 relative rounded-3xl overflow-hidden shadow-sm border border-slate-200">
-                {nodes.length > 0 ? (
-                  <KnowledgeTree
-                    subject={selectedSubject}
-                    nodes={nodes}
-                    edges={edges}
-                    masteryByTopic={masteryByTopic}
-                    mode="student"
-                    studentNodeStatus={nodeStatus}
-                    initialNodeId={studentState?.initialLevelNodeId}
-                    currentNodeId={studentState?.currentLevelNodeId}
-                    focusedNodeId={focusedNodeId}
-                    onFocusedNodeChange={handlePivotCenter}
-                    onShowContentClick={handleNodeClick}
-                    onNodeClick={handleNodeClick}
-                    onRefresh={() => {
-                      loadTreeData();
-                      loadStudentState();
-                    }}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full text-center p-8 max-w-md mx-auto bg-white border border-slate-200 rounded-3xl shadow-sm space-y-4">
-                    <div className="p-4 bg-amber-50 text-amber-600 rounded-full">
-                      <Compass size={32} className="animate-bounce" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-base font-black text-slate-900 uppercase tracking-wide">Môn {selectedSubject} chưa có bài học</h3>
-                      <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                        Sơ đồ cây tri thức môn học này chưa có nội dung. Em hãy bấm <strong>"Đổi môn học"</strong> ở góc dưới menu để chọn môn khác hoặc tham gia lớp mới bằng mã code nhé!
-                      </p>
-                    </div>
-                    <div className="flex gap-2 justify-center pt-2">
-                      <button
-                        onClick={() => {
-                          setSelectedSubject("");
-                          localStorage.removeItem("aurora_student_subject");
-                        }}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
-                      >
-                        <RefreshCw size={14} /> Đổi môn học
-                      </button>
-                      <button
-                        onClick={() => setShowJoinModal(true)}
-                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Key size={14} /> Nhập mã lớp
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div style={{ position: "absolute", top: -4, right: 2, fontSize: 26, animation: "ah-float 3s ease-in-out infinite" }}>✨</div>
+              <div style={{ position: "absolute", bottom: 2, left: -2, fontSize: 20, animation: "ah-float 3.4s ease-in-out infinite" }}>⭐</div>
+            </div>
+            <div style={{ ...POPPINS, display: "inline-block", background: "#FFF7E8", border: "1px solid #ffe1a6", color: "#b7811f", fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "5px 14px", borderRadius: 999, marginBottom: 11 }}>
+              Hoàn thành bài học 🎉
+            </div>
+            <div style={{ ...BALOO, fontWeight: 800, fontSize: 27, lineHeight: 1.15, marginBottom: 8 }}>
+              Giỏi lắm, {studentName}! 🎉
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontSize: 13.5, color: "#5b6072", marginBottom: 22, lineHeight: 1.4 }}>
+              <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 28, height: 28, objectFit: "contain" }} />
+              <span>
+                <b>{COMPANION.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+              <div style={{ flex: 1, background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 16, padding: 14 }}>
+                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 22, color: "#0FB9A6" }}>
+                  {correctSession}/{qTotal}
+                </div>
+                <div style={{ fontSize: 11, color: "#7c8194" }}>câu đúng</div>
               </div>
-        ) : (
-          /* Promax Socratic Learning Hub Split View */
-          selectedNode ? (
-            <div className="flex-1 flex gap-6 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
-              
-              {/* Left Column: Socratic RAG Theory Chat */}
-              <div style={{ width: `${leftWidth}%` }} className="bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm shrink-0">
-                <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                    <span className="text-[9px] bg-[var(--mint)]/15 text-[var(--mint)] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider font-mono flex items-center gap-1.5 w-fit">
-                      {selectedNode.isRoot ? <Compass size={10} /> : <BookOpen size={10} />}
-                      {selectedNode.isRoot ? "Nút Gốc môn học" : "Chủ đề học tập"}
-                    </span>
-                    <h2 className="text-base font-black text-slate-900 leading-tight truncate max-w-[280px]">
-                      {selectedNode.name}
-                    </h2>
-                    {navHistory.length > 1 && (
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1.5 overflow-x-auto whitespace-nowrap scrollbar-thin select-none max-w-full">
-                        {navHistory.map((item, idx) => (
-                          <div key={item.id} className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => handleShowContent(item)}
-                              className={`hover:text-indigo-650 hover:underline cursor-pointer transition-all ${
-                                item.id === selectedNode.id ? "text-indigo-600 font-extrabold" : "text-slate-450"
-                              }`}
-                            >
-                              {item.name}
-                            </button>
-                            {idx < navHistory.length - 1 && <span className="text-slate-300">/</span>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setActiveMainTab("graph")}
-                    className="text-[10px] font-black text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl hover:bg-indigo-50/50 active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1 shrink-0 ml-2"
-                  >
-                    <ArrowLeft size={10} /> Bản đồ cây
-                  </button>
+              <div style={{ flex: 1, background: "#fff8ec", border: "1px solid #ffe6bd", borderRadius: 16, padding: 14 }}>
+                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 22, color: "#e0912a" }}>⭐ {stars}</div>
+                <div style={{ fontSize: 11, color: "#7c8194" }}>tổng sao</div>
+              </div>
+              <div style={{ flex: 1, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 16, padding: 14 }}>
+                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 22, color: "#7C46E8" }}>
+                  {qTotal > 0 ? Math.round((correctSession / qTotal) * 100) : 0}%
                 </div>
-
-                {/* Extracted Theory Block */}
-                <div className="space-y-2 mb-4 bg-slate-50/60 border border-slate-200/40 p-4 rounded-2xl shadow-inner border-l-4 border-l-[var(--mint)]">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest font-mono">Tóm tắt nội dung chính</h3>
-                  <div className="text-sm text-slate-800 leading-relaxed font-bold max-h-[180px] overflow-y-auto pr-2">
-                    {selectedNode.theory || "Nội dung lý thuyết đang được cập nhật..."}
-                  </div>
-                </div>
-
-                {/* Socratic RAG Chatbot */}
-                <div data-tour="socratic-chat" className="flex-1 border-t border-slate-100 pt-4 flex flex-col overflow-hidden">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare size={13} className="text-indigo-600" />
-                    <h4 className="text-xs font-black text-slate-800">Trợ lý Socratic giải thích (RAG Chat)</h4>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/30 space-y-3 mb-4 text-sm font-medium">
-                    {theoryChat.map((msg, idx) => (
-                      <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                        <SafeHtml
-                          text={msg.content}
-                          variant="tutor"
-                          className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border transition-all text-xs md:text-sm leading-relaxed ${
-                            msg.sender === "student"
-                              ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
-                              : "bg-white border-slate-200 text-slate-800 rounded-bl-none font-bold"
-                          }`}
-                        />
-                      </div>
-                    ))}
-                    {chatLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-2 text-slate-400 flex items-center gap-1.5 animate-pulse">
-                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce" />
-                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-bounce [animation-delay:0.2s]" />
-                        </div>
-                      </div>
-                    )}
-                    <div ref={chatEndRef} />
-                  </div>
-
-                  <form onSubmit={handleSendChat} className="relative flex items-center border border-slate-250/70 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-50 bg-slate-50 focus-within:bg-white rounded-2xl transition-all duration-200 p-1.5 shadow-sm">
-                    <input
-                      type="text"
-                      placeholder="Hỏi thầy Socratic về bài học này..."
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      className="flex-1 bg-transparent text-sm px-2.5 py-2 text-zinc-950 focus:outline-none font-semibold"
-                    />
-                    <button
-                      type="submit"
-                      disabled={chatLoading}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
+                <div style={{ fontSize: 11, color: "#7c8194" }}>chính xác</div>
+              </div>
+            </div>
+            <div style={{ ...POPPINS, textAlign: "left", fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 13 }}>
+              Bộ sưu tập huy hiệu
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 26 }}>
+              {(summary?.badges ?? []).slice(0, 4).map((b) => {
+                const earned = b.status === "earned";
+                return (
+                  <div key={b.code} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: 80 }}>
+                    <div
+                      style={{
+                        height: 60,
+                        width: 60,
+                        borderRadius: "50%",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: earned ? 28 : 26,
+                        border: "2px solid #fff",
+                        ...(earned
+                          ? { background: `linear-gradient(135deg,${b.colorFrom},${b.colorTo})`, boxShadow: "0 10px 18px -8px rgba(255,159,67,.6),inset 0 2px 5px rgba(255,255,255,.6)" }
+                          : { background: "#eef1f4", filter: "grayscale(1)", opacity: 0.5 }),
+                      }}
                     >
-                      <Send size={12} />
-                    </button>
-                  </form>
-                </div>
-              </div>
-
-              {/* Horizontal Resizer Slider Handle */}
+                      {b.glyph}
+                    </div>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, textAlign: "center", lineHeight: 1.2, color: earned ? "#16161F" : "#a2a8b4" }}>{b.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", gap: 11 }}>
               <div
-                onMouseDown={handleMouseDown}
-                className="w-1.5 hover:w-2 bg-slate-200/50 hover:bg-indigo-400/80 cursor-col-resize self-stretch transition-all duration-150 rounded-full flex items-center justify-center relative group select-none shrink-0 mx-0.5"
-                title="Kéo giãn chiều rộng không gian"
+                onClick={restart}
+                style={{ ...POPPINS, flex: 1, background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", borderRadius: 15, padding: 15, fontWeight: 800, fontSize: 15, cursor: "pointer", boxShadow: "0 12px 24px -8px rgba(15,185,166,.55)" }}
               >
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-1.5 pointer-events-none opacity-40 group-hover:opacity-100 transition-opacity">
-                  <span className="h-1 w-1 bg-slate-500 rounded-full" />
-                  <span className="h-1 w-1 bg-slate-500 rounded-full" />
-                  <span className="h-1 w-1 bg-slate-500 rounded-full" />
-                </div>
+                Học tiếp →
               </div>
-
-              {/* Right Column: BKT Gauge, Questions & Socratic Inline Helper */}
-              <div data-tour="feynman-notebook" className="flex-1 bg-white border border-slate-200/80 rounded-[28px] p-5 flex flex-col shadow-sm overflow-y-auto">
-                
-                {/* 1. Conditional Progress Header: Gauge for Practice, Test Card for Diagnostic */}
-                {quizMode === "diagnostic" ? (
-                  <div className="bg-gradient-to-r from-indigo-700 via-indigo-800 to-violet-900 rounded-[24px] p-6 text-white shadow-lg border border-indigo-600/30 flex items-center justify-between mb-6 animate-[fadeIn_0.2s_ease-out] relative overflow-hidden">
-                    {/* Glowing background circles for visual depth */}
-                    <div className="absolute -right-10 -top-10 w-36 h-36 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
-                    <div className="absolute -left-10 -bottom-10 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
-                    
-                    <div className="space-y-2 flex-1 pr-4 relative z-10">
-                      <span className="inline-flex items-center gap-1.5 text-[9px] bg-white/15 text-indigo-100 font-black uppercase tracking-widest px-3 py-1 rounded-full font-mono border border-white/10">
-                        <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-                        Chế độ Chẩn đoán Năng lực
-                      </span>
-                      <h3 className="text-base font-black uppercase tracking-tight leading-tight">
-                        Bài đánh giá năng lực thích ứng
-                      </h3>
-                      <p className="text-[11px] text-indigo-100/90 font-medium leading-relaxed max-w-md">
-                        Làm bài hết sức mình. Hệ thống sẽ tự động đo đạc, phân tích lỗ hổng kiến thức và xếp lớp chính xác nhất cho em.
-                      </p>
-                    </div>
-                    
-                    <div className="h-16 w-16 bg-white/10 backdrop-blur-md rounded-full border border-white/20 flex flex-col items-center justify-center shadow-inner shrink-0 relative z-10 hover:scale-105 transition-transform duration-200">
-                      <span className="text-xl font-black leading-none text-white font-mono">{currentQIndex + 1}</span>
-                      <span className="text-[8px] text-indigo-200 font-black uppercase tracking-widest mt-0.5 font-mono">Câu hỏi</span>
-                    </div>
-                  </div>
-                ) : (
-                  (() => {
-                    const bkt = getBktScoreForNode(selectedNode.id);
-                    const masteryPercent = Math.round(bkt.mastery * 100);
-                    const confidencePercent = Math.round(bkt.confidence * 100);
-                    return (
-                      <div className="grid grid-cols-2 gap-4 mb-6">
-                        {/* Card 1: Mastery */}
-                        <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
-                          {/* Tooltip - below card */}
-                          <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
-                            <div className="font-extrabold mb-1 text-[var(--mint)] flex items-center gap-1">
-                              <Compass size={11} /> Độ thông thạo
-                            </div>
-                            Được tính từ tỷ lệ trả lời đúng và mức độ hiểu sâu kiến thức. Khi đạt trên 85%, em đã thông suốt chủ đề này!
-                          </div>
-
-                          <div className="relative w-24 h-14 flex justify-center mb-1">
-                            <svg className="w-24 h-14" viewBox="0 0 80 40">
-                              <path
-                                d="M 10 40 A 30 30 0 0 1 70 40"
-                                fill="transparent"
-                                className="stroke-slate-100"
-                                strokeWidth="5.5"
-                                strokeLinecap="round"
-                              />
-                              <path
-                                d="M 10 40 A 30 30 0 0 1 70 40"
-                                fill="transparent"
-                                className="stroke-[var(--mint)] transition-all duration-500 ease-out"
-                                strokeWidth="5.5"
-                                strokeLinecap="round"
-                                strokeDasharray="94.2"
-                                strokeDashoffset={94.2 - (94.2 * bkt.mastery)}
-                              />
-                            </svg>
-                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
-                              <span className="text-sm font-black text-slate-800">{masteryPercent}%</span>
-                            </div>
-                          </div>
-                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
-                            Độ thông thạo <HelpCircle size={10} className="text-slate-355" />
-                          </span>
-                        </div>
-
-                        {/* Card 2: Confidence */}
-                        <div className="bg-white border border-slate-200/60 rounded-3xl p-4 flex flex-col items-center justify-center relative group shadow-sm hover:shadow-md transition-all duration-300">
-                          {/* Tooltip - below card */}
-                          <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-52 p-3 bg-slate-900/95 text-white text-[10px] leading-relaxed rounded-2xl shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-50 transform -translate-y-1 group-hover:translate-y-0">
-                            <div className="font-extrabold mb-1 text-[var(--purple)] flex items-center gap-1">
-                              <Award size={11} /> Độ tự tin (BKT)
-                            </div>
-                            Chỉ số ước lượng bằng thuật toán Bayesian Knowledge Tracing. Đánh giá xác suất em thực sự nắm vững kiến thức, loại bỏ yếu tố may rủi.
-                          </div>
-
-                          <div className="relative w-24 h-14 flex justify-center mb-1">
-                            <svg className="w-24 h-14" viewBox="0 0 80 40">
-                              <path
-                                d="M 10 40 A 30 30 0 0 1 70 40"
-                                fill="transparent"
-                                className="stroke-slate-100"
-                                strokeWidth="5.5"
-                                strokeLinecap="round"
-                              />
-                              <path
-                                d="M 10 40 A 30 30 0 0 1 70 40"
-                                fill="transparent"
-                                className="stroke-[var(--purple)] transition-all duration-500 ease-out"
-                                strokeWidth="5.5"
-                                strokeLinecap="round"
-                                strokeDasharray="94.2"
-                                strokeDashoffset={94.2 - (94.2 * bkt.confidence)}
-                              />
-                            </svg>
-                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
-                              <span className="text-sm font-black text-slate-800">{confidencePercent}%</span>
-                            </div>
-                          </div>
-                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 font-mono flex items-center gap-1">
-                            Độ tự tin <HelpCircle size={10} className="text-slate-355" />
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })()
-                )}
-
-                {quizMode !== "diagnostic" && selectedNode && (
-                  <StudentMasteryDashboard
-                    subject={selectedSubject}
-                    selectedTopic={selectedNode}
-                    masteryByTopic={masteryByTopic}
-                    onProfileChange={setMasteryByTopic}
-                  />
-                )}
-
-                {/* 2. Practice Questions & Actions */}
-                {filteredQuestions.length > 0 ? (
-                  (() => {
-                    const currentQ = filteredQuestions[currentQIndex];
-                    if (!currentQ) return null;
-                    
-                    let options: string[] = [];
-                    try {
-                      options = JSON.parse(currentQ.optionsJson);
-                    } catch (e) {}
-
-                    const qChat = questionChat[currentQ.id] || [];
-
-                    return (
-                      <div className={`space-y-6 transition-all ${shake ? "animate-shake" : ""}`}>
-                        {/* Difficulty labels - Vietnamese taxonomy */}
-                        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                          <span className={`text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-full border ${
-                            currentQ.difficulty === "easy"
-                              ? "bg-sky-50 border-sky-200 text-sky-700"
-                              : currentQ.difficulty === "medium"
-                              ? "bg-amber-50 border-amber-200 text-amber-700"
-                              : currentQ.difficulty === "hard"
-                              ? "bg-orange-50 border-orange-200 text-orange-700"
-                              : "bg-rose-50 border-rose-200 text-rose-700"
-                          }`}>
-                            {{ easy: "Nhận biết", medium: "Thông hiểu", hard: "Vận dụng", very_hard: "Vận dụng cao" }[currentQ.difficulty] || currentQ.difficulty}
-                          </span>
-                          
-                          {difficultyFilter && (
-                            <button
-                              onClick={() => {
-                                setDifficultyFilter(null);
-                                setCantDoOptions(null);
-                                setCurrentQIndex(0);
-                                setSelectedOption(null);
-                              }}
-                              className="text-[10px] font-black text-indigo-600 hover:underline uppercase tracking-wide cursor-pointer font-mono"
-                            >
-                              Đặt lại độ khó gốc
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Question Box */}
-                        <SafeHtml
-                          text={currentQ.content}
-                          className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 text-sm text-slate-800 leading-relaxed shadow-inner font-extrabold"
-                        />
-
-                        {/* Options Buttons */}
-                        <div className="grid grid-cols-1 gap-2.5">
-                          {options.map((opt, idx) => {
-                            const isSelected = selectedOption === idx;
-                            const letters = ["A", "B", "C", "D"];
-                            return (
-                              <button
-                                key={idx}
-                                onClick={() => setSelectedOption(idx)}
-                                className={`w-full text-left p-3.5 rounded-2xl border text-xs leading-relaxed transition-all duration-250 hover:scale-[1.005] flex items-center gap-3.5 cursor-pointer font-bold ${
-                                  isSelected
-                                    ? "bg-indigo-50/50 border-indigo-600 text-indigo-950 font-extrabold ring-4 ring-indigo-100 shadow-sm"
-                                    : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50/50 hover:border-slate-350"
-                                }`}
-                              >
-                                <span className={`h-7 w-7 rounded-xl flex items-center justify-center font-black text-xs transition-all shadow-sm ${
-                                  isSelected
-                                    ? "bg-indigo-600 text-white"
-                                    : "bg-slate-100 text-slate-400"
-                                }`}>
-                                  {letters[idx] || (idx + 1)}
-                                </span>
-                                <SafeHtml as="span" text={opt} className="flex-1 font-extrabold" />
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Feedback Banner */}
-                        {answerFeedback && (
-                          <div className={`p-4 rounded-2xl text-center text-xs font-bold border shadow-sm animate-[fadeIn_0.2s_ease-out] ${
-                            answerFeedback.isCorrect
-                              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                              : "bg-rose-50 border-rose-200 text-rose-800"
-                          }`}>
-                            {answerFeedback.message}
-                          </div>
-                        )}
-
-                        {/* Hint Display */}
-                        {activeHint && (
-                          <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl space-y-2 animate-[fadeIn_0.3s_ease-out]">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1.5 font-mono">
-                                ✨ Gợi ý Bậc {hintPressCount}: {hintPressCount === 1 ? "Socratic Nudge" : hintPressCount === 2 ? "First-principles" : "Bottom-out (Ví dụ)"}
-                              </span>
-                              <span className="text-[9px] text-slate-400 font-semibold font-mono">(Trọng số BKT đã giảm)</span>
-                            </div>
-                            <SafeHtml 
-                              as="p"
-                              text={activeHint}
-                              variant="tutor"
-                              className="text-xs text-slate-750 leading-relaxed font-extrabold"
-                            />
-                          </div>
-                        )}
-
-                        {/* Control buttons */}
-                        <div className="flex gap-2.5 pt-3 border-t border-slate-100">
-                          <button
-                            onClick={handleSubmitAnswer}
-                            disabled={selectedOption === null || submitting}
-                            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-slate-100 disabled:text-slate-400 font-extrabold text-xs py-4 rounded-2xl shadow-md active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 border border-indigo-700 disabled:border-slate-200"
-                          >
-                            <Check size={14} className={selectedOption === null ? "text-slate-400" : "text-white"} />
-                            {submitting ? "Đang gửi..." : "Gửi đáp án"}
-                          </button>
-
-                          {quizMode === "practice" && (
-                            <button
-                              onClick={handleRequestHint}
-                              disabled={hintLoading || submitting}
-                              className="bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 disabled:opacity-50 font-black text-xs px-5 py-4 rounded-2xl transition-all hover:shadow-sm cursor-pointer flex items-center gap-1.5 duration-200"
-                            >
-                              <Sparkles size={13} className="text-indigo-650" />
-                              {hintPressCount === 0 ? "Xem gợi ý" : hintPressCount === 1 ? "Gợi ý 2" : hintPressCount === 2 ? "Gợi ý 3" : "Hết gợi ý"}
-                            </button>
-                          )}
-
-                          <button
-                            onClick={handleCantDo}
-                            disabled={submitting}
-                            className="bg-white border border-slate-200 hover:border-slate-350 hover:bg-slate-50 text-slate-600 disabled:opacity-50 font-extrabold text-xs px-6 py-4 rounded-2xl transition-all hover:shadow-sm cursor-pointer duration-200 active:scale-95 shadow-sm"
-                          >
-                            Bỏ qua
-                          </button>
-                        </div>
-
-                        {/* Adaptive "Cant Do" Choices */}
-                        {cantDoOptions && (
-                          <div className="pt-5 border-t border-dashed border-slate-200 space-y-4 bg-rose-50/20 p-4 rounded-2xl animate-[fadeIn_0.3s_ease-out]">
-                            <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest text-center font-mono">Giao điểm thích ứng (Adaptive Route)</h4>
-                            <p className="text-[11px] text-slate-500 leading-relaxed text-center font-semibold">
-                              Không sao đâu! Việc thừa nhận chưa làm được là bước đầu tiên để ôn tập gốc rễ. Em muốn chọn hướng nào?
-                            </p>
-                            <div className="grid grid-cols-1 gap-2">
-                              {cantDoOptions.hasEasyQ && (
-                                <button
-                                  onClick={handleChooseEasier}
-                                  className="w-full bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 p-3.5 rounded-xl text-xs font-black shadow-sm transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer animate-[fadeIn_0.2s_ease-out]"
-                                >
-                                  👉 Chuyển sang câu hỏi cấp Nhận biết (dễ hơn)
-                                </button>
-                              )}
-                              
-                              {cantDoOptions.parents.length > 0 ? (
-                                cantDoOptions.parents.map((parent) => (
-                                  <button
-                                    key={parent.id}
-                                    onClick={() => handleChooseFoundational(parent.id, parent.name)}
-                                    className="w-full bg-white border border-slate-200 hover:border-orange-400 hover:text-orange-600 p-3.5 rounded-xl text-xs font-black shadow-sm transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer animate-[fadeIn_0.2s_ease-out]"
-                                  >
-                                    👉 Quay lại học bài tiên quyết: "{parent.name}"
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="text-[10px] text-slate-400 text-center font-bold">
-                                  (Đây đã là gốc rễ kiến thức của phân môn)
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Paginate indicator */}
-                        {filteredQuestions.length > 1 && (
-                          <div className="flex justify-between items-center pt-2">
-                            <span className="text-[10px] text-slate-400 font-bold font-mono">
-                              Câu {currentQIndex + 1} / {filteredQuestions.length}
-                            </span>
-                            <div className="flex gap-1.5">
-                              <button
-                                onClick={() => {
-                                  setCurrentQIndex((prev) => Math.max(prev - 1, 0));
-                                  setSelectedOption(null);
-                                  setAnswerFeedback(null);
-                                  setCantDoOptions(null);
-                                  setHintPressCount(0);
-                                  setActiveHint(null);
-                                }}
-                                disabled={currentQIndex === 0}
-                                className="px-3 py-1.5 text-[10px] bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 font-bold disabled:opacity-40 cursor-pointer"
-                              >
-                                Trước
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setCurrentQIndex((prev) => Math.min(prev + 1, filteredQuestions.length - 1));
-                                  setSelectedOption(null);
-                                  setAnswerFeedback(null);
-                                  setCantDoOptions(null);
-                                  setHintPressCount(0);
-                                  setActiveHint(null);
-                                }}
-                                disabled={currentQIndex === filteredQuestions.length - 1}
-                                className="px-3 py-1.5 text-[10px] bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600 font-bold disabled:opacity-40 cursor-pointer"
-                              >
-                                Tiếp
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 3. Inline Socratic Question RAG Chatbot Helper */}
-                        {quizMode === "practice" && (
-                          <div className="pt-6 border-t border-slate-200 space-y-3 bg-indigo-50/20 p-4 rounded-[24px] border border-indigo-100/60 shadow-inner mt-4">
-                            <div className="flex items-center gap-2">
-                              <MessageSquare size={13} className="text-indigo-650" />
-                              <h4 className="text-xs font-black text-slate-855">Cần trợ giúp? Trò chuyện Socratic về câu hỏi này</h4>
-                            </div>
-
-                            {/* Question Chat logs */}
-                            <div className="max-h-[220px] overflow-y-auto border border-slate-100/80 rounded-2xl p-3 bg-white space-y-2 text-[11px] font-semibold">
-                              {qChat.length === 0 ? (
-                                <div className="text-center py-4 text-slate-400 font-semibold">
-                                  Chưa có hội thoại. Nhập câu hỏi bên dưới để bắt đầu thảo luận Socratic với AI về bài tập này nhé!
-                                </div>
-                              ) : (
-                                qChat.map((msg, idx) => (
-                                  <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                                    <SafeHtml
-                                      text={msg.content}
-                                      variant="tutor"
-                                      className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm transition-all text-[11px] leading-relaxed ${
-                                        msg.sender === "student"
-                                          ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
-                                          : "bg-indigo-50/70 border-indigo-100 text-indigo-950 rounded-bl-none font-bold"
-                                      }`}
-                                    />
-                                  </div>
-                                ))
-                              )}
-                              {questionChatLoading && (
-                                <div className="flex justify-start animate-pulse">
-                                  <div className="bg-indigo-50/70 border border-indigo-100 text-indigo-400 rounded-2xl rounded-bl-none px-3.5 py-1.5 flex items-center gap-1">
-                                    <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce" />
-                                    <span className="h-1 w-1 bg-indigo-450 rounded-full animate-bounce [animation-delay:0.2s]" />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Question Chat Input form */}
-                            <form onSubmit={(e) => handleSendQuestionChat(e, currentQ.id)} className="relative flex items-center border border-slate-250/70 focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-50 bg-white rounded-2xl transition-all duration-200 p-1.5 shadow-sm">
-                              <input
-                                type="text"
-                                placeholder="Hỏi AI về câu hỏi này..."
-                                value={questionChatInput}
-                                onChange={(e) => setQuestionChatInput(e.target.value)}
-                                className="flex-1 bg-transparent text-xs px-2.5 py-2 text-zinc-955 focus:outline-none font-semibold"
-                              />
-                              <button
-                                type="submit"
-                                disabled={questionChatLoading || !questionChatInput.trim()}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 h-8 w-8 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center cursor-pointer font-bold"
-                              >
-                                <Send size={12} />
-                              </button>
-                            </form>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div className="text-center py-16 text-slate-400 text-xs font-bold border border-dashed border-slate-200 rounded-2xl flex flex-col items-center gap-2">
-                    <HelpCircle size={24} className="text-indigo-400" />
-                    Chưa có câu hỏi trắc nghiệm nào cho bài học này.
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-3 p-10 bg-white border border-slate-200 rounded-3xl shadow-sm">
-              <Compass size={40} className="text-indigo-500 animate-pulse mb-1" />
-              <p className="text-sm font-bold text-slate-700">Chưa có bài học nào được chọn</p>
-              <p className="text-xs text-slate-400 max-w-sm text-center leading-relaxed">
-                Em hãy quay lại tab <strong>🌐 Sơ đồ Cây</strong> và bấm chọn một chủ đề học tập để bắt đầu không gian học tập Socratic nhé!
-              </p>
-              <button
-                onClick={() => setActiveMainTab("graph")}
-                className="bg-indigo-600 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md hover:bg-indigo-700 active:scale-95 transition-all mt-2 cursor-pointer font-bold"
+              <div
+                onClick={restart}
+                style={{ background: "#fff", border: "1px solid #eef1f4", color: "#5b6072", borderRadius: 15, padding: "15px 22px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
               >
-                Mở Sơ đồ Cây
-              </button>
-            </div>
-          )
-        )}
-        </>
-        )
-        )}
-      </main>
-
-      {/* Join Class by Code Modal */}
-      {showJoinModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out] p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl p-6 max-w-md w-full flex flex-col gap-4 relative animate-[scaleUp_0.2s_ease-out]">
-            <div className="flex justify-between items-start border-b border-slate-100 pb-3">
-              <div className="space-y-1">
-                <h3 className="font-black text-slate-900 text-base uppercase tracking-tight flex items-center gap-2">
-                  <span>🔑 Tham Gia Lớp Học Mới</span>
-                </h3>
-                <p className="text-xs text-slate-500 font-semibold leading-relaxed">
-                  Nhập mã lớp được giáo viên cấp (ví dụ: MATH-101) để tự động thêm môn học vào tài khoản.
-                </p>
+                Đóng
               </div>
-              <button
-                onClick={() => setShowJoinModal(false)}
-                className="h-7 w-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Mã Lớp Học (Class Code)
-                </label>
-                <input
-                  type="text"
-                  value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(e.target.value)}
-                  placeholder="Ví dụ: MATH-101, PHY-202..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-black text-slate-800 uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleJoinClassByCode();
-                  }}
-                />
-              </div>
-
-              {/* Quick Preset Badges */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Mã gợi ý trải nghiệm nhanh:</span>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleJoinClassByCode("MATH-101")}
-                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                  >
-                    Math 10 (MATH-101)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleJoinClassByCode("PHY-202")}
-                    className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                  >
-                    Vật lý 10 (PHY-202)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleJoinClassByCode("CHEM-303")}
-                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl transition-all cursor-pointer"
-                  >
-                    Hóa học 10 (CHEM-303)
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2 justify-end pt-3 border-t border-slate-100 mt-2">
-              <button
-                type="button"
-                onClick={() => setShowJoinModal(false)}
-                className="px-4 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-500 text-xs font-bold rounded-xl transition-all cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={() => handleJoinClassByCode()}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black rounded-xl transition-all shadow-md cursor-pointer"
-              >
-                Xác nhận kết nối
-              </button>
             </div>
           </div>
         </div>
       )}
-      <GuidedTour />
+
+      {/* celebration confetti */}
+      {celebrate && (
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 60 }}>
+          {confetti.map((c, i) => (
+            <span
+              key={i}
+              style={{
+                position: "absolute",
+                top: -20,
+                left: `${c.left}%`,
+                width: 9,
+                height: 14,
+                borderRadius: 3,
+                background: c.color,
+                transform: `rotate(${c.rot}deg)`,
+                animation: `ah-fall ${c.dur}s linear ${c.delay}s forwards`,
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

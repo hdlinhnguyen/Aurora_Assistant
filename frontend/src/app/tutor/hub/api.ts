@@ -115,11 +115,88 @@ export const chatTheory = (
     body: JSON.stringify({ message, history }),
   }) as Promise<{ reply: string }>;
 
-export const requestHint = (topicId: string, pressCount: number) =>
-  apiFetch("/student/hints", {
-    method: "POST",
-    body: JSON.stringify({ topicId, pressCount }),
-  }) as Promise<{ content?: string }>;
+export interface HintResult {
+  content?: string;
+  text?: string;
+  level?: number;
+  video_url?: string;
+  scene_name?: string;
+  exhausted?: boolean;
+  escalation?: any;
+}
+
+export const requestHint = async (
+  topicId: string,
+  pressCount: number,
+  topicName?: string,
+  questionText?: string
+): Promise<HintResult> => {
+  // 1. Thử gọi Python Animation Microservice (/api/hint)
+  try {
+    const res = await fetch("/api/hint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        topic_id: topicId,
+        topic_name: topicName,
+        question_text: questionText,
+        press_count: pressCount,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && (data.text || data.content)) {
+        return {
+          content: data.text || data.content,
+          text: data.text || data.content,
+          level: data.level || pressCount,
+          video_url: data.video_url,
+          scene_name: data.scene_name,
+          exhausted: data.exhausted,
+          escalation: data.escalation,
+        };
+      }
+    }
+  } catch {
+    /* Python server offline or fetch error */
+  }
+
+  // 2. Thử gọi Go Backend (/student/hints)
+  try {
+    const res = (await apiFetch("/student/hints", {
+      method: "POST",
+      body: JSON.stringify({ topicId, pressCount }),
+    })) as any;
+    if (res && (res.content || res.text)) {
+      return {
+        content: res.content || res.text,
+        text: res.content || res.text,
+        level: pressCount,
+      };
+    }
+  } catch {
+    /* Go backend offline */
+  }
+
+  // 3. FALLBACK CỤC BỘ TỨC THÌ (Local Dynamic Socratic Hint)
+  const level = Math.min(pressCount, 3);
+  let text = "";
+  if (level === 1) {
+    text = `Trước khi làm tiếp, em tự hỏi: với bài học này, bước đầu tiên cần kiểm tra điều gì? (Gợi mở Socratic Bậc 1)`;
+  } else if (level === 2) {
+    text = `Nhớ lại nguyên lý nền tảng của bài học: Xác định đúng định nghĩa, công thức gốc và điều kiện xác định. Từ nguyên lý đó, em suy ra bước làm tiếp theo xem! (Gợi mở Bậc 2 - First Principles)`;
+  } else {
+    text = `Làm thử ví dụ nhỏ nhất của bài học rồi áp dụng y hệt các bước đó vào bài đang làm. Gợi ý cụ thể: Viết lại biểu thức theo dạng tiêu chuẩn. (Gợi mở Bậc 3 - Bottom-out)`;
+  }
+
+  return {
+    content: text,
+    text: text,
+    level: level,
+    video_url: undefined,
+    scene_name: undefined,
+  };
+};
 
 export const getBadges = () => apiFetch("/student/badges") as Promise<GameSummary>;
 
@@ -136,6 +213,48 @@ export const postFeynmanEvent = (payload: FeynmanEventPayload) =>
     method: "POST",
     body: JSON.stringify(payload),
   }) as Promise<{ ok: boolean }>;
+
+export const getStudentState = (subject: string) =>
+  apiFetch(`/subjects/${encodeURIComponent(subject)}/state`) as Promise<{
+    id: string;
+    studentId: string;
+    subject: string;
+    initialLevelNodeId: string;
+    currentLevelNodeId: string;
+    needsDiagnostic: boolean;
+  }>;
+
+export const getExams = (subject: string) =>
+  apiFetch(`/student/exams?subject=${encodeURIComponent(subject)}`) as Promise<any[]>;
+
+export const getExam = (examId: string) =>
+  apiFetch(`/student/exams/${examId}`) as Promise<{
+    exam: any;
+    questions: any[];
+  }>;
+
+export const submitExam = (examId: string, answers: Record<string, string>) =>
+  apiFetch(`/student/exams/${examId}/submit`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  }) as Promise<{ totalScore: string; maxScore: string }>;
+
+export const submitCantDo = (nodeId: string) =>
+  apiFetch(`/nodes/${nodeId}/cant-do`, {
+    method: "POST",
+  }) as Promise<{
+    parents: Array<{ id: string; name: string }>;
+    hasEasyQ: boolean;
+  }>;
+
+export const submitAdaptiveDowngrade = (nodeId: string) =>
+  apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
+    method: "POST",
+  }) as Promise<{
+    hasParent: boolean;
+    parentId: string;
+    parentName: string;
+  }>;
 
 // ---------- Mapper ----------
 export type DiffTag = "Nhận biết" | "Thông hiểu" | "Vận dụng";

@@ -6,6 +6,7 @@ import { API_BASE_URL } from "@/lib/api";
 import dynamic from "next/dynamic";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
+import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -189,9 +190,9 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Right Column: Chat Widget */}
-          <div className="lg:col-span-7 flex justify-center">
-            <div className="relative w-full max-w-lg">
+          {/* Right Column: Chat Widget & Mascot Companion */}
+          <div className="lg:col-span-7 flex flex-col sm:flex-row gap-6 items-center justify-center">
+            <div className="relative w-full max-w-lg flex-1">
               <div className="absolute -inset-6 rounded-[3rem] bg-gradient-to-br from-[var(--purple)]/20 to-[var(--mint)]/25 blur-2xl pointer-events-none" />
               <div className="relative w-full rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] space-y-4">
                 <div className="flex items-center justify-between border-b border-border pb-3">
@@ -242,6 +243,24 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Mascot Companion adjacent outside chat */}
+            <div className="flex-shrink-0">
+              <MascotCompanion
+                compact
+                state={
+                  mockStep === 0
+                    ? "waving"
+                    : mockStep === 1
+                    ? "waiting"
+                    : mockStep === 2
+                    ? "thinking"
+                    : mockStep === 3
+                    ? "celebrate"
+                    : "review"
+                }
+              />
             </div>
           </div>
         </div>
