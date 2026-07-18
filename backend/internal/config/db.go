@@ -16,6 +16,47 @@ import (
 
 var DB *gorm.DB
 
+func migrationModels() []any {
+	return []any{
+		&model.User{},
+		&model.Classroom{},
+		&model.ChatSession{},
+		&model.Message{},
+		&model.Topic{},
+		&model.Node{},
+		&model.Edge{},
+		&model.Question{},
+		&model.QuestionRubricItem{},
+		&model.QuestionTopicMapping{},
+		&model.QuestionRubricItemTopicMapping{},
+		&model.QuestionTaggingState{},
+		&model.StudentState{},
+		&model.ActivityLog{},
+		&model.AICache{},
+		&model.LearningPath{},
+		&model.StudentTopicMastery{},
+		&model.StudentTopicMasteryHistory{},
+		&model.GuardrailEvent{},
+		&model.TelemetryEvent{},
+		&model.TelemetryOutbox{},
+		&model.Exam{},
+		&model.ExamQuestion{},
+		&model.ExamRubricItem{},
+		&model.ExamSnapshot{},
+		&model.ExamGradingProgress{},
+		&model.ExamInternalEvent{},
+		&model.ExamExport{},
+		&model.ExamAuditLog{},
+		&model.GradingBatch{},
+		&model.ScoringSubmission{},
+		&model.ScoringQuestionResult{},
+		&model.ScoringRubricResult{},
+		&model.ScoringApprovalSnapshot{},
+		&model.ScoringAuditLog{},
+		&model.ScoringInternalEvent{},
+	}
+}
+
 func ExamExportDir() string {
 	dir := os.Getenv("EXAM_EXPORT_DIR")
 	if dir == "" {
@@ -71,42 +112,7 @@ func ConnectDB() {
 		log.Fatal("Failed to create extension uuid-ossp:", err)
 	}
 
-	err = db.AutoMigrate(
-		&model.User{},
-		&model.Classroom{},
-		&model.ChatSession{},
-		&model.Message{},
-		&model.Topic{},
-		&model.Node{},
-		&model.Edge{},
-		&model.Question{},
-		&model.QuestionRubricItem{},
-		&model.QuestionTopicMapping{},
-		&model.QuestionRubricItemTopicMapping{},
-		&model.QuestionTaggingState{},
-		&model.StudentState{},
-		&model.ActivityLog{},
-		&model.AICache{},
-		&model.LearningPath{},
-		&model.StudentTopicMastery{},
-		&model.StudentTopicMasteryHistory{},
-		&model.GuardrailEvent{},
-		&model.Exam{},
-		&model.ExamQuestion{},
-		&model.ExamRubricItem{},
-		&model.ExamSnapshot{},
-		&model.ExamGradingProgress{},
-		&model.ExamInternalEvent{},
-		&model.ExamExport{},
-		&model.ExamAuditLog{},
-		&model.GradingBatch{},
-		&model.ScoringSubmission{},
-		&model.ScoringQuestionResult{},
-		&model.ScoringRubricResult{},
-		&model.ScoringApprovalSnapshot{},
-		&model.ScoringAuditLog{},
-		&model.ScoringInternalEvent{},
-	)
+	err = db.AutoMigrate(migrationModels()...)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
