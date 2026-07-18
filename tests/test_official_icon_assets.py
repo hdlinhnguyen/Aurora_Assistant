@@ -10,11 +10,20 @@ APP_DIR = ROOT / "frontend" / "src" / "app"
 
 def assert_resized_source(candidate_path: Path, expected_size: tuple[int, int]) -> None:
     with Image.open(SOURCE) as source, Image.open(candidate_path) as candidate:
-        expected = source.convert("RGB").resize(expected_size, Image.Resampling.LANCZOS)
-        actual = candidate.convert("RGB")
+        expected = source.convert("RGBA").resize(expected_size, Image.Resampling.LANCZOS)
+        actual = candidate.convert("RGBA")
 
     assert actual.size == expected_size
     assert ImageChops.difference(actual, expected).getbbox() is None
+
+
+def test_official_source_has_real_transparency() -> None:
+    with Image.open(SOURCE) as source:
+        assert source.mode == "RGBA"
+        alpha = source.getchannel("A")
+        assert alpha.getextrema() == (0, 255)
+        assert alpha.getpixel((0, 0)) == 0
+        assert alpha.getpixel((source.width - 1, source.height - 1)) == 0
 
 
 def test_nextjs_icon_assets_are_derived_from_official_source() -> None:
