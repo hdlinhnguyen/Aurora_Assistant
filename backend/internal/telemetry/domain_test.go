@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func validEvent() Event {
@@ -89,5 +91,27 @@ func TestValidateBatchRejectsMoreThanOneHundredEvents(t *testing.T) {
 	batch := Batch{Events: make([]Event, 101)}
 	if err := ValidateBatch(batch); !errors.Is(err, ErrBatchTooLarge) {
 		t.Fatalf("expected ErrBatchTooLarge, got %v", err)
+	}
+}
+
+func TestValidateEventAcceptsFrontendLifecycleEvents(t *testing.T) {
+	tests := []struct {
+		name       string
+		properties map[string]any
+	}{
+		{name: "learning_session_ended", properties: map[string]any{"session_id": uuid.NewString()}},
+		{name: "question_abandoned", properties: map[string]any{"question_id": uuid.NewString(), "active_time_ms": 1200}},
+		{name: "path_step_moved", properties: map[string]any{"thread_id": "thread-1", "step_index": 1, "direction": "up", "resulting_step_count": 3}},
+		{name: "path_step_deleted", properties: map[string]any{"thread_id": "thread-1", "step_index": 1, "resulting_step_count": 2}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			event := validEvent()
+			event.Name = test.name
+			event.Properties = test.properties
+			if err := ValidateEvent(event); err != nil {
+				t.Fatalf("ValidateEvent() error = %v", err)
+			}
+		})
 	}
 }

@@ -41,3 +41,24 @@ type TelemetryOutbox struct {
 	UpdatedAt     time.Time  `json:"-"`
 	DeliveredAt   *time.Time `json:"-"`
 }
+
+type QuestionAttemptFact struct {
+	ID                uuid.UUID  `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"-"`
+	AttemptID         string     `gorm:"type:uuid;not null;uniqueIndex" json:"-"`
+	SessionID         *string    `gorm:"type:uuid;index" json:"-"`
+	ActorID           string     `gorm:"type:varchar(128);not null;index" json:"-"`
+	QuestionID        string     `gorm:"type:varchar(128);not null;index" json:"-"`
+	TopicID           string     `gorm:"type:varchar(128);index" json:"-"`
+	PresentedAt       *time.Time `json:"-"`
+	SubmittedAt       *time.Time `json:"-"`
+	ElapsedTimeMS     int64      `gorm:"not null;default:0" json:"-"`
+	ActiveTimeMS      int64      `gorm:"not null;default:0" json:"-"`
+	HintTimeMS        int64      `gorm:"not null;default:0" json:"-"`
+	AnswerChangeCount int        `gorm:"not null;default:0" json:"-"`
+	HintCount         int        `gorm:"not null;default:0" json:"-"`
+	SelectedOption    *int       `json:"-"`
+	IsCorrect         *bool      `json:"-"`
+	Abandoned         bool       `gorm:"not null;default:false" json:"-"`
+	QualityFlagsJSON  []byte     `gorm:"type:jsonb;not null;default:'[]'" json:"-"`
+	UpdatedAt         time.Time  `json:"-"`
+}

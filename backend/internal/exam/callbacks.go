@@ -1,6 +1,7 @@
 package exam
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"backend/internal/model"
+	"backend/internal/telemetry"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -109,6 +111,11 @@ func (s *Service) FirstSubmission(
 			tx, current.ID, eventTypeFirstSubmission, idempotencyKey, payloadJSON, result,
 		)
 	})
+	if err == nil {
+		s.publishExamTelemetry("exam_submitted", examID, idempotencyKey, map[string]any{
+			"exam_id": examID.String(), "submission_count": input.TotalSubmissions,
+		})
+	}
 	return result, err
 }
 
@@ -207,7 +214,26 @@ func (s *Service) GradingCompleted(
 			tx, current.ID, eventTypeGradingCompleted, idempotencyKey, payloadJSON, result,
 		)
 	})
+	if err == nil {
+		s.publishExamTelemetry("exam_graded", examID, idempotencyKey, map[string]any{
+			"exam_id": examID.String(), "graded_count": input.GradedSubmissions,
+			"scored_count": input.ScoredSubmissions, "submission_count": input.TotalSubmissions,
+		})
+	}
 	return result, err
+}
+
+func (s *Service) publishExamTelemetry(name string, examID uuid.UUID, idempotencyKey string, properties map[string]any) {
+	if s.publisher == nil {
+		return
+	}
+	eventID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(name+":"+examID.String()+":"+idempotencyKey))
+	event := telemetry.Event{
+		EventID: eventID.String(), Name: name, SchemaVersion: telemetry.CurrentSchemaVersion,
+		OccurredAt: time.Now().UTC(), ActorID: "system", ActorRole: "system", Source: "go_backend",
+		ConsentState: "required", RetentionClass: "decision", Properties: properties,
+	}
+	_, _ = s.publisher.Publish(context.Background(), event)
 }
 
 func (r *Repository) lockExam(examID uuid.UUID) (*model.Exam, error) {

@@ -38,7 +38,6 @@ interface QuestionBankTabProps {
   handleStartAddQuestion: () => void;
   handleDownloadTemplate: () => void;
   handleExcelImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleMasterBankImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleStartEditQuestion: (q: Question) => void;
   handleDeleteQuestion: (qId: string) => void;
   handleDeleteQuestionsBulk: (qIds: string[]) => void;
@@ -61,7 +60,6 @@ export default function QuestionBankTab({
   handleStartAddQuestion,
   handleDownloadTemplate,
   handleExcelImport,
-  handleMasterBankImport,
   handleStartEditQuestion,
   handleDeleteQuestion,
   handleDeleteQuestionsBulk,
@@ -95,14 +93,27 @@ export default function QuestionBankTab({
     html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
 
-    const renderMathExpr = (expr: string) => {
-      let m = expr;
+    const cleanMathSymbols = (str: string) => {
+      let m = str;
+      
+      // Strip left/right modifiers
+      m = m.replace(/\\left/g, "").replace(/\\right/g, "");
+      
+      // Replace latex spaces with normal space
+      m = m.replace(/\\,/g, " ")
+           .replace(/\\ /g, " ")
+           .replace(/\\;/g, " ")
+           .replace(/\\:/g, " ")
+           .replace(/\\!/g, "");
+
+      // Replace fractions using inline-styles to avoid spacing/line-height gaps
       m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
-        return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[12px] leading-tight font-sans">
-          <span class="border-b border-indigo-700 px-1 text-center pb-0.5">${num}</span>
-          <span class="px-1 text-center pt-0.5">${den}</span>
+        return `<span style="display: inline-flex; flex-direction: column; align-items: center; line-height: 1 !important; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; margin: 0 4px; vertical-align: middle;">
+          <span style="display: block; width: 100%; text-align: center; border-bottom: 1px solid #7c3aed; padding-bottom: 2px; line-height: 1 !important;">${num}</span>
+          <span style="display: block; width: 100%; text-align: center; padding-top: 2px; line-height: 1 !important;">${den}</span>
         </span>`;
       });
+
       m = m.replace(/\\cdot/g, "·");
       m = m.replace(/\\neq/g, "≠");
       m = m.replace(/\\Rightarrow|\\implies/g, "⇒");
@@ -110,13 +121,35 @@ export default function QuestionBankTab({
       m = m.replace(/\\ge|\\geq/g, "≥");
       m = m.replace(/\\times/g, "×");
       m = m.replace(/\\div/g, "÷");
+      m = m.replace(/\\in/g, "∈");
+      m = m.replace(/\\pm/g, "±");
 
-      return `<span class="font-mono bg-indigo-50/70 text-indigo-900 px-1.5 py-0.5 rounded text-[11px] font-bold border border-indigo-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
+      // Blackboard bold sets
+      m = m.replace(/\\mathbb\{Z\}/g, "ℤ");
+      m = m.replace(/\\mathbb\{R\}/g, "ℝ");
+      m = m.replace(/\\mathbb\{N\}/g, "ℕ");
+      m = m.replace(/\\mathbb\{Q\}/g, "ℚ");
+      m = m.replace(/\\mathbb\{C\}/g, "ℂ");
+
+      // Replace exponents (superscripts)
+      m = m.replace(/\^\{(.*?)\}/g, "<sup>$1</sup>");
+      m = m.replace(/\^([a-zA-Z0-9\-+])/g, "<sup>$1</sup>");
+
+      // Replace subscripts
+      m = m.replace(/_\{(.*?)\}/g, "<sub>$1</sub>");
+      m = m.replace(/_([a-zA-Z0-9\-+])/g, "<sub>$1</sub>");
+
+      return m;
     };
 
+    // 1. First: Replace LaTeX formulas wrapped in $...$ and style them as inline-flex math
     html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
-      return renderMathExpr(p1);
+      const cleaned = cleanMathSymbols(p1);
+      return `<span class="font-serif italic text-slate-800 mx-0.5 inline-flex items-center align-middle">${cleaned}</span>`;
     });
+
+    // 2. Second: Clean up any raw LaTeX commands outside of $...$ (e.g. raw \in, \neq, \mathbb{Z})
+    html = cleanMathSymbols(html);
 
     html = html.replace(/\n/g, "<br />");
     return html;
@@ -181,74 +214,41 @@ export default function QuestionBankTab({
             <Plus size={14} /> Thêm câu hỏi
           </button>
 
-          {/* Actions Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm border flex items-center gap-1.5 cursor-pointer active:scale-95 ${
-                  subjectQuestions.length === 0
-                    ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-pulse-glow"
-                    : "bg-white hover:bg-muted text-foreground border-border"
-                }`}
-              >
-                {subjectQuestions.length === 0 ? <Sparkles size={14} className="animate-spin" /> : <ChevronDown size={14} />}
-                Nhập & Nạp dữ liệu
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5 shadow-md border border-border bg-popover text-popover-foreground">
-              <DropdownMenuLabel className="text-[10px] font-black text-muted-foreground uppercase tracking-wider px-2.5 py-1.5">
-                Nguồn dữ liệu
-              </DropdownMenuLabel>
-              
-              <DropdownMenuItem
-                onClick={handleLoadDemoQuestions}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-violet-750 hover:text-violet-850 transition-colors"
-              >
-                <Sparkles size={14} className="text-violet-600" />
-                Nạp câu hỏi mẫu
-              </DropdownMenuItem>
+          <button
+            onClick={handleLoadDemoQuestions}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm border flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+              subjectQuestions.length === 0
+                ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-pulse-glow"
+                : "bg-white hover:bg-muted text-foreground border-border"
+            }`}
+            title="Tự động nạp 97 câu hỏi mẫu chuẩn hóa từ file Excel hệ thống"
+          >
+            <Sparkles size={14} className={subjectQuestions.length === 0 ? "text-white animate-pulse" : "text-violet-600"} />
+            Nạp câu hỏi mẫu
+          </button>
 
-              <DropdownMenuSeparator className="my-1 border-t border-border" />
+          <button
+            onClick={() => document.getElementById("excel-file-input")?.click()}
+            className="px-4 py-2 bg-white hover:bg-muted text-foreground border border-border text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
+          >
+            <Upload size={14} className="text-muted-foreground" />
+            Nhập từ Excel (.xlsx)
+          </button>
 
-              <DropdownMenuItem
-                onClick={() => document.getElementById("master-bank-file-input")?.click()}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
-              >
-                <FileJson size={14} className="text-muted-foreground" />
-                Nhập Master Bank (.json)
-              </DropdownMenuItem>
+          <button
+            onClick={handleDownloadTemplate}
+            className="px-4 py-2 bg-white hover:bg-muted text-foreground border border-border text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
+          >
+            <Download size={14} className="text-muted-foreground" />
+            Tải file mẫu Excel
+          </button>
 
-              <DropdownMenuItem
-                onClick={() => document.getElementById("excel-file-input")?.click()}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
-              >
-                <Upload size={14} className="text-muted-foreground" />
-                Nhập từ Excel (.xlsx)
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onClick={handleDownloadTemplate}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
-              >
-                <Download size={14} className="text-muted-foreground" />
-                Tải file mẫu Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Hidden inputs for imports */}
+          {/* Hidden input for Excel import */}
           <input
             id="excel-file-input"
             type="file"
             accept=".xlsx,.xls"
             onChange={handleExcelImport}
-            className="hidden"
-          />
-          <input
-            id="master-bank-file-input"
-            type="file"
-            accept=".json"
-            onChange={handleMasterBankImport}
             className="hidden"
           />
         </div>
@@ -356,7 +356,7 @@ export default function QuestionBankTab({
 
                     {/* Options */}
                     {(q.questionType || "multiple_choice") === "essay" ? (
-                      <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-[10px] font-bold text-indigo-800">
+                      <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-3 py-2 text-[10px] font-bold text-violet-850">
                         {q.rubricItems?.length || 0} ý trong barem
                       </div>
                     ) : (

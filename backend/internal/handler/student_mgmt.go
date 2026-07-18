@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -133,7 +134,7 @@ func (h *StudentMgmtHandler) GetClassroomStudents(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID Lớp học không hợp lệ"})
 	}
 
-	if !h.verifyClassroomOwner(teacherID, classID) {
+	if !isAdminRequest(c) && !h.verifyClassroomOwner(teacherID, classID) {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Bạn không có quyền xem lớp học này"})
 	}
 
@@ -143,6 +144,19 @@ func (h *StudentMgmtHandler) GetClassroomStudents(c fiber.Ctx) error {
 	}
 
 	return c.JSON(students)
+}
+
+func isAdminRequest(c fiber.Ctx) bool {
+	token, ok := c.Locals("user").(*jwt.Token)
+	if !ok {
+		return false
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return false
+	}
+	role, _ := claims["role"].(string)
+	return role == "admin"
 }
 
 // ──────────────────────────────────────────────────────────────────────

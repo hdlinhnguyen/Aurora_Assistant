@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { telemetry } from "@/lib/telemetry";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -371,17 +372,13 @@ export default function TeacherDashboard() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ["Chủ đề", "Câu hỏi", "Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D", "Đáp án đúng (0-3)", "Độ khó (easy/medium/hard)"];
-    const sampleRows = [
-      ["Cộng phân số cùng mẫu", "Tính 1/5 + 2/5 = ?", "3/5", "4/5", "5/5", "2/5", 0, "easy"],
-      ["Cộng phân số cùng mẫu", "Tính 3/7 + 2/7 = ?", "5/14", "5/7", "1/7", "6/7", 1, "easy"],
-      ["Cộng phân số khác mẫu", "Tính 1/2 + 1/3 = ?", "2/5", "5/6", "1/5", "5/5", 1, "medium"]
-    ];
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "mau_nhap_cau_hoi.xlsx");
-    toast.success("Đã tải xuống file mẫu Excel!");
+    const link = document.createElement("a");
+    link.href = "/mau_nhap_cau_hoi.xlsx";
+    link.download = "mau_nhap_cau_hoi.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Đã tải xuống file mẫu câu hỏi (chứa dữ liệu từ Đề 1 & Master Bank)!");
   };
 
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -518,26 +515,83 @@ export default function TeacherDashboard() {
 
   const handleLoadDemoQuestions = async () => {
     setLoading(true);
-    setLoadingMessage("Đang tải và nạp câu hỏi mẫu từ hệ thống...");
+    setLoadingMessage("Đang nạp câu hỏi mẫu từ file Excel hệ thống...");
     try {
-      const resFile = await fetch("/master_bank.json");
-      const json = await resFile.json();
-      const res = await apiFetch("/import/master-bank", {
-        method: "POST",
-        body: JSON.stringify(json),
-      });
-      toast.success(
-        `Nạp câu hỏi mẫu thành công: Đã import ${res.imported} câu hỏi!`,
-        {
-          description: [
-            res.skippedDedup > 0 ? `${res.skippedDedup} câu trùng sig (bỏ qua)` : "",
-            res.skippedNonTN4 > 0 ? `${res.skippedNonTN4} câu TuLuan/DungSai (bỏ qua)` : "",
-            res.skippedNoNode > 0 ? `${res.skippedNoNode} câu thiếu node (bỏ qua)` : "",
-          ].filter(Boolean).join(". ") || undefined,
+      const response = await fetch("/mau_nhap_cau_hoi.xlsx");
+      if (!response.ok) throw new Error("Không thể tải file câu hỏi mẫu từ server.");
+      const arrayBuffer = await response.arrayBuffer();
+      const wb = XLSX.read(arrayBuffer, { type: "array" });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
+
+      if (data.length <= 1) {
+        toast.warning("File Excel mẫu không có dữ liệu câu hỏi.");
+        setLoading(false);
+        return;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+      const questionsByNode: Record<string, any[]> = {};
+
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row || row.length < 2) continue;
+
+        const topicName = row[0]?.toString().trim();
+        const content = row[1]?.toString().trim();
+        const optA = row[2]?.toString().trim() || "";
+        const optB = row[3]?.toString().trim() || "";
+        const optC = row[4]?.toString().trim() || "";
+        const optD = row[5]?.toString().trim() || "";
+        let correctOption = parseInt(row[6]?.toString().trim());
+        if (isNaN(correctOption)) correctOption = 0;
+        const difficulty = row[7]?.toString().trim().toLowerCase() || "medium";
+
+        if (!topicName || !content) {
+          failCount++;
+          continue;
         }
-      );
+
+        const matchedNode = nodes.find(n => n.name.toLowerCase() === topicName.toLowerCase());
+        if (!matchedNode) {
+          failCount++;
+          continue;
+        }
+
+        const options = [optA, optB, optC, optD];
+        const questionPayload = {
+          content: content,
+          optionsJson: JSON.stringify(options),
+          correctOption: correctOption,
+          difficulty: difficulty
+        };
+
+        if (!questionsByNode[matchedNode.id]) {
+          questionsByNode[matchedNode.id] = [];
+        }
+        questionsByNode[matchedNode.id].push(questionPayload);
+      }
+
+      for (const nodeId in questionsByNode) {
+        const qs = questionsByNode[nodeId];
+        await apiFetch(`/nodes/${nodeId}/questions/bulk`, {
+          method: "POST",
+          body: JSON.stringify(qs)
+        });
+        successCount += qs.length;
+      }
+
+      toast.success(`Nạp câu hỏi mẫu thành công: Đã import ${successCount} câu hỏi!`, {
+        description: failCount > 0 ? `Bỏ qua ${failCount} dòng do không khớp tên chủ đề hoặc thiếu thông tin.` : undefined
+      });
+
       loadSubjectQuestions();
       loadExamsStatus();
+      if (editingNode) {
+        loadNodeQuestions(editingNode.id);
+      }
     } catch (err: any) {
       toast.error("Lỗi khi nạp câu hỏi mẫu: " + err.message);
     } finally {
@@ -951,6 +1005,12 @@ export default function TeacherDashboard() {
       setActiveThreadId(res.thread_id);
       setInsights(res.class_insight);
       setDraftPaths(res.paths);
+      telemetry.track("learning_path_generated", {
+        thread_id: res.thread_id,
+        path_count: Object.keys(res.paths || {}).length,
+        model_version: "frontend-observation-v1",
+      });
+      void telemetry.flush().catch(() => undefined);
       toast.success("Lập lộ trình nháp thành công!");
     } catch (err: any) {
       const detail = formatBackendError(err.message || err.toString());
@@ -973,6 +1033,13 @@ export default function TeacherDashboard() {
           custom_paths: draftPaths,
         }),
       });
+      telemetry.track("learning_path_approved", {
+        thread_id: activeThreadId,
+        approved: true,
+        note_length: "PhÃª duyá»‡t bá»Ÿi giÃ¡o viÃªn".length,
+        path_count: Object.keys(draftPaths || {}).length,
+      });
+      void telemetry.flush().catch(() => undefined);
       toast.success("Đã phê duyệt và kích hoạt lộ trình học tập cho học sinh!");
       setActiveThreadId(null);
       setInsights(null);
@@ -1010,6 +1077,12 @@ export default function TeacherDashboard() {
       ...draftPaths,
       [studentId]: studentPath
     });
+    telemetry.track("path_step_moved", {
+      thread_id: activeThreadId || "draft",
+      step_index: stepIndex,
+      direction,
+      resulting_step_count: steps.length,
+    });
   };
 
   const handleDeleteStep = (studentId: string, stepIndex: number) => {
@@ -1027,6 +1100,11 @@ export default function TeacherDashboard() {
     setDraftPaths({
       ...draftPaths,
       [studentId]: studentPath
+    });
+    telemetry.track("path_step_deleted", {
+      thread_id: activeThreadId || "draft",
+      step_index: stepIndex,
+      resulting_step_count: steps.length,
     });
   };
 
@@ -2847,7 +2925,6 @@ export default function TeacherDashboard() {
                 handleStartAddQuestion={handleStartAddQuestion}
                 handleDownloadTemplate={handleDownloadTemplate}
                 handleExcelImport={handleExcelImport}
-                handleMasterBankImport={handleMasterBankImport}
                 handleStartEditQuestion={handleStartEditQuestion}
                 handleDeleteQuestion={handleDeleteQuestion}
                 handleDeleteQuestionsBulk={handleDeleteQuestionsBulk}

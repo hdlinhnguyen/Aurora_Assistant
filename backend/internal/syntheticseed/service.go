@@ -13,12 +13,14 @@ import (
 )
 
 type Result struct {
-	Teacher       model.User
-	Students      []model.User
-	Subject       string
-	NodeIDs       []uuid.UUID
-	QuestionCount int
-	ActivityCount int
+	Teacher                 model.User
+	Students                []model.User
+	Subject                 string
+	NodeIDs                 []uuid.UUID
+	QuestionCount           int
+	ActivityCount           int
+	ExamCount               int
+	ApprovedSubmissionCount int
 }
 
 type Service struct {
@@ -55,10 +57,12 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 	for _, user := range users {
 		userIDs = append(userIDs, user.ID)
 	}
+	if err := resetHistoricalExamData(tx, userIDs); err != nil {
+		return err
+	}
 
 	var nodes []model.Node
-	// Bao gồm cả dữ liệu synthetic cũ (khi đổi tên môn) qua stable_key để dọn sạch orphan.
-	if err := tx.Unscoped().Where("subject = ? OR stable_key LIKE ?", config.Subject, "synthetic-%").Find(&nodes).Error; err != nil {
+	if err := tx.Unscoped().Where("subject = ?", config.Subject).Find(&nodes).Error; err != nil {
 		return err
 	}
 	nodeIDs := make([]uuid.UUID, 0, len(nodes))
@@ -100,7 +104,7 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 		if err := tx.Where("topic_id IN ?", nodeIDs).Delete(&model.StudentTopicMastery{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("subject = ? OR source_type = ?", config.Subject, "synthetic").Delete(&model.Edge{}).Error; err != nil {
+		if err := tx.Where("subject = ?", config.Subject).Delete(&model.Edge{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Unscoped().Where("id IN ?", nodeIDs).Delete(&model.Node{}).Error; err != nil {
@@ -198,73 +202,21 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 		students = append(students, student)
 	}
 
-	nodes := []model.Node{
-		{ID: uuid.New(), Subject: config.Subject, Name: config.Subject, Theory: "Khởi đầu hành trình Toán lớp 4 — chọn một bài học để bắt đầu nhé!", PosX: 400, PosY: 50, IsRoot: true, StableKey: "synthetic-root", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Cộng phân số", Theory: "Cộng hai phân số: nếu khác mẫu thì quy đồng trước, sau đó cộng các tử số với nhau.", PosX: 250, PosY: 180, StableKey: "synthetic-fraction-add", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Cộng phân số cùng mẫu", Theory: "Khi hai phân số đã cùng mẫu, ta chỉ việc cộng hai tử số và giữ nguyên mẫu số.", PosX: 150, PosY: 310, StableKey: "synthetic-same-denominator", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Cộng phân số khác mẫu", Theory: "Muốn cộng hai phân số khác mẫu, trước tiên quy đồng để hai mẫu số bằng nhau, rồi cộng các tử số.", PosX: 350, PosY: 310, StableKey: "synthetic-different-denominators", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Nhân số thập phân", Theory: "Nhân số thập phân như nhân số tự nhiên, rồi đếm tổng số chữ số ở phần thập phân của hai thừa số để đặt dấu phẩy vào tích.", PosX: 550, PosY: 180, StableKey: "synthetic-decimal-multiply", Status: "active"},
-	}
-	if err := tx.Create(&nodes).Error; err != nil {
+	curriculum, err := createSyntheticCurriculum(tx, config, teacher)
+	if err != nil {
 		return Result{}, err
-	}
-	edges := []model.Edge{
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[0].ID, TargetID: nodes[1].ID, Status: "active", SourceType: "synthetic"},
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[1].ID, TargetID: nodes[2].ID, Status: "active", SourceType: "synthetic"},
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[1].ID, TargetID: nodes[3].ID, Status: "active", SourceType: "synthetic"},
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[0].ID, TargetID: nodes[4].ID, Status: "active", SourceType: "synthetic"},
-	}
-	if err := tx.Create(&edges).Error; err != nil {
-		return Result{}, err
-	}
-
-	for _, node := range nodes[1:] {
-		topic := model.Topic{ID: uuid.New(), TeacherID: teacher.ID, Name: node.Name, Subject: config.Subject, GradeLevel: "Synthetic", Modes: "socratic,feynman", Published: true}
-		if err := tx.Create(&topic).Error; err != nil {
-			return Result{}, err
-		}
-	}
-
-	// Ngân hàng câu hỏi tiếng Việt cho từng bài (3 câu: Nhận biết / Thông hiểu / Vận dụng).
-	questionBank := [][]struct {
-		Content    string
-		Options    string
-		Correct    int
-		Difficulty string
-	}{
-		{ // Cộng phân số
-			{"Để cộng hai phân số khác mẫu, bước quan trọng đầu tiên là gì?", `["Quy đồng để hai mẫu số bằng nhau","Cộng thẳng tử với tử, mẫu với mẫu","Nhân hai mẫu số lại với nhau","Bỏ mẫu số đi rồi cộng"]`, 0, "easy"},
-			{"1/2 + 1/2 bằng bao nhiêu?", `["1/4","2/4","1","1/2"]`, 2, "medium"},
-			{"An ăn 1/3 cái bánh, Bình ăn 1/3 cái bánh. Cả hai ăn hết mấy phần cái bánh?", `["2/3","2/6","1/3","1/6"]`, 0, "hard"},
-		},
-		{ // Cộng phân số cùng mẫu
-			{"2/5 + 1/5 bằng bao nhiêu?", `["3/5","3/10","2/10","1/5"]`, 0, "easy"},
-			{"Khi cộng hai phân số cùng mẫu, ta làm gì với mẫu số?", `["Giữ nguyên mẫu số","Cộng hai mẫu số lại","Nhân hai mẫu số","Đổi sang mẫu số khác"]`, 0, "medium"},
-			{"3/7 + 2/7 + 1/7 bằng bao nhiêu?", `["6/7","6/21","5/7","6/14"]`, 0, "hard"},
-		},
-		{ // Cộng phân số khác mẫu
-			{"Muốn cộng 1/2 + 1/3, việc đầu tiên cần làm là gì?", `["Quy đồng về mẫu số chung là 6","Cộng thẳng thành 2/5","Nhân hai tử số với nhau","Giữ nguyên rồi cộng hai tử"]`, 0, "easy"},
-			{"Sau khi quy đồng, 1/2 + 1/3 bằng bao nhiêu?", `["5/6","2/5","3/5","1/6"]`, 0, "medium"},
-			{"1/4 + 1/6 bằng bao nhiêu?", `["5/12","2/10","1/5","2/24"]`, 0, "hard"},
-		},
-		{ // Nhân số thập phân
-			{"0,2 × 3 bằng bao nhiêu?", `["0,6","6","0,06","2,3"]`, 0, "easy"},
-			{"0,5 × 0,4 bằng bao nhiêu?", `["0,20","2,0","0,9","0,02"]`, 0, "medium"},
-			{"Khi nhân 1,25 × 0,4, tích có mấy chữ số ở phần thập phân?", `["3 chữ số","1 chữ số","2 chữ số","0 chữ số"]`, 0, "hard"},
-		},
 	}
 
 	questionsByNode := make(map[uuid.UUID][]model.Question)
 	questionCount := 0
-	for nodeIndex, node := range nodes[1:] {
-		bank := questionBank[nodeIndex]
-		questions := make([]model.Question, 0, len(bank))
-		for _, item := range bank {
+	for nodeIndex, node := range curriculum.Targets {
+		questions := make([]model.Question, 0, 3)
+		for questionIndex := 0; questionIndex < 3; questionIndex++ {
 			question := model.Question{
 				ID: uuid.New(), NodeID: node.ID,
-				Content:     item.Content,
-				OptionsJSON: item.Options, CorrectOption: item.Correct,
-				Difficulty: item.Difficulty, QuestionType: "multiple_choice", GradeLevel: "Lớp 4",
+				Content:     fmt.Sprintf("Câu hỏi %d.%d — bài \"%s\"", nodeIndex+1, questionIndex+1, node.Name),
+				OptionsJSON: `["Đáp án A","Đáp án B","Đáp án C","Đáp án D"]`, CorrectOption: questionIndex % 4,
+				Difficulty: []string{"easy", "medium", "hard"}[questionIndex], QuestionType: "multiple_choice", GradeLevel: "7",
 			}
 			questions = append(questions, question)
 		}
@@ -278,20 +230,20 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 	baseTime := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Minute)
 	activityCount := 0
 	for studentIndex, student := range students {
-		state := model.StudentState{ID: uuid.New(), StudentID: student.ID, Subject: config.Subject, InitialLevelNodeID: nodes[0].ID, CurrentLevelNodeID: nodes[1].ID}
+		state := model.StudentState{ID: uuid.New(), StudentID: student.ID, Subject: config.Subject, InitialLevelNodeID: curriculum.Root.ID, CurrentLevelNodeID: curriculum.Targets[0].ID}
 		if err := tx.Create(&state).Error; err != nil {
 			return Result{}, err
 		}
-		session := model.ChatSession{ID: uuid.New(), StudentID: student.ID, Topic: nodes[1].Name, Status: "active", Mode: "socratic"}
+		session := model.ChatSession{ID: uuid.New(), StudentID: student.ID, Topic: curriculum.Targets[0].Name, Status: "active", Mode: "socratic"}
 		if err := tx.Create(&session).Error; err != nil {
 			return Result{}, err
 		}
-		message := model.Message{ID: uuid.New(), SessionID: session.ID, Sender: "student", Content: "Phiên học tập mẫu", IsCorrectStep: true, CreatedAt: baseTime}
+		message := model.Message{ID: uuid.New(), SessionID: session.ID, Sender: "student", Content: "Synthetic learning session", IsCorrectStep: true, CreatedAt: baseTime}
 		if err := tx.Create(&message).Error; err != nil {
 			return Result{}, err
 		}
 
-		for topicIndex, node := range nodes[1:4] {
+		for topicIndex, node := range curriculum.Targets[:3] {
 			questions := questionsByNode[node.ID]
 			for _, attempt := range GenerateAttempts(config.Seed, studentIndex, topicIndex, len(questions)) {
 				action := "answer_incorrect"
@@ -311,11 +263,22 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 		}
 	}
 
-	nodeIDs := make([]uuid.UUID, 0, len(nodes))
-	for _, node := range nodes {
-		nodeIDs = append(nodeIDs, node.ID)
+	nodeIDs := curriculumNodeIDs(curriculum)
+	targetNodeIDs := make(map[string]uuid.UUID, len(curriculum.Targets))
+	for _, node := range curriculum.Targets {
+		targetNodeIDs[node.StableKey] = node.ID
 	}
-	return Result{Teacher: teacher, Students: students, Subject: config.Subject, NodeIDs: nodeIDs, QuestionCount: questionCount, ActivityCount: activityCount}, nil
+	exams, approvedCount, err := createHistoricalExamData(
+		tx, config, teacher, students, targetNodeIDs, time.Now().UTC().Truncate(time.Minute),
+	)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{
+		Teacher: teacher, Students: students, Subject: config.Subject, NodeIDs: nodeIDs,
+		QuestionCount: questionCount, ActivityCount: activityCount,
+		ExamCount: len(exams), ApprovedSubmissionCount: approvedCount,
+	}, nil
 }
 
 func createAccount(tx *gorm.DB, account Account) (model.User, error) {

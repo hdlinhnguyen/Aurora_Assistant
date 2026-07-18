@@ -52,3 +52,4 @@ reusable_modules.md
 run.ps1
 .local-go/
 .worktrees/
+.vercel

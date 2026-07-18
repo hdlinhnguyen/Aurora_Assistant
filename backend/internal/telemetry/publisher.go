@@ -17,13 +17,37 @@ type TransactionalPublisher interface {
 	PublishTx(context.Context, *gorm.DB, Event) error
 }
 
-type OutboxPublisher struct {
-	db    *gorm.DB
-	clock Clock
+type ActorPublisher interface {
+	PublishActor(context.Context, uuid.UUID, string, Event) (PublishResult, error)
 }
 
-func NewPublisher(db *gorm.DB, clock Clock) *OutboxPublisher {
-	return &OutboxPublisher{db: db, clock: clock}
+type PseudonymConfig struct {
+	Key        []byte
+	KeyVersion string
+}
+
+type OutboxPublisher struct {
+	db              *gorm.DB
+	clock           Clock
+	pseudonymConfig PseudonymConfig
+}
+
+func NewPublisher(db *gorm.DB, clock Clock, configs ...PseudonymConfig) *OutboxPublisher {
+	config := PseudonymConfig{KeyVersion: "v1"}
+	if len(configs) > 0 {
+		config = configs[0]
+	}
+	return &OutboxPublisher{db: db, clock: clock, pseudonymConfig: config}
+}
+
+func (p *OutboxPublisher) PublishActor(ctx context.Context, actorID uuid.UUID, role string, event Event) (PublishResult, error) {
+	if len(p.pseudonymConfig.Key) == 0 {
+		return PublishResult{}, ErrInvalidEvent
+	}
+	event.ActorID = Pseudonym(p.pseudonymConfig.Key, p.pseudonymConfig.KeyVersion, actorID)
+	event.ActorRole = role
+	event.ReceivedAt = p.clock.Now().UTC()
+	return p.Publish(ctx, event)
 }
 
 func (p *OutboxPublisher) Publish(ctx context.Context, event Event) (PublishResult, error) {
@@ -45,14 +69,6 @@ func (p *OutboxPublisher) enqueue(tx *gorm.DB, event Event) (bool, error) {
 	if err := ValidateEvent(event); err != nil {
 		return false, err
 	}
-	var existing model.TelemetryOutbox
-	result := tx.Where("event_id = ?", event.EventID).Limit(1).Find(&existing)
-	if result.Error != nil {
-		return false, result.Error
-	}
-	if result.RowsAffected == 1 {
-		return true, nil
-	}
 	if event.ReceivedAt.IsZero() {
 		event.ReceivedAt = p.clock.Now().UTC()
 	}
@@ -69,10 +85,14 @@ func (p *OutboxPublisher) enqueue(tx *gorm.DB, event Event) (bool, error) {
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	if err := tx.Create(row).Error; err != nil {
-		return false, err
+	result := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "event_id"}},
+		DoNothing: true,
+	}).Create(row)
+	if result.Error != nil {
+		return false, result.Error
 	}
-	return false, nil
+	return result.RowsAffected == 0, nil
 }
 
 type Worker struct {

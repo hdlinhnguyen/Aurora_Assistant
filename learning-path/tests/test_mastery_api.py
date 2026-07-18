@@ -59,6 +59,13 @@ def test_calculate_mastery_returns_requested_topic_states() -> None:
     assert payload["states"]["topic-a"]["student_id"] == "student-1"
     assert payload["states"]["topic-a"]["evidence_count"] == 1
     assert payload["states"]["topic-b"]["mastery_status"] == "unknown"
+    metadata = payload["decision_metadata"]
+    assert metadata["event_name"] == "mastery_calculated"
+    assert metadata["model_version"]
+    assert metadata["config_version"]
+    assert metadata["topic_count"] == 2
+    assert metadata["evidence_count"] == 1
+    assert "raw_quiz" not in metadata
 
 
 def test_calculate_mastery_deduplicates_evidence_ids() -> None:

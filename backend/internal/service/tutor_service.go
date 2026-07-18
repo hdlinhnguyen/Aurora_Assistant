@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"backend/internal/model"
+	"backend/internal/telemetry"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -85,8 +87,17 @@ type TutorService interface {
 }
 
 type tutorService struct {
-	db    *gorm.DB
-	aiSvc AIService
+	db        *gorm.DB
+	aiSvc     AIService
+	telemetry telemetry.ActorPublisher
+}
+
+type TutorOption func(*tutorService)
+
+func WithTelemetryPublisher(publisher telemetry.ActorPublisher) TutorOption {
+	return func(service *tutorService) {
+		service.telemetry = publisher
+	}
 }
 
 type GapStat struct {
@@ -108,11 +119,15 @@ type FeynmanStudentStat struct {
 	SessionID    string  `json:"sessionId" gorm:"column:session_id"`
 }
 
-func NewTutorService(db *gorm.DB, aiSvc AIService) TutorService {
-	return &tutorService{
+func NewTutorService(db *gorm.DB, aiSvc AIService, options ...TutorOption) TutorService {
+	service := &tutorService{
 		db:    db,
 		aiSvc: aiSvc,
 	}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 func (s *tutorService) CreateSession(studentID uuid.UUID, topic string, mode string) (*model.ChatSession, error) {
@@ -553,7 +568,42 @@ func (s *tutorService) SubmitAnswer(studentID uuid.UUID, nodeID uuid.UUID, quest
 	}
 
 	s.LogActivity(studentID, node.Subject, nodeID, action, detail)
+	s.publishAnswerTelemetry(studentID, nodeID, q, selectedOption, isCorrect)
 	return isCorrect, &q, nil
+}
+
+func (s *tutorService) publishAnswerTelemetry(
+	studentID, nodeID uuid.UUID,
+	question model.Question,
+	selectedOption int,
+	isCorrect bool,
+) {
+	if s.telemetry == nil {
+		return
+	}
+	now := time.Now().UTC()
+	events := []telemetry.Event{
+		{
+			EventID: uuid.NewString(), Name: "question_answer_submitted", SchemaVersion: telemetry.CurrentSchemaVersion,
+			OccurredAt: now, TopicID: nodeID.String(), Source: "go_backend", ConsentState: "required", RetentionClass: "interaction",
+			Properties: map[string]any{
+				"question_id": question.ID.String(), "selected_option": selectedOption,
+				"active_time_ms": 0, "server_timing_available": false, "difficulty": question.Difficulty,
+			},
+		},
+		{
+			EventID: uuid.NewString(), Name: "question_graded", SchemaVersion: telemetry.CurrentSchemaVersion,
+			OccurredAt: now, TopicID: nodeID.String(), Source: "go_backend", ConsentState: "required", RetentionClass: "interaction",
+			Properties: map[string]any{
+				"question_id": question.ID.String(), "is_correct": isCorrect, "difficulty": question.Difficulty,
+			},
+		},
+	}
+	for _, event := range events {
+		if _, err := s.telemetry.PublishActor(context.Background(), studentID, "student", event); err != nil {
+			log.Printf("telemetry answer event failed: %v", err)
+		}
+	}
 }
 
 func (s *tutorService) SubmitCantDo(studentID uuid.UUID, nodeID uuid.UUID) (map[string]interface{}, error) {
@@ -607,12 +657,12 @@ func (s *tutorService) RequestReDiagnostic(studentID uuid.UUID, subject string) 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			state = model.StudentState{
-				ID:                 uuid.New(),
-				StudentID:          studentID,
-				Subject:            subject,
-				NeedsDiagnostic:    true,
-				CreatedAt:          time.Now(),
-				UpdatedAt:          time.Now(),
+				ID:              uuid.New(),
+				StudentID:       studentID,
+				Subject:         subject,
+				NeedsDiagnostic: true,
+				CreatedAt:       time.Now(),
+				UpdatedAt:       time.Now(),
 			}
 			return s.db.Create(&state).Error
 		}
@@ -869,9 +919,15 @@ func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject st
 	// Build per-node accuracy map for mastery ring visualization
 	nodeAccuracy := map[string]map[string]int{}
 	allNodeIds := map[string]bool{}
-	for k := range nodeCorrectCount { allNodeIds[k] = true }
-	for k := range nodeIncorrectCount { allNodeIds[k] = true }
-	for k := range nodeCantDoCount { allNodeIds[k] = true }
+	for k := range nodeCorrectCount {
+		allNodeIds[k] = true
+	}
+	for k := range nodeIncorrectCount {
+		allNodeIds[k] = true
+	}
+	for k := range nodeCantDoCount {
+		allNodeIds[k] = true
+	}
 	for nodeIDStr := range allNodeIds {
 		correct := nodeCorrectCount[nodeIDStr]
 		incorrect := nodeIncorrectCount[nodeIDStr]
@@ -1085,6 +1141,7 @@ func (s *tutorService) RenameSubject(oldName, newName string) error {
 		return nil
 	})
 }
+
 type ParsedQuestion struct {
 	Content       string   `json:"content"`
 	Options       []string `json:"options"`
