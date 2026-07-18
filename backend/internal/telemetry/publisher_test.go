@@ -3,6 +3,7 @@ package telemetry
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -52,4 +53,40 @@ func TestPublishTxRollsBackWithBusinessTransaction(t *testing.T) {
 	var count int64
 	require.NoError(t, db.Model(&model.TelemetryOutbox{}).Where("event_id = ?", event.EventID).Count(&count).Error)
 	require.Zero(t, count)
+}
+
+func TestPublishConcurrentDuplicateReturnsOneAcceptedEvent(t *testing.T) {
+	db := newTelemetryTestDB(t)
+	publisher := NewPublisher(db, fixedClock{now: time.Now().UTC()})
+	event := validEvent()
+	var wait sync.WaitGroup
+	results := make(chan PublishResult, 8)
+	errorsSeen := make(chan error, 8)
+	for range 8 {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			result, err := publisher.Publish(context.Background(), event)
+			results <- result
+			errorsSeen <- err
+		}()
+	}
+	wait.Wait()
+	close(results)
+	close(errorsSeen)
+
+	accepted := 0
+	duplicates := 0
+	for err := range errorsSeen {
+		require.NoError(t, err)
+	}
+	for result := range results {
+		if result.Duplicate {
+			duplicates++
+		} else {
+			accepted++
+		}
+	}
+	require.Equal(t, 1, accepted)
+	require.Equal(t, 7, duplicates)
 }

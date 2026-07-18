@@ -176,6 +176,7 @@ export default function StudentTutorPage() {
   const learningSessionIdRef = useRef("");
   const questionTimerRef = useRef(new QuestionTimer());
   const attemptSubmittedRef = useRef(false);
+  const previousSelectedOptionRef = useRef<number | null>(null);
 
   const handleJoinClassByCode = (codeToJoin?: string) => {
     const code = (codeToJoin || joinCodeInput).trim().toUpperCase();
@@ -891,6 +892,7 @@ export default function StudentTutorPage() {
     const attemptId = window.crypto.randomUUID();
     questionTimerRef.current.present(attemptId);
     attemptSubmittedRef.current = false;
+    previousSelectedOptionRef.current = null;
     telemetry.track(
       "question_presented",
       { question_id: telemetryQuestion.id, difficulty: telemetryQuestion.difficulty },
@@ -923,9 +925,15 @@ export default function StudentTutorPage() {
   }, [telemetryQuestion?.id, selectedNode?.id]);
 
   useEffect(() => {
-    if (selectedOption !== null) {
+    if (selectedOption === null) {
+      previousSelectedOptionRef.current = null;
+    } else if (
+      previousSelectedOptionRef.current !== null &&
+      previousSelectedOptionRef.current !== selectedOption
+    ) {
       questionTimerRef.current.recordAnswerChange();
     }
+    previousSelectedOptionRef.current = selectedOption;
   }, [selectedOption]);
 
   // Render the student tutor workspace interface

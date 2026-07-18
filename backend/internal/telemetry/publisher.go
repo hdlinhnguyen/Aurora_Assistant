@@ -69,14 +69,6 @@ func (p *OutboxPublisher) enqueue(tx *gorm.DB, event Event) (bool, error) {
 	if err := ValidateEvent(event); err != nil {
 		return false, err
 	}
-	var existing model.TelemetryOutbox
-	result := tx.Where("event_id = ?", event.EventID).Limit(1).Find(&existing)
-	if result.Error != nil {
-		return false, result.Error
-	}
-	if result.RowsAffected == 1 {
-		return true, nil
-	}
 	if event.ReceivedAt.IsZero() {
 		event.ReceivedAt = p.clock.Now().UTC()
 	}
@@ -93,10 +85,14 @@ func (p *OutboxPublisher) enqueue(tx *gorm.DB, event Event) (bool, error) {
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	if err := tx.Create(row).Error; err != nil {
-		return false, err
+	result := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "event_id"}},
+		DoNothing: true,
+	}).Create(row)
+	if result.Error != nil {
+		return false, result.Error
 	}
-	return false, nil
+	return result.RowsAffected == 0, nil
 }
 
 type Worker struct {
