@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
-import { GraduationCap, Users, Compass, RefreshCw, Sparkles } from "lucide-react";
+import { GraduationCap, Users, RefreshCw, Sparkles, MoreVertical } from "lucide-react";
 
 export default function QuickRoleSwitcher() {
   const router = useRouter();
@@ -13,6 +13,17 @@ export default function QuickRoleSwitcher() {
   const [currentRole, setCurrentRole] = useState<"student" | "teacher" | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (isOpen && !(e.target as Element).closest(".quick-role-switcher-dropdown")) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isOpen]);
 
   useEffect(() => {
     const userStr = localStorage.getItem("aurora_user");
@@ -65,46 +76,64 @@ export default function QuickRoleSwitcher() {
   };
 
   return (
-    <div
-      data-tour="role-switcher"
-      className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 p-1.5 shadow-sm backdrop-blur-md text-foreground text-xs"
-    >
-      {/* Current Role Indicator */}
-      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted font-semibold text-muted-foreground">
-        {currentRole === "teacher" ? (
-          <>
-            <Users className="h-3.5 w-3.5 text-[var(--purple)]" />
-            <span>Góc Giáo viên</span>
-          </>
-        ) : (
-          <>
-            <GraduationCap className="h-3.5 w-3.5 text-[var(--mint)]" />
-            <span>Góc Học sinh</span>
-          </>
-        )}
-      </div>
-
-      {/* Switch Button */}
+    <div className="relative inline-block text-left quick-role-switcher-dropdown z-50">
+      {/* Trigger Button */}
       <button
-        onClick={() => handleRoleSwitch(currentRole === "teacher" ? "student" : "teacher")}
-        disabled={loading}
-        title="Chuyển đổi 1-click giữa tài khoản Học sinh & Giáo viên"
-        className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-foreground text-background font-bold hover:opacity-90 transition-all active:scale-[0.96] disabled:opacity-50"
+        onClick={() => setIsOpen(!isOpen)}
+        title="Menu Tùy Chọn Demo"
+        className="h-9 w-9 rounded-full border border-border bg-card/85 text-muted-foreground hover:text-foreground hover:bg-muted shadow-sm backdrop-blur-md flex items-center justify-center transition-all cursor-pointer"
       >
-        <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
-        <span>
-          Đổi sang {currentRole === "teacher" ? "Học sinh" : "Giáo viên"}
-        </span>
+        <MoreVertical size={16} />
       </button>
 
-      {/* Tour Trigger Button */}
-      <button
-        onClick={handleStartTour}
-        className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[var(--mint)]/15 text-[var(--mint)] hover:bg-[var(--mint)]/25 font-bold transition-all border border-[var(--mint)]/30"
-      >
-        <Sparkles className="h-3.5 w-3.5" />
-        <span>Tour Hướng Dẫn</span>
-      </button>
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-52 rounded-2xl border border-border bg-card p-2 shadow-xl backdrop-blur-md animate-[scaleUp_0.15s_ease-out] flex flex-col gap-1 z-50">
+          {/* Current Role Indicator */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/65 text-muted-foreground font-semibold text-xs select-none">
+            {currentRole === "teacher" ? (
+              <>
+                <Users className="h-3.5 w-3.5 text-[var(--purple)]" />
+                <span>Góc Giáo viên</span>
+              </>
+            ) : (
+              <>
+                <GraduationCap className="h-3.5 w-3.5 text-[var(--mint)]" />
+                <span>Góc Học sinh</span>
+              </>
+            )}
+          </div>
+
+          <div className="border-b border-border my-1" />
+
+          {/* Switch Button */}
+          <button
+            onClick={() => {
+              handleRoleSwitch(currentRole === "teacher" ? "student" : "teacher");
+              setIsOpen(false);
+            }}
+            disabled={loading}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-muted text-foreground font-bold text-xs active:scale-[0.98] transition-all disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${loading ? "animate-spin" : ""}`} />
+            <span>
+              Đổi sang {currentRole === "teacher" ? "Học sinh" : "Giáo viên"}
+            </span>
+          </button>
+
+          {/* Tour Trigger Button */}
+          <button
+            onClick={() => {
+              handleStartTour();
+              setIsOpen(false);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-[var(--mint)]/10 text-[var(--mint)] font-bold text-xs active:scale-[0.98] transition-all cursor-pointer"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Tour Hướng Dẫn</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

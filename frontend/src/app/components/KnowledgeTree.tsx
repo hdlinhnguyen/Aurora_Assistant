@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, MouseEvent } from "react";
 import { apiFetch } from "@/lib/api";
-import { TopicMastery, masteryPercent as toMasteryPercent } from "@/lib/mastery";
+import { BKT_INITIAL_MASTERY, TopicMastery, masteryPercent as toMasteryPercent } from "@/lib/mastery";
 import { toast } from "sonner";
 import { Plus, Trash, Trash2, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo, Redo, RefreshCw, Layers, LayoutGrid, CheckCircle2, AlertCircle, PlayCircle, Lock, Compass, X, Check, HelpCircle, AlertTriangle } from "lucide-react";
 
@@ -48,7 +48,6 @@ export default function KnowledgeTree({
   edges,
   mode,
   studentNodeStatus = {},
-  nodeAccuracy = {},
   masteryByTopic = {},
   initialNodeId,
   currentNodeId,
@@ -212,16 +211,59 @@ export default function KnowledgeTree({
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.15, 2.5));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.15, 0.4));
   const handleResetZoom = () => {
-    setPan({ x: 0, y: 0 });
-    setScale(1);
+    const container = containerRef.current;
+    if (!container || displayNodes.length === 0) {
+      setPan({ x: 0, y: 0 });
+      setScale(1);
+      return;
+    }
+
+    const xs = displayNodes.map(n => n.posX);
+    const ys = displayNodes.map(n => n.posY);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs) + 230; // node width
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys) + 85;  // node height
+
+    const graphWidth = maxX - minX;
+    const graphHeight = maxY - minY;
+
+    const containerWidth = container.clientWidth || 800;
+    const containerHeight = container.clientHeight || 500;
+
+    const padding = 40;
+    const scaleX = (containerWidth - padding * 2) / graphWidth;
+    const scaleY = (containerHeight - padding * 2) / graphHeight;
+    const newScale = Math.max(0.5, Math.min(Math.min(scaleX, scaleY), 1.2));
+
+    const graphCenterX = minX + graphWidth / 2;
+    const graphCenterY = minY + graphHeight / 2;
+    const containerCenterX = containerWidth / 2;
+    const containerCenterY = containerHeight / 2;
+
+    const panX = containerCenterX - graphCenterX * newScale;
+    const panY = containerCenterY - graphCenterY * newScale;
+
+    setPan({ x: Math.round(panX), y: Math.round(panY) });
+    setScale(newScale);
   };
+
+  // Auto-center on load
+  useEffect(() => {
+    if (nodes && nodes.length > 0 && containerRef.current) {
+      const timer = setTimeout(() => {
+        handleResetZoom();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [nodes]);
 
   // Auto-layout: matches backend algorithm (global topological levels, centered)
   const handleAutoLayout = async () => {
-    const NODE_SPACING = 280.0;
+    const NODE_SPACING = 350.0;
     const LEFT_MARGIN = 100.0;
     const TOP_MARGIN = 80.0;
-    const LEVEL_HEIGHT = 200.0;
+    const LEVEL_HEIGHT = 260.0;
 
     // Build adjacency and in-degree
     const adj: Record<string, string[]> = {};
@@ -723,7 +765,7 @@ export default function KnowledgeTree({
     for (let lvl = 0; lvl <= maxLocalLevel; lvl++) {
       const levelNodes = nodesByLocalLevel[lvl] || [];
       const count = levelNodes.length;
-      const nodeSpacing = 280;
+      const nodeSpacing = 350;
       const totalWidth = nodeSpacing * count;
       const startX = 100;
 
@@ -734,7 +776,7 @@ export default function KnowledgeTree({
         } else {
           posX = startX + idx * nodeSpacing;
         }
-        const posY = 80 + lvl * 180;
+        const posY = 80 + lvl * 250;
         localCoords[id] = { x: posX, y: posY };
       });
     }
@@ -853,34 +895,34 @@ export default function KnowledgeTree({
       <div className="w-full border-b border-border bg-card/90 px-4 py-3 flex items-center justify-between gap-4 z-20 shadow-sm">
         {/* Left Side: Zoom and Undo/Redo */}
         <div className="flex items-center gap-2">
-          <div className="flex bg-muted border border-border rounded-xl p-0.5 shadow-sm items-center">
+          <div className="flex bg-slate-100 border border-slate-200/50 rounded-2xl p-1 shadow-inner items-center">
             <button
               onClick={handleZoomIn}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
               title="Phóng to"
             >
               <ZoomIn size={14} />
             </button>
             <button
               onClick={handleZoomOut}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
               title="Thu nhỏ"
             >
               <ZoomOut size={14} />
             </button>
             <button
               onClick={handleResetZoom}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
               title="Căn giữa"
             >
               <Move size={14} />
             </button>
             <button
               onClick={() => setShowGroups(!showGroups)}
-              className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 showGroups
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-card hover:text-foreground"
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200/40"
+                  : "text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm"
               }`}
               title={showGroups ? "Ẩn nhóm chủ đề" : "Hiện nhóm chủ đề"}
             >
@@ -889,15 +931,15 @@ export default function KnowledgeTree({
           </div>
 
           {mode === "teacher" && !isFocusedView && (
-            <div className="flex bg-muted border border-border rounded-xl p-0.5 shadow-sm items-center">
+            <div className="flex bg-slate-100 border border-slate-200/50 rounded-2xl p-1 shadow-inner items-center ml-1">
               <button
                 onClick={handleUndo}
                 disabled={historyIndex <= 0}
                 title="Hoàn tác (Ctrl+Z)"
-                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   historyIndex > 0
-                    ? "hover:bg-card text-foreground"
-                    : "text-muted-foreground/30 cursor-not-allowed"
+                    ? "hover:bg-white text-slate-800 hover:shadow-sm"
+                    : "text-slate-400/40 cursor-not-allowed"
                 }`}
               >
                 <Undo size={14} />
@@ -906,10 +948,10 @@ export default function KnowledgeTree({
                 onClick={handleRedo}
                 disabled={historyIndex >= history.length - 1}
                 title="Làm lại (Ctrl+Y)"
-                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   historyIndex < history.length - 1
-                    ? "hover:bg-card text-foreground"
-                    : "text-muted-foreground/30 cursor-not-allowed"
+                    ? "hover:bg-white text-slate-800 hover:shadow-sm"
+                    : "text-slate-400/40 cursor-not-allowed"
                 }`}
               >
                 <Redo size={14} />
@@ -921,10 +963,11 @@ export default function KnowledgeTree({
             <div className="flex items-center gap-1.5 ml-2">
               <button
                 onClick={handleAutoLayout}
-                className="h-8 px-3 rounded-xl border border-border bg-card text-foreground hover:bg-muted flex items-center gap-1.5 text-xs font-bold shadow-sm hover:brightness-95 active:scale-95 transition-all cursor-pointer"
+                className="h-8 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 text-xs font-black shadow-sm active:scale-95 transition-all cursor-pointer"
                 title="Tự động sắp xếp cây theo cấu trúc"
               >
-                <LayoutGrid size={13} /> Sắp xếp
+                <LayoutGrid size={13} className="text-slate-500" />
+                <span>Sắp xếp</span>
               </button>
             </div>
           )}
@@ -1078,22 +1121,20 @@ export default function KnowledgeTree({
 
                 // Mastery ring calculation
                 const bktState = masteryByTopic[node.id];
-                const nodeAcc = nodeAccuracy[node.id];
-                const accuracyPercent = nodeAcc && nodeAcc.total > 0
-                  ? Math.round((nodeAcc.correct / nodeAcc.total) * 100)
-                  : 0;
-                const displayedMasteryPercent = bktState
-                  ? toMasteryPercent(bktState.masteryProbability)
-                  : accuracyPercent;
-                const hasMasteryData = Boolean(bktState) || Boolean(nodeAcc && nodeAcc.total > 0);
+                const displayedMasteryPercent = toMasteryPercent(
+                  bktState?.masteryProbability ?? BKT_INITIAL_MASTERY,
+                );
+                const showMastery = mode !== "teacher";
                 const ringPad = 6;
                 const ringW = nodeWidth + ringPad * 2;
                 const ringH = nodeHeight + ringPad * 2;
-                const ringR = 18;
+                const ringR = 22;
                 const ringPerimeter = 2 * (ringW - 2 * ringR) + 2 * (ringH - 2 * ringR) + 2 * Math.PI * ringR;
                 const ringFill = (displayedMasteryPercent / 100) * ringPerimeter;
                 const ringGap = ringPerimeter - ringFill;
-                const ringColor = bktState?.masteryStatus === "uncertain"
+                const ringColor = !bktState || bktState.masteryStatus === "unknown"
+                  ? "#64748b"
+                  : bktState.masteryStatus === "uncertain"
                   ? "#d97706"
                   : displayedMasteryPercent >= 80
                     ? "#10b981"
@@ -1101,14 +1142,27 @@ export default function KnowledgeTree({
                       ? "#2563eb"
                       : "#ef4444";
 
+                const isHovered = hoveredNodeId === node.id;
                 return (
                   <g 
                     key={node.id} 
-                    className="group/node"
-                    style={{ opacity, transition: "opacity 0.2s" }}
+                    className="group/node transition-all duration-200"
+                    onMouseEnter={() => setHoveredNodeId(node.id)}
+                    onMouseLeave={() => setHoveredNodeId(null)}
+                    style={{
+                      opacity,
+                      transform: isActiveNode 
+                        ? "scale(1.06)" 
+                        : isHovered 
+                          ? "scale(1.03)" 
+                          : "scale(1)",
+                      transformOrigin: `${node.posX + nodeWidth / 2}px ${node.posY + nodeHeight / 2}px`,
+                      transition: "transform 0.2s ease, opacity 0.2s ease",
+                      cursor: selectable ? "pointer" : "default"
+                    }}
                   >
                     {/* Mastery Progress Ring */}
-                    {hasMasteryData && mode !== "teacher" && (
+                    {showMastery && (
                       <rect
                         x={node.posX - ringPad}
                         y={node.posY - ringPad}
@@ -1129,7 +1183,7 @@ export default function KnowledgeTree({
                       />
                     )}
                     {/* Mastery ring background track */}
-                    {hasMasteryData && mode !== "teacher" && (
+                    {showMastery && (
                       <rect
                         x={node.posX - ringPad}
                         y={node.posY - ringPad}
@@ -1168,11 +1222,10 @@ export default function KnowledgeTree({
                           }
                         }}
                         className={`h-full w-full rounded-2xl border-2 p-3 flex flex-col justify-between items-start shadow-sm select-none transition-all duration-200 relative ${colorClass} ${
-                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-pointer hover:shadow-md hover:scale-[1.01]"
-                        } ${isActiveNode
-                            ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] scale-[1.06] shadow-lg shadow-[var(--purple)]/20 z-10"
+                          isActiveNode
+                            ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] shadow-lg shadow-[var(--purple)]/20 z-10"
                             : isHighlighted
-                              ? "ring-1 ring-[var(--purple)]/40 border-[var(--purple)]/40 scale-[1.01]"
+                              ? "ring-1 ring-[var(--purple)]/40 border-[var(--purple)]/40"
                               : ""
                         }`}
                       >
@@ -1202,16 +1255,16 @@ export default function KnowledgeTree({
                               }[status]}
                             </span>
                           </div>
-                          {hasMasteryData && mode !== "teacher" && (
+                          {showMastery && (
                             <span
                               className="text-[8px] font-black px-1.5 py-0.5 rounded-full border tabular-nums leading-none shrink-0"
                               style={{
-                                backgroundColor: displayedMasteryPercent >= 80 ? "#ecfdf5" : displayedMasteryPercent >= 50 ? "#eff6ff" : "#fef2f2",
+                                backgroundColor: !bktState || bktState.masteryStatus === "unknown" ? "#f1f5f9" : displayedMasteryPercent >= 80 ? "#ecfdf5" : displayedMasteryPercent >= 50 ? "#eff6ff" : "#fef2f2",
                                 color: ringColor,
                                 borderColor: ringColor + "40",
                               }}
                             >
-                              {bktState ? "BKT " : ""}{displayedMasteryPercent}%
+                              BKT {displayedMasteryPercent}%
                             </span>
                           )}
                         </div>

@@ -72,6 +72,8 @@ function LoginForm() {
     }
   };
 
+  const syntheticQuickLogin = () => handleDemoLogin("synthetic.teacher@aurora.local", "teacher");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -163,6 +165,18 @@ function LoginForm() {
             <span className="text-[8px] text-muted-foreground mt-0.5 truncate w-full">admin@...</span>
           </button>
         </div>
+      )}
+
+      {isLogin && (
+        <button
+          type="button"
+          onClick={syntheticQuickLogin}
+          disabled={loading}
+          className="mb-6 w-full rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-left text-emerald-900 shadow-sm transition-all hover:bg-emerald-100 active:scale-[0.99] disabled:opacity-50"
+        >
+          <span className="block text-xs font-black">Synthetic Teacher (Vào nhanh)</span>
+          <span className="mt-0.5 block text-[10px] text-emerald-700">Mở ngay dashboard teacher với dữ liệu BKT mẫu</span>
+        </button>
       )}
 
       {error && (

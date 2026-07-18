@@ -2,16 +2,17 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -23,14 +24,28 @@ import (
 	"backend/internal/config"
 	"backend/internal/model"
 	"backend/internal/service"
+	"backend/internal/telemetry"
 )
 
 type TutorHandler struct {
-	svc service.TutorService
+	svc       service.TutorService
+	telemetry telemetry.ActorPublisher
 }
 
-func NewTutorHandler(svc service.TutorService) *TutorHandler {
-	return &TutorHandler{svc: svc}
+type TutorHandlerOption func(*TutorHandler)
+
+func WithTutorTelemetry(publisher telemetry.ActorPublisher) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.telemetry = publisher
+	}
+}
+
+func NewTutorHandler(svc service.TutorService, options ...TutorHandlerOption) *TutorHandler {
+	handler := &TutorHandler{svc: svc}
+	for _, option := range options {
+		option(handler)
+	}
+	return handler
 }
 
 type CreateSessionRequest struct {
@@ -559,7 +574,7 @@ func (h *TutorHandler) UploadTheory(c fiber.Ctx) error {
 	}
 
 	theory := c.FormValue("theory")
-	
+
 	fileHeader, err := c.FormFile("file")
 	if err == nil && fileHeader != nil {
 		if extracted, err := extractTextFromFile(fileHeader); err == nil {
@@ -761,7 +776,6 @@ func (h *TutorHandler) GetClassInterventionGroups(c fiber.Ctx) error {
 	}
 	return c.JSON(groups)
 }
-
 
 func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	token, ok := c.Locals("user").(*jwt.Token)
@@ -1241,25 +1255,25 @@ func (h *TutorHandler) GetInternalGraph(c fiber.Ctx) error {
 }
 
 type CreatePathBodyRequest struct {
-	ClassID                       string    `json:"class_id"`
-	StudentIDs                    []string  `json:"student_ids"`
-	TargetTopicIDs                []string  `json:"target_topic_ids"`
-	TeacherID                     string    `json:"teacher_id"`
-	TargetMasteryThreshold        float64   `json:"target_mastery_threshold"`
-	MinimumConfidenceThreshold    float64   `json:"minimum_confidence_threshold"`
+	ClassID                    string   `json:"class_id"`
+	StudentIDs                 []string `json:"student_ids"`
+	TargetTopicIDs             []string `json:"target_topic_ids"`
+	TeacherID                  string   `json:"teacher_id"`
+	TargetMasteryThreshold     float64  `json:"target_mastery_threshold"`
+	MinimumConfidenceThreshold float64  `json:"minimum_confidence_threshold"`
 }
 
 type RawQuizEvidence struct {
-	EvidenceID    string    `json:"evidence_id"`
-	StudentID     string    `json:"student_id"`
-	SessionID     string    `json:"session_id"`
-	QuestionID    string    `json:"question_id"`
-	TopicID       string    `json:"topic_id"`
-	Score         float64   `json:"score"`
-	AttemptNumber int       `json:"attempt_number"`
-	HintsUsed     int       `json:"hints_used"`
-	GradingMethod string    `json:"grading_method"`
-	OccurredAt    string    `json:"occurred_at"`
+	EvidenceID    string  `json:"evidence_id"`
+	StudentID     string  `json:"student_id"`
+	SessionID     string  `json:"session_id"`
+	QuestionID    string  `json:"question_id"`
+	TopicID       string  `json:"topic_id"`
+	Score         float64 `json:"score"`
+	AttemptNumber int     `json:"attempt_number"`
+	HintsUsed     int     `json:"hints_used"`
+	GradingMethod string  `json:"grading_method"`
+	OccurredAt    string  `json:"occurred_at"`
 }
 
 type CreatePathFastAPIBody struct {
@@ -1271,7 +1285,7 @@ type CreatePathFastAPIBody struct {
 
 func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	teacherIDStr := c.Locals("userID").(string)
-	
+
 	var req struct {
 		ClassID        string   `json:"classId"`
 		StudentIDs     []string `json:"studentIds"`
@@ -1284,7 +1298,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	if req.ClassID == "" {
 		req.ClassID = "class-demo"
 	}
-	
+
 	if len(req.StudentIDs) == 0 {
 		var studentEmails = []string{"studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn", "student@aurora.edu.vn"}
 		var ids []string
@@ -1342,7 +1356,8 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := "http://127.0.0.1:8000/learning-path"
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
 	}
@@ -1362,6 +1377,14 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã JSON phản hồi"})
 	}
 
+	if teacherID, parseErr := uuid.Parse(teacherIDStr); parseErr == nil {
+		pathCount := 0
+		if paths, ok := result["paths"].(map[string]interface{}); ok {
+			pathCount = len(paths)
+		}
+		threadID, _ := result["thread_id"].(string)
+		h.publishLearningPathGenerated(teacherID, threadID, pathCount)
+	}
 	return c.JSON(result)
 }
 
@@ -1380,6 +1403,8 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu yêu cầu không hợp lệ"})
 	}
 
+	teacherID, _ := uuid.Parse(c.Locals("userID").(string))
+
 	// We still notify FastAPI server of approval to update the thread status
 	reqToFastAPI := struct {
 		Approve bool   `json:"approve"`
@@ -1394,7 +1419,8 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := fmt.Sprintf("http://127.0.0.1:8000/learning-path/%s/approve", threadID)
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
 	}
@@ -1448,6 +1474,7 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 		}
 		config.DB.Create(&newPath)
 	}
+	h.publishLearningPathApproved(teacherID, threadID, req.Approve, req.Note, len(pathsToSave))
 
 	return c.JSON(result)
 }
@@ -1510,7 +1537,8 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := "http://127.0.0.1:8000/hints"
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ gợi ý: " + err.Error()})
 	}
@@ -1543,9 +1571,56 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 			CreatedAt: time.Now(),
 		}
 		config.DB.Create(&newLog)
+		h.publishHintTelemetry(studentID, topicUUID, req.PressCount, string(bodyBytes))
 	}
 
 	return c.JSON(hintResult)
+}
+
+func (h *TutorHandler) publishHintTelemetry(studentID, topicID uuid.UUID, level int, _ string) {
+	if h.telemetry == nil {
+		return
+	}
+	now := time.Now().UTC()
+	for _, name := range []string{"hint_requested", "hint_rendered"} {
+		event := telemetry.Event{
+			EventID: uuid.NewString(), Name: name, SchemaVersion: telemetry.CurrentSchemaVersion,
+			OccurredAt: now, TopicID: topicID.String(), Source: "go_backend",
+			ConsentState: "required", RetentionClass: "interaction",
+			Properties: map[string]any{"hint_level": level},
+		}
+		if _, err := h.telemetry.PublishActor(context.Background(), studentID, "student", event); err != nil {
+			log.Printf("telemetry hint event failed: %v", err)
+		}
+	}
+}
+
+func (h *TutorHandler) publishLearningPathGenerated(teacherID uuid.UUID, threadID string, pathCount int) {
+	if h.telemetry == nil {
+		return
+	}
+	event := telemetry.Event{
+		EventID: uuid.NewString(), Name: "learning_path_generated", SchemaVersion: telemetry.CurrentSchemaVersion,
+		OccurredAt: time.Now().UTC(), Source: "go_backend", ConsentState: "required", RetentionClass: "decision",
+		Properties: map[string]any{"thread_id": threadID, "path_count": pathCount, "model_version": "learning-path-v1"},
+	}
+	if _, err := h.telemetry.PublishActor(context.Background(), teacherID, "teacher", event); err != nil {
+		log.Printf("telemetry learning path event failed: %v", err)
+	}
+}
+
+func (h *TutorHandler) publishLearningPathApproved(teacherID uuid.UUID, threadID string, approved bool, note string, pathCount int) {
+	if h.telemetry == nil {
+		return
+	}
+	event := telemetry.Event{
+		EventID: uuid.NewString(), Name: "learning_path_approved", SchemaVersion: telemetry.CurrentSchemaVersion,
+		OccurredAt: time.Now().UTC(), Source: "go_backend", ConsentState: "required", RetentionClass: "decision",
+		Properties: map[string]any{"thread_id": threadID, "approved": approved, "note_length": len(note), "path_count": pathCount},
+	}
+	if _, err := h.telemetry.PublishActor(context.Background(), teacherID, "teacher", event); err != nil {
+		log.Printf("telemetry learning path approval event failed: %v", err)
+	}
 }
 
 func (h *TutorHandler) RequestReDiagnostic(c fiber.Ctx) error {
@@ -1655,18 +1730,18 @@ func (h *TutorHandler) ImportMasterBank(c fiber.Ctx) error {
 			// Create fallback node
 			fallbackNodeID = uuid.New()
 			fallbackNode := model.Node{
-				ID:        fallbackNodeID,
-				Subject:   subject,
-				Name:      "Hình học tổng hợp",
-				Theory:    "Node tổng hợp chứa các câu hỏi hình học chưa được phân loại vào node cụ thể.",
+				ID:         fallbackNodeID,
+				Subject:    subject,
+				Name:       "Hình học tổng hợp",
+				Theory:     "Node tổng hợp chứa các câu hỏi hình học chưa được phân loại vào node cụ thể.",
 				TopicGroup: "Hình học",
-				PosX:      600,
-				PosY:      400,
-				IsRoot:    false,
-				StableKey: "l7-hinh-hoc-tong-hop",
-				Status:    "active",
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				PosX:       600,
+				PosY:       400,
+				IsRoot:     false,
+				StableKey:  "l7-hinh-hoc-tong-hop",
+				Status:     "active",
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
 			}
 			config.DB.Create(&fallbackNode)
 		}

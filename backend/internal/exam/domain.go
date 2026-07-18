@@ -95,8 +95,9 @@ type PatchInput struct {
 }
 
 type ListFilter struct {
-	Status string
-	Search string
+	Subject string
+	Status  string
+	Search  string
 }
 
 type Choice struct {

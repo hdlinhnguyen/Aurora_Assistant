@@ -14,8 +14,10 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 
+	"backend/internal/adminmetrics"
 	"backend/internal/config"
 	"backend/internal/exam"
+	"backend/internal/gamification"
 	"backend/internal/handler"
 	masteryprofile "backend/internal/mastery"
 	"backend/internal/middleware"
@@ -23,6 +25,7 @@ import (
 	"backend/internal/scoring"
 	"backend/internal/service"
 	"backend/internal/syntheticseed"
+	"backend/internal/telemetry"
 )
 
 func envOrDefault(name, fallback string) string {
@@ -53,7 +56,7 @@ func main() {
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001"},
-		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization"},
+		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization, Idempotency-Key, idempotency-key"},
 	}))
 
 	// Initial check endpoint
@@ -63,35 +66,66 @@ func main() {
 			"message": "Aurora Socratic Tutor API is running",
 		})
 	})
+	telemetryKey := os.Getenv("TELEMETRY_HMAC_KEY")
+	if telemetryKey == "" {
+		telemetryKey = "development-only-telemetry-key"
+		log.Println("TELEMETRY_HMAC_KEY is not set; using development telemetry key")
+	}
+	telemetryPublisher := telemetry.NewPublisher(config.DB, telemetry.SystemClock{}, telemetry.PseudonymConfig{
+		Key: []byte(telemetryKey), KeyVersion: "v1",
+	})
 
 	// Services
 	authSvc := service.NewAuthService(config.DB, os.Getenv("JWT_SECRET"))
 	aiSvc := service.NewAIService(config.DB)
-	tutorSvc := service.NewTutorService(config.DB, aiSvc)
+	tutorSvc := service.NewTutorService(config.DB, aiSvc, service.WithTelemetryPublisher(telemetryPublisher))
 	taggingSvc := service.NewTaggingService(config.DB)
 	questionBankSvc := service.NewQuestionBankService(config.DB)
 	examSvc := exam.NewServiceWithExporter(
 		exam.NewRepository(config.DB),
 		exam.NewDOCXExporter(),
 		config.ExamExportDir(),
+		exam.WithTelemetryPublisher(telemetryPublisher),
 	)
 	masteryRepo := masteryprofile.NewRepository(config.DB)
 	masteryClient := masteryprofile.NewClient(envOrDefault("LEARNING_PATH_URL", "http://127.0.0.1:8000"), nil)
-	masterySvc := masteryprofile.NewService(config.DB, masteryRepo, masteryClient)
+	masterySvc := masteryprofile.NewService(
+		config.DB, masteryRepo, masteryClient,
+		masteryprofile.WithTelemetryPublisher(telemetryPublisher),
+	)
+	gamificationRepo := gamification.NewRepository(config.DB)
+	gamificationSvc := gamification.NewService(config.DB, gamificationRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
-	tutorHandler := handler.NewTutorHandler(tutorSvc)
+	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher))
 	adminHandler := handler.NewAdminHandler(config.DB)
+	adminMetricsHandler := handler.NewAdminMetricsHandler(adminmetrics.NewService(config.DB))
 	studentMgmtHandler := handler.NewStudentMgmtHandler(config.DB)
 	taggingHandler := handler.NewTaggingHandler(taggingSvc)
 	questionBankHandler := handler.NewQuestionBankHandler(questionBankSvc)
 	examHandler := handler.NewExamHandler(examSvc, os.Getenv("EXAM_INTERNAL_TOKEN"))
 	masteryHandler := handler.NewMasteryHandler(masterySvc)
+	gamificationHandler := handler.NewGamificationHandler(gamificationSvc)
+	studentExamHandler := handler.NewStudentExamHandler(config.DB)
 	scoringSvc := scoring.NewService(scoring.NewRepository(config.DB), func(db *gorm.DB) exam.ScoringGateway {
 		return exam.NewScoringGateway(db)
 	})
 	scoringHandler := handler.NewScoringHandler(scoringSvc)
+	telemetryCollector := telemetry.NewCollector(
+		telemetryPublisher,
+		[]byte(telemetryKey),
+		"v1",
+		telemetry.SystemClock{},
+	)
+	telemetryWorker := telemetry.NewWorker(config.DB, telemetry.SystemClock{})
+	workerContext, stopTelemetryWorker := context.WithCancel(context.Background())
+	defer stopTelemetryWorker()
+	go func() {
+		if err := telemetryWorker.Run(workerContext); err != nil && err != context.Canceled {
+			log.Printf("telemetry worker stopped: %v", err)
+		}
+	}()
 
 	// Ensure at least one admin exists.
 	var adminCount int64
@@ -109,6 +143,11 @@ func main() {
 		log.Fatalf("synthetic startup failed: %v", err)
 	}
 
+	// Seed catalog huy hiệu (dữ liệu hệ thống, idempotent — không cần env gate).
+	if err := gamificationSvc.SeedBadges(context.Background()); err != nil {
+		log.Fatalf("badge seed failed: %v", err)
+	}
+
 	// Public Routes
 	app.Post("/api/auth/register", authHandler.Register)
 	app.Post("/api/auth/login", authHandler.Login)
@@ -116,6 +155,7 @@ func main() {
 
 	// Protected Routes
 	api := app.Group("/api", middleware.Protected(config.DB))
+	api.Post("/telemetry/events", telemetryCollector)
 	teacherExams := api.Group("/teacher", middleware.RequireRole("teacher"))
 	studentMastery := api.Group("/student", middleware.RequireRole("student"))
 	teacherExams.Post("/exams", examHandler.Create)
@@ -158,6 +198,10 @@ func main() {
 	teacherExams.Post("/students/:studentId/mastery/recalculate", masteryHandler.RecalculateTeacherProfile)
 	studentMastery.Get("/mastery", masteryHandler.GetStudentProfile)
 	studentMastery.Get("/mastery/:topicId/history", masteryHandler.GetStudentHistory)
+	studentMastery.Get("/badges", gamificationHandler.GetStudentBadges)
+	studentMastery.Get("/exams", studentExamHandler.GetStudentExams)
+	studentMastery.Get("/exams/:examId", studentExamHandler.GetStudentExam)
+	studentMastery.Post("/exams/:examId/submit", studentExamHandler.SubmitStudentExam)
 
 	app.Post("/internal/exams/:examId/first-submission", examHandler.FirstSubmission)
 	app.Post("/internal/exams/:examId/grading-completed", examHandler.GradingCompleted)
@@ -211,9 +255,11 @@ func main() {
 	adminGroup.Put("/teachers/:id", adminHandler.UpdateTeacher)
 	adminGroup.Delete("/teachers/:id", adminHandler.DeleteTeacher)
 	adminGroup.Get("/classrooms", adminHandler.GetClassrooms)
+	adminGroup.Get("/classrooms/:classId/students", studentMgmtHandler.GetClassroomStudents)
 	adminGroup.Post("/classrooms", adminHandler.CreateClassroom)
 	adminGroup.Put("/classrooms/:id", adminHandler.UpdateClassroom)
 	adminGroup.Delete("/classrooms/:id", adminHandler.DeleteClassroom)
+	adminGroup.Get("/telemetry-dashboard", adminMetricsHandler.GetTelemetryDashboard)
 
 	// Teacher Routes (Teacher & Admin only)
 	teacherGroup := api.Group("/teacher", middleware.RequireRole("teacher", "admin"))
@@ -234,6 +280,7 @@ func main() {
 
 	// New Student & Classroom Management under /teacher
 	teacherGroup.Get("/classrooms", studentMgmtHandler.GetTeacherClassrooms)
+	teacherGroup.Post("/classrooms", studentMgmtHandler.CreateTeacherClassroom)
 	teacherGroup.Get("/classrooms/:classId/students", studentMgmtHandler.GetClassroomStudents)
 	teacherGroup.Post("/students", studentMgmtHandler.CreateStudent)
 	teacherGroup.Post("/students/bulk", studentMgmtHandler.CreateStudentsBulk)

@@ -1,5 +1,7 @@
 export type MasteryStatus = "unknown" | "uncertain" | "learning" | "confirmed_gap" | "mastered";
 
+export const BKT_INITIAL_MASTERY = 0.3;
+
 export interface TopicMastery {
   studentId: string;
   topicId: string;

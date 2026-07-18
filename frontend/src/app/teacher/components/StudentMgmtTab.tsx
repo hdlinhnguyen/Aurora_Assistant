@@ -98,6 +98,24 @@ export default function StudentMgmtTab() {
     }
   };
 
+  const [creatingClass, setCreatingClass] = useState(false);
+
+  const handleCreateClassroom = async (name?: string) => {
+    setCreatingClass(true);
+    try {
+      const res = await apiFetch("/teacher/classrooms", {
+        method: "POST",
+        body: JSON.stringify({ name: name || "Lớp học mặc định" }),
+      });
+      toast.success(`Đã tạo lớp học "${res.name}" thành công!`);
+      await loadClassrooms();
+    } catch (err: any) {
+      toast.error("Tạo lớp học thất bại: " + err.message);
+    } finally {
+      setCreatingClass(false);
+    }
+  };
+
   const loadStudents = async (classId: string) => {
     if (!classId) return;
     setLoading(true);
@@ -279,7 +297,14 @@ export default function StudentMgmtTab() {
         <div className="flex items-center gap-3">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Chọn Lớp học:</label>
           {classrooms.length === 0 ? (
-            <span className="text-sm font-semibold text-rose-500">Chưa được gán lớp học nào</span>
+            <button
+              onClick={() => handleCreateClassroom()}
+              disabled={creatingClass}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition-all active:scale-95 cursor-pointer shadow-md animate-pulse"
+            >
+              <PlusCircle size={14} />
+              {creatingClass ? "\u0110ang t\u1EA1o..." : "T\u1EA1o l\u1EDBp h\u1ECDc m\u1EB7c \u0111\u1ECBnh"}
+            </button>
           ) : (
             <select
               value={selectedClassId}
@@ -652,6 +677,12 @@ export default function StudentMgmtTab() {
                 </div>
               )}
 
+              {demoNodes.length === 0 && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-[11px] font-semibold leading-relaxed">
+                  ⚠️ Môn học này chưa có cây kiến thức. Vui lòng nạp cây kiến thức trước khi thêm học sinh Demo có kết quả mô phỏng.
+                </div>
+              )}
+
               <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
                 <button
                   type="button"
@@ -662,7 +693,7 @@ export default function StudentMgmtTab() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || demoNodes.length === 0}
                   className="px-4 py-2.5 rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all active:scale-95"
                 >
                   {submitting ? "Đang xử lý..." : "Xác nhận tạo"}

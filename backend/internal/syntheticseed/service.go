@@ -13,12 +13,14 @@ import (
 )
 
 type Result struct {
-	Teacher       model.User
-	Students      []model.User
-	Subject       string
-	NodeIDs       []uuid.UUID
-	QuestionCount int
-	ActivityCount int
+	Teacher                 model.User
+	Students                []model.User
+	Subject                 string
+	NodeIDs                 []uuid.UUID
+	QuestionCount           int
+	ActivityCount           int
+	ExamCount               int
+	ApprovedSubmissionCount int
 }
 
 type Service struct {
@@ -54,6 +56,9 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 	userIDs := make([]uuid.UUID, 0, len(users))
 	for _, user := range users {
 		userIDs = append(userIDs, user.ID)
+	}
+	if err := resetHistoricalExamData(tx, userIDs); err != nil {
+		return err
 	}
 
 	var nodes []model.Node
@@ -108,6 +113,25 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 	}
 
 	if len(userIDs) > 0 {
+		// Delete exam-related data created by these users
+		var examIDs []uuid.UUID
+		if err := tx.Model(&model.Exam{}).Where("created_by IN ?", userIDs).Pluck("id", &examIDs).Error; err != nil {
+			return err
+		}
+		if len(examIDs) > 0 {
+			var examQuestionIDs []uuid.UUID
+			if err := tx.Model(&model.ExamQuestion{}).Where("exam_id IN ?", examIDs).Pluck("id", &examQuestionIDs).Error; err != nil {
+				return err
+			}
+			if len(examQuestionIDs) > 0 {
+				tx.Where("exam_question_id IN ?", examQuestionIDs).Delete(&model.ExamRubricItem{})
+			}
+			for _, del := range []any{&model.ExamExport{}, &model.ExamAuditLog{}, &model.ExamInternalEvent{}, &model.ExamGradingProgress{}, &model.ExamSnapshot{}, &model.ExamQuestion{}} {
+				tx.Where("exam_id IN ?", examIDs).Delete(del)
+			}
+			tx.Unscoped().Where("id IN ?", examIDs).Delete(&model.Exam{})
+		}
+
 		var sessionIDs []uuid.UUID
 		if err := tx.Model(&model.ChatSession{}).Where("student_id IN ?", userIDs).Pluck("id", &sessionIDs).Error; err != nil {
 			return err
@@ -136,6 +160,10 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 		if err := tx.Unscoped().Where("teacher_id IN ?", userIDs).Delete(&model.Topic{}).Error; err != nil {
 			return err
 		}
+		// Delete classrooms owned by synthetic teachers
+		if err := tx.Where("teacher_id IN ?", userIDs).Delete(&model.Classroom{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Unscoped().Where("id IN ?", userIDs).Delete(&model.User{}).Error; err != nil {
 			return err
 		}
@@ -149,51 +177,46 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 		return Result{}, err
 	}
 	students := make([]model.User, 0, len(config.Students))
+
+	// Create a default classroom for the synthetic teacher
+	classroom := model.Classroom{
+		ID:        uuid.New(),
+		Name:      "Lớp Demo",
+		TeacherID: teacher.ID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := tx.Create(&classroom).Error; err != nil {
+		return Result{}, fmt.Errorf("create synthetic classroom: %w", err)
+	}
+
 	for _, account := range config.Students {
 		student, err := createAccount(tx, account)
 		if err != nil {
 			return Result{}, err
 		}
+		// Assign student to the synthetic classroom
+		if err := tx.Model(&student).Update("classroom_id", classroom.ID).Error; err != nil {
+			return Result{}, err
+		}
 		students = append(students, student)
 	}
 
-	nodes := []model.Node{
-		{ID: uuid.New(), Subject: config.Subject, Name: config.Subject, Theory: "Synthetic root topic", PosX: 400, PosY: 50, IsRoot: true, StableKey: "synthetic-root", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Fraction addition", Theory: "Add fractions using a common denominator.", PosX: 250, PosY: 180, StableKey: "synthetic-fraction-add", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Same denominator", Theory: "Add numerators and keep the denominator.", PosX: 150, PosY: 310, StableKey: "synthetic-same-denominator", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Different denominators", Theory: "Find a common denominator before adding.", PosX: 350, PosY: 310, StableKey: "synthetic-different-denominators", Status: "active"},
-		{ID: uuid.New(), Subject: config.Subject, Name: "Decimal multiplication", Theory: "Multiply values and place the decimal point.", PosX: 550, PosY: 180, StableKey: "synthetic-decimal-multiply", Status: "active"},
-	}
-	if err := tx.Create(&nodes).Error; err != nil {
+	curriculum, err := createSyntheticCurriculum(tx, config, teacher)
+	if err != nil {
 		return Result{}, err
-	}
-	edges := []model.Edge{
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[0].ID, TargetID: nodes[1].ID, Status: "active", SourceType: "synthetic"},
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[1].ID, TargetID: nodes[2].ID, Status: "active", SourceType: "synthetic"},
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[1].ID, TargetID: nodes[3].ID, Status: "active", SourceType: "synthetic"},
-		{ID: uuid.New(), Subject: config.Subject, SourceID: nodes[0].ID, TargetID: nodes[4].ID, Status: "active", SourceType: "synthetic"},
-	}
-	if err := tx.Create(&edges).Error; err != nil {
-		return Result{}, err
-	}
-
-	for _, node := range nodes[1:] {
-		topic := model.Topic{ID: uuid.New(), TeacherID: teacher.ID, Name: node.Name, Subject: config.Subject, GradeLevel: "Synthetic", Modes: "socratic,feynman", Published: true}
-		if err := tx.Create(&topic).Error; err != nil {
-			return Result{}, err
-		}
 	}
 
 	questionsByNode := make(map[uuid.UUID][]model.Question)
 	questionCount := 0
-	for nodeIndex, node := range nodes[1:] {
+	for nodeIndex, node := range curriculum.Targets {
 		questions := make([]model.Question, 0, 3)
 		for questionIndex := 0; questionIndex < 3; questionIndex++ {
 			question := model.Question{
 				ID: uuid.New(), NodeID: node.ID,
-				Content:     fmt.Sprintf("Synthetic question %d.%d", nodeIndex+1, questionIndex+1),
-				OptionsJSON: `["Option A","Option B","Option C","Option D"]`, CorrectOption: questionIndex % 4,
-				Difficulty: []string{"easy", "medium", "hard"}[questionIndex], QuestionType: "multiple_choice", GradeLevel: "Synthetic",
+				Content:     fmt.Sprintf("Câu hỏi %d.%d — bài \"%s\"", nodeIndex+1, questionIndex+1, node.Name),
+				OptionsJSON: `["Đáp án A","Đáp án B","Đáp án C","Đáp án D"]`, CorrectOption: questionIndex % 4,
+				Difficulty: []string{"easy", "medium", "hard"}[questionIndex], QuestionType: "multiple_choice", GradeLevel: "7",
 			}
 			questions = append(questions, question)
 		}
@@ -207,11 +230,11 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 	baseTime := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Minute)
 	activityCount := 0
 	for studentIndex, student := range students {
-		state := model.StudentState{ID: uuid.New(), StudentID: student.ID, Subject: config.Subject, InitialLevelNodeID: nodes[0].ID, CurrentLevelNodeID: nodes[1].ID}
+		state := model.StudentState{ID: uuid.New(), StudentID: student.ID, Subject: config.Subject, InitialLevelNodeID: curriculum.Root.ID, CurrentLevelNodeID: curriculum.Targets[0].ID}
 		if err := tx.Create(&state).Error; err != nil {
 			return Result{}, err
 		}
-		session := model.ChatSession{ID: uuid.New(), StudentID: student.ID, Topic: nodes[1].Name, Status: "active", Mode: "socratic"}
+		session := model.ChatSession{ID: uuid.New(), StudentID: student.ID, Topic: curriculum.Targets[0].Name, Status: "active", Mode: "socratic"}
 		if err := tx.Create(&session).Error; err != nil {
 			return Result{}, err
 		}
@@ -220,7 +243,7 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 			return Result{}, err
 		}
 
-		for topicIndex, node := range nodes[1:4] {
+		for topicIndex, node := range curriculum.Targets[:3] {
 			questions := questionsByNode[node.ID]
 			for _, attempt := range GenerateAttempts(config.Seed, studentIndex, topicIndex, len(questions)) {
 				action := "answer_incorrect"
@@ -240,11 +263,22 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 		}
 	}
 
-	nodeIDs := make([]uuid.UUID, 0, len(nodes))
-	for _, node := range nodes {
-		nodeIDs = append(nodeIDs, node.ID)
+	nodeIDs := curriculumNodeIDs(curriculum)
+	targetNodeIDs := make(map[string]uuid.UUID, len(curriculum.Targets))
+	for _, node := range curriculum.Targets {
+		targetNodeIDs[node.StableKey] = node.ID
 	}
-	return Result{Teacher: teacher, Students: students, Subject: config.Subject, NodeIDs: nodeIDs, QuestionCount: questionCount, ActivityCount: activityCount}, nil
+	exams, approvedCount, err := createHistoricalExamData(
+		tx, config, teacher, students, targetNodeIDs, time.Now().UTC().Truncate(time.Minute),
+	)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{
+		Teacher: teacher, Students: students, Subject: config.Subject, NodeIDs: nodeIDs,
+		QuestionCount: questionCount, ActivityCount: activityCount,
+		ExamCount: len(exams), ApprovedSubmissionCount: approvedCount,
+	}, nil
 }
 
 func createAccount(tx *gorm.DB, account Account) (model.User, error) {

@@ -1,12 +1,25 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { API_BASE_URL } from "@/lib/api";
+import dynamic from "next/dynamic";
+
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 export default function LandingPage() {
   const router = useRouter();
   
+  // Lottie animation state
+  const [animationData, setAnimationData] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/education.json")
+      .then((res) => res.json())
+      .then((data) => setAnimationData(data))
+      .catch((err) => console.error("Error loading animation:", err));
+  }, []);
+
   // Interactive mock chat state to showcase Socratic learning
   const [mockStep, setMockStep] = useState(0);
   const mockMessages = [
@@ -68,7 +81,7 @@ export default function LandingPage() {
             </span>
           </h1>
           <p className="text-muted-foreground text-base leading-relaxed max-w-lg mx-auto lg:mx-0">
-            Hệ thống AI không cho sẵn lời giải. Thay vào đó, AI đóng vai trò người bạn thông thái đặt câu hỏi gợi mở, giúp các bạn nhỏ cấp 1 tự tư duy để tìm ra đáp án cuối cùng.
+            Hệ thống AI không cho sẵn lời giải. Thay vào đó, AI đóng vai trò người bạn thông thái đặt câu hỏi gợi mở, giúp các em học sinh tự tư duy để tìm ra đáp án cuối cùng.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -106,62 +119,133 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Right Column: Simulated Socratic Conversation */}
-        <div className="lg:col-span-6 flex justify-center">
-          <div className="relative">
-            <div className="absolute -inset-6 rounded-[3rem] bg-gradient-to-br from-[var(--mint)]/20 to-[var(--purple)]/25 blur-2xl" />
-            <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] space-y-4">
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-[var(--mint)] animate-pulse" />
-                  <span className="text-xs font-bold text-muted-foreground">Gia sư Socratic (Mô phỏng)</span>
-                </div>
-                <button
-                  onClick={() => setMockStep(0)}
-                  className="text-[10px] text-[var(--purple)] hover:underline font-semibold"
-                >
-                  Đặt lại
-                </button>
-              </div>
-
-              {/* Simulated Chat Messages */}
-              <div className="h-64 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-                {mockMessages.slice(0, mockStep + 1).map((msg, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                        msg.sender === "student"
-                          ? "bg-foreground text-background rounded-br-none"
-                          : "bg-muted text-foreground border border-border rounded-bl-none"
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Demo Actions */}
-              {mockStep < mockMessages.length - 1 && (
-                <div className="pt-2 text-center">
-                  <button
-                    onClick={() => setMockStep((prev) => prev + 1)}
-                    className="inline-flex items-center gap-2 bg-muted hover:bg-border border border-border px-4 py-2 rounded-full text-xs font-bold text-foreground animate-bounce"
-                  >
-                    <span>{mockStep % 2 === 0 ? "Xem Học sinh trả lời" : "Xem AI đặt câu hỏi tiếp"}</span>
-                    <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                  </button>
+        {/* Right Column: Lottie Animation */}
+        <div className="lg:col-span-6 flex justify-center items-center">
+          <div className="relative w-full max-w-[500px]">
+            <div className="absolute -inset-4 rounded-[3rem] bg-gradient-to-br from-[var(--mint)]/20 to-[var(--purple)]/25 blur-2xl pointer-events-none" />
+            <div className="relative w-full flex justify-center items-center min-h-[350px]">
+              {animationData ? (
+                <Lottie
+                  animationData={animationData}
+                  loop={true}
+                  autoplay={true}
+                  className="w-full h-auto max-w-[450px]"
+                />
+              ) : (
+                <div className="w-[300px] h-[300px] flex items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-[var(--mint)]" />
                 </div>
               )}
             </div>
           </div>
         </div>
       </header>
+
+      {/* Interactive Socratic Demo Section */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          {/* Left Column: Explanation */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--purple)]/15 text-xs font-bold text-[var(--purple)] border border-[var(--purple)]/25 uppercase">
+              Phương Pháp Khác Biệt
+            </div>
+            <h2 className="text-3xl md:text-4xl font-[var(--font-display)] font-extrabold text-foreground leading-tight">
+              Trải nghiệm lớp học gợi mở Socratic
+            </h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Phương pháp Socratic không cung cấp lời giải trực tiếp. Thay vào đó, AI đóng vai trò là một người dẫn dắt thông thái, đặt ra các câu hỏi gợi mở theo từng bước để giúp học sinh tự tìm ra bản chất của vấn đề và ghi nhớ sâu sắc hơn.
+            </p>
+            
+            <div className="space-y-4 pt-2">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 grid h-8 w-8 place-items-center rounded-lg bg-[var(--mint)]/20 text-[var(--mint)] font-bold text-sm">
+                  1
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">Không làm hộ</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Không cung cấp lời giải ăn sẵn, tránh thói quen lười suy nghĩ của học sinh.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 grid h-8 w-8 place-items-center rounded-lg bg-[var(--purple)]/20 text-[var(--purple)] font-bold text-sm">
+                  2
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">Đặt câu hỏi gợi mở</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Phân tích lỗi sai trong câu trả lời của học sinh để đưa ra gợi ý phù hợp.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/20 text-indigo-500 font-bold text-sm">
+                  3
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">Thấu hiểu sâu sắc</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Giúp học sinh hiểu rõ bản chất toán học/khoa học chứ không chỉ là học vẹt công thức.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Chat Widget */}
+          <div className="lg:col-span-7 flex justify-center">
+            <div className="relative w-full max-w-lg">
+              <div className="absolute -inset-6 rounded-[3rem] bg-gradient-to-br from-[var(--purple)]/20 to-[var(--mint)]/25 blur-2xl pointer-events-none" />
+              <div className="relative w-full rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] space-y-4">
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-[var(--mint)] animate-pulse" />
+                    <span className="text-xs font-bold text-muted-foreground">Gia sư Socratic (Mô phỏng)</span>
+                  </div>
+                  <button
+                    onClick={() => setMockStep(0)}
+                    className="text-[10px] text-[var(--purple)] hover:underline font-semibold"
+                  >
+                    Đặt lại
+                  </button>
+                </div>
+
+                {/* Simulated Chat Messages */}
+                <div className="h-64 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
+                  {mockMessages.slice(0, mockStep + 1).map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                          msg.sender === "student"
+                            ? "bg-foreground text-background rounded-br-none"
+                            : "bg-muted text-foreground border border-border rounded-bl-none"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Demo Actions */}
+                {mockStep < mockMessages.length - 1 && (
+                  <div className="pt-2 text-center">
+                    <button
+                      onClick={() => setMockStep((prev) => prev + 1)}
+                      className="inline-flex items-center gap-2 bg-muted hover:bg-border border border-border px-4 py-2 rounded-full text-xs font-bold text-foreground animate-bounce"
+                    >
+                      <span>{mockStep % 2 === 0 ? "Xem Học sinh trả lời" : "Xem AI đặt câu hỏi tiếp"}</span>
+                      <svg className="h-3.5 w-3.5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Target Audiences Sections */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
@@ -178,7 +262,7 @@ export default function LandingPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
-            <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh Cấp 1</h3>
+            <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-[var(--mint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

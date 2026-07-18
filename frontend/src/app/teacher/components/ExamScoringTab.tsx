@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import {
   Check,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   History,
@@ -22,35 +23,105 @@ const results = [
   { value: "unanswered", label: "Không làm", icon: RotateCcw },
 ];
 
-type Session = { batch: any; submission: any };
+interface Exam {
+  id: string;
+  title: string;
+  subject: string;
+  gradeLevel: string;
+  durationMinutes: number;
+  totalPoints: string;
+  status: string;
+  version: number;
+}
 
-export default function ExamScoringTab() {
-  const [exams, setExams] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface GradingBatch {
+  id: string;
+  examId: string;
+  examTitle: string;
+  teacherId: string;
+  status: string;
+  createdAt: string;
+}
+
+interface QuestionResponse {
+  id: string;
+  reviewed: boolean;
+  status: string;
+  points: string;
+  content: string;
+  questionType?: string;
+  rubricItems?: any[];
+}
+
+interface RubricResponse {
+  id: string;
+  reviewed: boolean;
+  status: string;
+  points: string;
+  content?: string;
+  description?: string;
+}
+
+interface Submission {
+  id: string;
+  batchId: string;
+  studentId: string;
+  studentName: string;
+  status: string;
+  totalScore: string;
+  version: number;
+  questions?: QuestionResponse[];
+  rubrics?: RubricResponse[];
+  gradedAt?: string;
+  awardedPoints?: string | number;
+}
+
+interface Session {
+  batch: GradingBatch;
+  submission: Submission | null;
+}
+
+export default function ExamScoringTab({ selectedSubject }: { selectedSubject: string }) {
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [exam, setExam] = useState<any>(null);
-  const [student, setStudent] = useState<any>(null);
-  const [submission, setSubmission] = useState<any>(null);
+  const [exam, setExam] = useState<Exam | null>(null);
+  const [student, setStudent] = useState<Student | null>(null);
+  const [submission, setSubmission] = useState<Submission | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    if (!selectedSubject) {
+      setExams([]);
+      setExam(null);
+      return;
+    }
+    setExam(null);
+    setStudent(null);
+    setSubmission(null);
     Promise.all([
-      apiFetch("/teacher/exams?status=preparing_exam"),
+      apiFetch(`/teacher/exams?status=preparing_exam&subject=${encodeURIComponent(selectedSubject)}`),
       apiFetch("/teacher/scoring/students"),
       apiFetch("/teacher/grading-batches"),
     ])
       .then(([examRows, studentRows, sessionRows]) => {
         setExams(examRows);
         setStudents(studentRows);
-        setSessions(sessionRows.map((batch: any) => ({ batch, submission: null })));
+        setSessions(sessionRows.map((batch: GradingBatch) => ({ batch, submission: null })));
       })
       .catch((error) => setNotice(error.message));
-  }, []);
+  }, [selectedSubject]);
 
-  const selectExam = async (nextExam: any) => {
+  const selectExam = async (nextExam: Exam) => {
     setExam(nextExam);
     setStudent(null);
     setSubmission(null);
@@ -58,10 +129,10 @@ export default function ExamScoringTab() {
     setBusy("exam");
     try {
       const related = (await apiFetch("/teacher/grading-batches")).filter(
-        (batch: any) => batch.examId === nextExam.id,
+        (batch: GradingBatch) => batch.examId === nextExam.id,
       );
       const hydrated = await Promise.all(
-        related.map(async (batch: any) => ({
+        related.map(async (batch: GradingBatch) => ({
           batch,
           submission: (await apiFetch(`/teacher/grading-batches/${batch.id}`)).submissions?.[0],
         })),
@@ -83,7 +154,7 @@ export default function ExamScoringTab() {
   );
   const sessionFor = (studentId: string) =>
     sessions.find((item) => item.submission?.studentId === studentId);
-  const selectStudent = async (nextStudent: any) => {
+  const selectStudent = async (nextStudent: Student) => {
     if (!exam) return;
     setStudent(nextStudent);
     setBusy("student");
@@ -104,7 +175,7 @@ export default function ExamScoringTab() {
         session = { batch: detail, submission: detail.submissions[0] };
         setSessions((current) => [...current, session!]);
       }
-      setSubmission(await apiFetch(`/teacher/scoring-submissions/${session.submission.id}`));
+      setSubmission(await apiFetch(`/teacher/scoring-submissions/${session.submission!.id}`));
     } catch (error: any) {
       setNotice(error.message);
       setStudent(null);
@@ -179,55 +250,75 @@ export default function ExamScoringTab() {
     ? (submission.questions?.length || 0) + (submission.rubrics?.length || 0)
     : 0;
 
+  if (!exam) {
+    return (
+      <div data-testid="scoring-workspace" className="flex-1 min-h-0 flex justify-center animate-[fadeIn_0.3s_ease-out]">
+        <aside
+          data-testid="scoring-exam-step"
+          className="w-full max-w-xl rounded-3xl border bg-card shadow-sm min-h-0 overflow-hidden flex flex-col"
+        >
+          <div className="p-5 border-b bg-gradient-to-br from-violet-50 to-white">
+            <p className="text-[9px] uppercase tracking-[.2em] text-violet-700 font-black">Bước 1</p>
+            <h2 className="mt-1 text-lg font-black">Chọn đề kiểm tra</h2>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Chỉ hiển thị đề đã sẵn sàng chấm.
+            </p>
+          </div>
+          <div className="p-3 space-y-2 overflow-auto flex-1">
+            {exams.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => selectExam(item)}
+                className="w-full rounded-2xl border border-border p-4 text-left transition-all hover:border-violet-300 hover:bg-violet-50/20 flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <b className="text-sm font-bold line-clamp-2">{item.title}</b>
+                  <ChevronRight size={14} className="text-muted-foreground" />
+                </div>
+                <p className="mt-2 text-[10px] font-bold text-muted-foreground">
+                  {item.subject} · {item.totalPoints} điểm
+                </p>
+              </button>
+            ))}
+            {!exams.length && (
+              <p className="p-6 text-center text-xs text-muted-foreground">Chưa có đề sẵn sàng.</p>
+            )}
+          </div>
+        </aside>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="scoring-workspace"
-      className="flex-1 min-h-0 grid gap-4 xl:grid-cols-[270px_310px_minmax(0,1fr)] animate-[fadeIn_0.3s_ease-out]"
+      className="flex-1 min-h-0 grid gap-4 xl:grid-cols-[310px_minmax(0,1fr)] animate-[fadeIn_0.3s_ease-out]"
     >
-      <aside
-        data-testid="scoring-exam-step"
-        className="rounded-3xl border bg-card shadow-sm min-h-0 overflow-hidden flex flex-col"
-      >
-        <div className="p-5 border-b bg-gradient-to-br from-indigo-50 to-white">
-          <p className="text-[9px] uppercase tracking-[.2em] font-black text-indigo-600">Bước 1</p>
-          <h2 className="mt-1 text-lg font-black">Chọn đề kiểm tra</h2>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            Chỉ hiển thị đề đã sẵn sàng chấm.
-          </p>
-        </div>
-        <div className="p-3 space-y-2 overflow-auto">
-          {exams.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => selectExam(item)}
-              className={`w-full rounded-2xl border p-3 text-left transition-all ${exam?.id === item.id ? "border-indigo-300 bg-indigo-50 shadow-sm" : "border-transparent hover:bg-muted"}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <b className="text-xs line-clamp-2">{item.title}</b>
-                <ChevronRight size={14} />
-              </div>
-              <p className="mt-2 text-[10px] text-muted-foreground">
-                {item.subject} · {item.totalPoints} điểm
-              </p>
-            </button>
-          ))}
-          {!exams.length && (
-            <p className="p-6 text-center text-xs text-muted-foreground">Chưa có đề sẵn sàng.</p>
-          )}
-        </div>
-      </aside>
-
       <aside
         data-testid="scoring-student-step"
         aria-disabled={!exam}
         className={`rounded-3xl border bg-card shadow-sm min-h-0 overflow-hidden flex flex-col ${!exam ? "opacity-55" : ""}`}
       >
-        <div className="p-5 border-b">
-          <p className="text-[9px] uppercase tracking-[.2em] font-black text-emerald-600">Bước 2</p>
-          <h2 className="mt-1 text-lg font-black">Chọn học sinh</h2>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            Mỗi lần chỉ mở một phiếu cá nhân.
-          </p>
+        <div className="p-5 border-b flex items-start gap-3">
+          <button
+            onClick={() => {
+              setExam(null);
+              setStudent(null);
+              setSubmission(null);
+            }}
+            className="mt-1 h-8 px-2.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground flex items-center gap-1 text-[10px] font-black shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+            title="Quay lại danh sách đề kiểm tra"
+          >
+            <ChevronLeft size={13} />
+            Quay lại
+          </button>
+          <div>
+            <p className="text-[9px] uppercase tracking-[.2em] font-black text-emerald-600">Bước 2</p>
+            <h2 className="mt-1 text-lg font-black leading-none">Chọn học sinh</h2>
+            <p className="mt-1 text-[10px] text-muted-foreground leading-normal">
+              Mỗi lần chỉ mở một phiếu cá nhân.
+            </p>
+          </div>
         </div>
         {exam ? (
           <>
