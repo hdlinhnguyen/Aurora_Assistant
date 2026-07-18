@@ -22,18 +22,12 @@ import (
 	masteryprofile "backend/internal/mastery"
 	"backend/internal/middleware"
 	"backend/internal/model"
+	"backend/internal/runtime"
 	"backend/internal/scoring"
 	"backend/internal/service"
 	"backend/internal/syntheticseed"
 	"backend/internal/telemetry"
 )
-
-func envOrDefault(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
-}
 
 func main() {
 	// Load .env file
@@ -55,7 +49,7 @@ func main() {
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowOrigins: runtime.CORSOrigins(),
 		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization, Idempotency-Key, idempotency-key"},
 	}))
 
@@ -88,7 +82,8 @@ func main() {
 		exam.WithTelemetryPublisher(telemetryPublisher),
 	)
 	masteryRepo := masteryprofile.NewRepository(config.DB)
-	masteryClient := masteryprofile.NewClient(envOrDefault("LEARNING_PATH_URL", "http://127.0.0.1:8000"), nil)
+	learningPathURL := runtime.LearningPathURL()
+	masteryClient := masteryprofile.NewClient(learningPathURL, nil)
 	masterySvc := masteryprofile.NewService(
 		config.DB, masteryRepo, masteryClient,
 		masteryprofile.WithTelemetryPublisher(telemetryPublisher),
@@ -98,7 +93,12 @@ func main() {
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
-	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher), handler.WithMasteryRecalc(masterySvc))
+	tutorHandler := handler.NewTutorHandler(
+		tutorSvc,
+		handler.WithTutorTelemetry(telemetryPublisher),
+		handler.WithMasteryRecalc(masterySvc),
+		handler.WithLearningPathURL(learningPathURL),
+	)
 	adminHandler := handler.NewAdminHandler(config.DB)
 	adminMetricsHandler := handler.NewAdminMetricsHandler(adminmetrics.NewService(config.DB))
 	studentMgmtHandler := handler.NewStudentMgmtHandler(config.DB)

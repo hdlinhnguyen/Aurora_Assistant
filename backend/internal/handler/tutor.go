@@ -30,9 +30,10 @@ import (
 )
 
 type TutorHandler struct {
-	svc           service.TutorService
-	telemetry     telemetry.ActorPublisher
-	masteryRecalc masteryRecalculator
+	svc             service.TutorService
+	telemetry       telemetry.ActorPublisher
+	masteryRecalc   masteryRecalculator
+	learningPathURL string
 }
 
 // masteryRecalculator tính lại BKT mastery cho 1 học sinh/môn (cập nhật ngay khi trả lời).
@@ -54,8 +55,17 @@ func WithMasteryRecalc(m masteryRecalculator) TutorHandlerOption {
 	}
 }
 
+func WithLearningPathURL(baseURL string) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.learningPathURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	}
+}
+
 func NewTutorHandler(svc service.TutorService, options ...TutorHandlerOption) *TutorHandler {
-	handler := &TutorHandler{svc: svc}
+	handler := &TutorHandler{
+		svc:             svc,
+		learningPathURL: "http://127.0.0.1:8000",
+	}
 	for _, option := range options {
 		option(handler)
 	}
@@ -1440,7 +1450,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
 	}
 
-	fastAPIURL := "http://127.0.0.1:8000/learning-path"
+	fastAPIURL := h.learningPathURL + "/learning-path"
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
@@ -1521,7 +1531,7 @@ func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
 	}
 
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Post("http://127.0.0.1:8000/learning-path/live", "application/json", bytes.NewBuffer(jsonBytes))
+	resp, err := client.Post(h.learningPathURL+"/learning-path/live", "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		// Không nối được service → trả rỗng, FE tự fallback thứ tự cây.
 		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
@@ -1620,7 +1630,7 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
 	}
 
-	fastAPIURL := fmt.Sprintf("http://127.0.0.1:8000/learning-path/%s/approve", threadID)
+	fastAPIURL := fmt.Sprintf("%s/learning-path/%s/approve", h.learningPathURL, threadID)
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
@@ -1738,7 +1748,7 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
 	}
 
-	fastAPIURL := "http://127.0.0.1:8000/hints"
+	fastAPIURL := h.learningPathURL + "/hints"
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
