@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type StudentStat struct {
@@ -343,14 +344,69 @@ func (s *tutorService) CreateNode(node *model.Node) error {
 }
 
 func (s *tutorService) UpdateNode(nodeID uuid.UUID, updates map[string]interface{}) error {
-	updates["updated_at"] = time.Now()
-	return s.db.Model(&model.Node{}).Where("id = ?", nodeID).Updates(updates).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var node model.Node
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&node, "id = ?", nodeID).Error; err != nil {
+			return err
+		}
+		if subject, ok := updates["subject"]; ok && subject != nil {
+			newSubject, ok := subject.(string)
+			if !ok {
+				return &DomainError{Code: "invalid_subject", Message: "Node subject must be a string."}
+			}
+			if newSubject != node.Subject {
+				var sourceRefs, directRefs, rubricRefs int64
+				if err := tx.Model(&model.Question{}).Where("node_id = ?", nodeID).Count(&sourceRefs).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&model.QuestionTopicMapping{}).Where("node_id = ?", nodeID).Count(&directRefs).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&model.QuestionRubricItemTopicMapping{}).Where("node_id = ?", nodeID).Count(&rubricRefs).Error; err != nil {
+					return err
+				}
+				if sourceRefs > 0 || directRefs > 0 || rubricRefs > 0 {
+					return &DomainError{
+						Code:    "node_in_use",
+						Message: "Node subject cannot change while the node is referenced by questions or tags.",
+					}
+				}
+			}
+		}
+		updates["updated_at"] = time.Now()
+		return tx.Model(&model.Node{}).Where("id = ?", nodeID).Updates(updates).Error
+	})
 }
 
 func (s *tutorService) DeleteNode(nodeID uuid.UUID) error {
-	s.db.Where("source_id = ? OR target_id = ?", nodeID, nodeID).Delete(&model.Edge{})
-	s.db.Where("node_id = ?", nodeID).Delete(&model.Question{})
-	return s.db.Where("id = ?", nodeID).Delete(&model.Node{}).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var node model.Node
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&node, "id = ?", nodeID).Error; err != nil {
+			return err
+		}
+		var sourceRefs, directRefs, rubricRefs int64
+		if err := tx.Model(&model.Question{}).Where("node_id = ?", nodeID).Count(&sourceRefs).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.QuestionTopicMapping{}).Where("node_id = ?", nodeID).Count(&directRefs).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.QuestionRubricItemTopicMapping{}).Where("node_id = ?", nodeID).Count(&rubricRefs).Error; err != nil {
+			return err
+		}
+		if sourceRefs > 0 || directRefs > 0 || rubricRefs > 0 {
+			return &DomainError{
+				Code:    "node_in_use",
+				Message: "Node cannot be deleted while it is referenced by questions or tags.",
+			}
+		}
+		if err := tx.Where("source_id = ? OR target_id = ?", nodeID, nodeID).Delete(&model.Edge{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", nodeID).Delete(&model.Node{}).Error
+	})
 }
 
 func (s *tutorService) CreateEdge(edge *model.Edge) error {
@@ -565,10 +621,10 @@ func (s *tutorService) RequestReDiagnostic(studentID uuid.UUID, subject string) 
 	state.InitialLevelNodeID = uuid.Nil
 	state.CurrentLevelNodeID = uuid.Nil
 	state.UpdatedAt = time.Now()
-	
+
 	// Delete previous activity logs to reset progress
 	s.db.Where("student_id = ? AND subject = ?", studentID, subject).Delete(&model.ActivityLog{})
-	
+
 	return s.db.Save(&state).Error
 }
 
@@ -621,7 +677,7 @@ func (s *tutorService) AdaptiveDowngrade(studentID uuid.UUID, nodeID uuid.UUID) 
 
 func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
-	
+
 	// 1. Get all unique subjects
 	subjects, err := s.GetSubjects()
 	if err != nil {
@@ -678,7 +734,7 @@ func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 		for _, subject := range subjects {
 			var state model.StudentState
 			stateErr := s.db.Where("student_id = ? AND subject = ?", student.ID, subject).First(&state).Error
-			
+
 			var initialNodeName, currentNodeName string
 			var initialNodeId, currentNodeId interface{}
 			var updatedAtVal time.Time
@@ -743,8 +799,6 @@ func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 
 	return results, nil
 }
-
-
 func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject string) (map[string]interface{}, error) {
 	var state model.StudentState
 	err := s.db.Where("student_id = ? AND subject = ?", studentID, subject).First(&state).Error
@@ -763,7 +817,7 @@ func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject st
 	for _, l := range logs {
 		var nodeName string
 		s.db.Table("nodes").Where("id = ?", l.NodeID).Select("name").Row().Scan(&nodeName)
-		
+
 		formattedLogs = append(formattedLogs, map[string]interface{}{
 			"id":        l.ID,
 			"nodeId":    l.NodeID,
@@ -798,13 +852,13 @@ func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject st
 			}
 		}
 	}
-	
+
 	for nodeIDStr, cantDo := range nodeCantDoCount {
 		if cantDo > 0 && nodeStatus[nodeIDStr] == "" {
 			nodeStatus[nodeIDStr] = "struggle"
 		}
 	}
-	
+
 	for nodeIDStr, correct := range nodeCorrectCount {
 		if correct > 0 && nodeStatus[nodeIDStr] == "" {
 			nodeStatus[nodeIDStr] = "mastered"
@@ -948,7 +1002,7 @@ func (s *tutorService) GetSubjects() ([]string, error) {
 	if err := s.db.Model(&model.Node{}).Distinct().Where("subject NOT LIKE ?", "%Khoa học%").Pluck("subject", &subjects).Error; err != nil {
 		return nil, err
 	}
-	
+
 	// Filter out any other unwanted subjects, and default to only "Toán Lớp 5"
 	cleanedSubjects := []string{}
 	for _, sub := range subjects {
@@ -1010,15 +1064,12 @@ func (s *tutorService) RenameSubject(oldName, newName string) error {
 		return nil
 	})
 }
-
-
 type ParsedQuestion struct {
 	Content       string   `json:"content"`
 	Options       []string `json:"options"`
 	CorrectOption int      `json:"correctOption"`
 	Difficulty    string   `json:"difficulty"`
 }
-
 type ParsedNode struct {
 	Name       string           `json:"name"`
 	Theory     string           `json:"theory"`
@@ -1573,7 +1624,6 @@ func (s *tutorService) GetMonitoringData(subject string) ([]StudentStat, error) 
 	}
 	return stats, nil
 }
-
 func (s *tutorService) GetClassInterventionGroups(subject string) (map[string]interface{}, error) {
 	var nodes []model.Node
 	if err := s.db.Where("subject = ?", subject).Find(&nodes).Error; err != nil {
@@ -1671,5 +1721,3 @@ func (s *tutorService) GetClassInterventionGroups(subject string) (map[string]in
 		"groups":  groups,
 	}, nil
 }
-
-

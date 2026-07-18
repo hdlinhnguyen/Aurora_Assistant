@@ -2,7 +2,7 @@
 erDiagram
     ASSESSMENT_TEMPLATE ||--o{ SUBMISSION : duoc_chon_cho
     STUDENT ||--o{ SUBMISSION : nop
-    SUBMISSION ||--|{ SUBMISSION_FILE : gom
+    SUBMISSION ||--o{ SUBMISSION_FILE : co_the_gom
     SUBMISSION ||--o| OCR_JOB : co_the_tao
     OCR_JOB ||--o{ OCR_BLOCK : sinh_ra
     SUBMISSION ||--o| MAPPING_JOB : co_the_tao
@@ -102,6 +102,7 @@ erDiagram
         string question_id
         string description
         string topic_tags
+        float max_points
     }
 
     STUDENT {

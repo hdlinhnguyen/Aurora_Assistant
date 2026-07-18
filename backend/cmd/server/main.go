@@ -12,11 +12,14 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/recover"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
+	"gorm.io/gorm"
 
 	"backend/internal/config"
+	"backend/internal/exam"
 	"backend/internal/handler"
 	"backend/internal/middleware"
 	"backend/internal/model"
+	"backend/internal/scoring"
 	"backend/internal/service"
 )
 
@@ -56,10 +59,24 @@ func main() {
 	authSvc := service.NewAuthService(config.DB, os.Getenv("JWT_SECRET"))
 	aiSvc := service.NewAIService(config.DB)
 	tutorSvc := service.NewTutorService(config.DB, aiSvc)
+	taggingSvc := service.NewTaggingService(config.DB)
+	questionBankSvc := service.NewQuestionBankService(config.DB)
+	examSvc := exam.NewServiceWithExporter(
+		exam.NewRepository(config.DB),
+		exam.NewDOCXExporter(),
+		config.ExamExportDir(),
+	)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
 	tutorHandler := handler.NewTutorHandler(tutorSvc)
+	taggingHandler := handler.NewTaggingHandler(taggingSvc)
+	questionBankHandler := handler.NewQuestionBankHandler(questionBankSvc)
+	examHandler := handler.NewExamHandler(examSvc, os.Getenv("EXAM_INTERNAL_TOKEN"))
+	scoringSvc := scoring.NewService(scoring.NewRepository(config.DB), func(db *gorm.DB) exam.ScoringGateway {
+		return exam.NewScoringGateway(db)
+	})
+	scoringHandler := handler.NewScoringHandler(scoringSvc)
 
 	// Seed Demo Accounts & Mock Statistics natively (clean delete and register fresh with cascade)
 	config.DB.Exec("DELETE FROM messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE student_id IN (SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?)))", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
@@ -68,8 +85,7 @@ func main() {
 	config.DB.Exec("DELETE FROM activity_logs WHERE student_id IN (SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?))", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
 	config.DB.Exec("DELETE FROM topics WHERE teacher_id IN (SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?))", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
 	config.DB.Exec("DELETE FROM users WHERE email IN (?, ?, ?, ?, ?)", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
-	
-	
+
 	authSvc.Register("student@aurora.edu.vn", "demo123", "Học sinh Demo", "student")
 	authSvc.Register("teacher@aurora.edu.vn", "demo123", "Giáo viên Demo", "teacher")
 	authSvc.Register("studentA@aurora.edu.vn", "demo123", "Nguyễn Văn A", "student")
@@ -86,7 +102,7 @@ func main() {
 	sessionAId := uuid.New().String()
 	sessionBId := uuid.New().String()
 	sessionCId := uuid.New().String()
-	
+
 	config.DB.Exec("INSERT INTO chat_sessions (id, student_id, topic, status, mode, created_at, updated_at) VALUES (?, ?, 'Cộng phân số', 'active', 'feynman', NOW(), NOW())", sessionAId, studentAId)
 	config.DB.Exec("INSERT INTO chat_sessions (id, student_id, topic, status, mode, created_at, updated_at) VALUES (?, ?, 'Nhân thập phân', 'active', 'socratic', NOW(), NOW())", sessionBId, studentBId)
 	config.DB.Exec("INSERT INTO chat_sessions (id, student_id, topic, status, mode, created_at, updated_at) VALUES (?, ?, 'Chia phân số', 'active', 'feynman', NOW(), NOW())", sessionCId, studentCId)
@@ -94,12 +110,12 @@ func main() {
 	// Insert mock messages
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'student', 'Ta cộng hai tử số và giữ nguyên mẫu số chung.', '', true, 0, NOW())", uuid.New().String(), sessionAId)
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'ai', 'Tuyệt vời thầy ơi!', '', true, 92, NOW())", uuid.New().String(), sessionAId)
-	
+
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'student', 'Em nhân hai số rồi bỏ dấu phẩy đi luôn.', '', false, 0, NOW())", uuid.New().String(), sessionBId)
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'ai', 'Sai rồi em, phải đếm chữ số thập phân chứ.', 'Nhân số thập phân', false, 0, NOW())", uuid.New().String(), sessionBId)
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'student', 'Em quy đồng mẫu số bằng cách cộng tử với tử mẫu với mẫu.', '', false, 0, NOW())", uuid.New().String(), sessionBId)
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'ai', 'Không đúng rồi, phải quy đồng mẫu số chứ.', 'Cộng hai phân số khác mẫu', false, 0, NOW())", uuid.New().String(), sessionBId)
-	
+
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'student', 'Lấy số đó nhân nghịch đảo là xong chứ gì.', '', true, 0, NOW())", uuid.New().String(), sessionCId)
 	config.DB.Exec("INSERT INTO messages (id, session_id, sender, content, detected_gap, is_correct_step, feynman_score, created_at) VALUES (?, ?, 'ai', 'Em chưa hiểu lắm thầy ơi, nghịch đảo là gì ạ?', '', false, 58, NOW())", uuid.New().String(), sessionCId)
 
@@ -193,14 +209,53 @@ func main() {
 
 	// Protected Routes
 	api := app.Group("/api", middleware.Protected(config.DB))
-	
+	teacherExams := api.Group("/teacher", middleware.RequireRole("teacher"))
+	teacherExams.Post("/exams", examHandler.Create)
+	teacherExams.Get("/exams", examHandler.List)
+	teacherExams.Get("/exams/:examId", examHandler.Get)
+	teacherExams.Patch("/exams/:examId", examHandler.Patch)
+	teacherExams.Delete("/exams/:examId", examHandler.Delete)
+	teacherExams.Get("/exams/:examId/audit", examHandler.Audit)
+	teacherExams.Get("/exam-bank/questions", examHandler.ListBankQuestions)
+	teacherExams.Get("/exam-bank/questions/:questionId", examHandler.GetBankQuestion)
+	teacherExams.Get("/exam-bank/topics", examHandler.ListTopics)
+	teacherExams.Post("/exams/:examId/questions/from-bank", examHandler.AddBankQuestion)
+	teacherExams.Post("/exams/:examId/questions/manual", examHandler.AddManualQuestion)
+	teacherExams.Patch("/exams/:examId/questions/:questionId", examHandler.PatchQuestion)
+	teacherExams.Delete("/exams/:examId/questions/:questionId", examHandler.DeleteQuestion)
+	teacherExams.Put("/exams/:examId/questions/reorder", examHandler.ReorderQuestions)
+	teacherExams.Post("/exams/:examId/questions/:questionId/rubric-items", examHandler.AddRubricItem)
+	teacherExams.Patch("/exams/:examId/questions/:questionId/rubric-items/:rubricId", examHandler.PatchRubricItem)
+	teacherExams.Delete("/exams/:examId/questions/:questionId/rubric-items/:rubricId", examHandler.DeleteRubricItem)
+	teacherExams.Put("/exams/:examId/questions/:questionId/rubric-items/reorder", examHandler.ReorderRubricItems)
+	teacherExams.Post("/exams/:examId/validate", examHandler.Validate)
+	teacherExams.Post("/exams/:examId/prepare", examHandler.Prepare)
+	teacherExams.Post("/exams/:examId/return-to-draft", examHandler.ReturnToDraft)
+	teacherExams.Post("/exams/:examId/exports/docx", examHandler.ExportDOCX)
+	teacherExams.Get("/exams/:examId/exports", examHandler.ListExports)
+	teacherExams.Get("/exams/:examId/exports/:exportId/download", examHandler.DownloadExport)
+	teacherExams.Get("/scoring/students", scoringHandler.ListStudents)
+	teacherExams.Post("/grading-batches", scoringHandler.CreateBatch)
+	teacherExams.Get("/grading-batches", scoringHandler.ListBatches)
+	teacherExams.Get("/grading-batches/:batchId", scoringHandler.GetBatch)
+	teacherExams.Get("/scoring-submissions/:submissionId", scoringHandler.GetSubmission)
+	teacherExams.Put("/scoring-submissions/:submissionId/questions/:questionId", scoringHandler.UpdateQuestion)
+	teacherExams.Put("/scoring-submissions/:submissionId/rubrics/:rubricId", scoringHandler.UpdateRubric)
+	teacherExams.Post("/scoring-submissions/:submissionId/approve", scoringHandler.Approve)
+	teacherExams.Post("/scoring-submissions/:submissionId/revisions", scoringHandler.StartRevision)
+	teacherExams.Get("/scoring-submissions/:submissionId/history", scoringHandler.History)
+	teacherExams.Get("/scoring-submissions/:submissionId/audit", scoringHandler.Audit)
+
+	app.Post("/internal/exams/:examId/first-submission", examHandler.FirstSubmission)
+	app.Post("/internal/exams/:examId/grading-completed", examHandler.GradingCompleted)
+
 	api.Post("/tutor/sessions", tutorHandler.CreateSession)
 	api.Get("/tutor/sessions", tutorHandler.GetSessions)
 	api.Get("/tutor/sessions/:id/messages", tutorHandler.GetMessages)
 	api.Post("/tutor/sessions/:id/messages", tutorHandler.SendMessage)
 	api.Post("/tutor/sessions/:id/axioms", tutorHandler.SaveAxioms)
 	api.Get("/tutor/sessions/:id/axioms", tutorHandler.GetAxioms)
-	
+
 	api.Get("/teacher/dashboard", tutorHandler.GetDashboard)
 	api.Post("/teacher/topics", tutorHandler.CreateTopic)
 	api.Get("/teacher/topics", tutorHandler.GetTopics)
@@ -228,6 +283,21 @@ func main() {
 	api.Post("/nodes/:nodeId/questions/bulk", tutorHandler.CreateQuestionsBulk)
 	api.Put("/questions/:id", tutorHandler.UpdateQuestion)
 	api.Delete("/questions/:id", tutorHandler.DeleteQuestion)
+
+	api.Get("/teacher/question-bank/questions", questionBankHandler.ListQuestions)
+	api.Post("/teacher/question-bank/questions", questionBankHandler.CreateQuestion)
+	api.Get("/teacher/question-bank/questions/:questionId", questionBankHandler.GetQuestion)
+	api.Patch("/teacher/question-bank/questions/:questionId", questionBankHandler.UpdateQuestion)
+	api.Delete("/teacher/question-bank/questions/:questionId", questionBankHandler.DeleteQuestion)
+	api.Post("/teacher/question-bank/questions/:questionId/rubric-items", questionBankHandler.CreateRubricItem)
+	api.Patch("/teacher/question-bank/questions/:questionId/rubric-items/:rubricItemId", questionBankHandler.UpdateRubricItem)
+	api.Delete("/teacher/question-bank/questions/:questionId/rubric-items/:rubricItemId", questionBankHandler.DeleteRubricItem)
+	api.Put("/teacher/question-bank/questions/:questionId/rubric-items/reorder", questionBankHandler.ReorderRubricItems)
+
+	api.Get("/teacher/question-bank/questions/:questionId/tagging-context", taggingHandler.GetContext)
+	api.Put("/teacher/question-bank/questions/:questionId/topics", taggingHandler.SetQuestionTopics)
+	api.Put("/teacher/question-bank/questions/:questionId/rubric-items/:rubricItemId/topics", taggingHandler.SetRubricItemTopics)
+	api.Get("/teacher/question-bank/questions/:questionId/effective-topics", taggingHandler.GetEffectiveTopics)
 
 	api.Post("/nodes/:nodeId/upload-theory", tutorHandler.UploadTheory)
 	api.Post("/nodes/:nodeId/chat-theory", tutorHandler.ChatNodeTheory)
@@ -270,4 +340,3 @@ func main() {
 	log.Printf("Aurora Assistant Server starting on port %s", port)
 	log.Fatal(app.Listen(":" + port))
 }
-

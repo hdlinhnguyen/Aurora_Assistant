@@ -4,7 +4,7 @@
 
 **Goal:** Viết bộ tài liệu thiết kế và sơ đồ Mermaid đầy đủ cho module Handwritten OCR and Rubric Mapping bằng tiếng Việt có dấu.
 
-**Architecture:** Module dùng pipeline bất đồng bộ gồm tiếp nhận bài làm, upload tối ưu cho băng thông thấp, OCR qua Datalab.to, mapping qua Qwen 8B self-host và bước giảng viên duyệt bắt buộc. Khi OCR hoặc mapping thất bại, hoặc khi giảng viên chủ động chọn, hệ thống chuyển sang chế độ thủ công.
+**Architecture:** Module mặc định đưa bài làm vào luồng giảng viên xử lý thủ công. Khi giảng viên chủ động bật tùy chọn hỗ trợ, pipeline bất đồng bộ chạy OCR qua Datalab.to và mapping qua Qwen 8B self-host trước bước duyệt bắt buộc.
 
 **Tech Stack:** Markdown, Mermaid, Datalab.to OCR API, Qwen 8B self-host, hàng đợi job bất đồng bộ.
 

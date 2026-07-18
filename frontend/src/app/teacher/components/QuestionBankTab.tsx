@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Upload, Pencil, Trash } from "lucide-react";
+import { Upload, Pencil, Tags, Trash } from "lucide-react";
 
 import { NodeItem, Question } from "../page";
 
@@ -20,6 +20,7 @@ interface QuestionBankTabProps {
   handleExcelImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleStartEditQuestion: (q: Question) => void;
   handleDeleteQuestion: (qId: string) => void;
+  handleTagQuestion: (q: Question) => void;
   setEditingNode: (node: NodeItem | null) => void;
   formatDate: (dateStr?: string) => string;
 }
@@ -39,14 +40,19 @@ export default function QuestionBankTab({
   handleExcelImport,
   handleStartEditQuestion,
   handleDeleteQuestion,
+  handleTagQuestion,
   setEditingNode,
   formatDate,
 }: QuestionBankTabProps) {
+  const [questionTypeFilter, setQuestionTypeFilter] = React.useState("");
   const filtered = subjectQuestions.filter(q => {
     const matchSearch = qbSearchText ? q.content.toLowerCase().includes(qbSearchText.toLowerCase()) : true;
     const matchNode = qbFilterNodeId ? q.nodeId === qbFilterNodeId : true;
     const matchDiff = qbFilterDifficulty ? q.difficulty.toLowerCase() === qbFilterDifficulty.toLowerCase() : true;
-    return matchSearch && matchNode && matchDiff;
+    const matchType = questionTypeFilter
+      ? (q.questionType || "multiple_choice") === questionTypeFilter
+      : true;
+    return matchSearch && matchNode && matchDiff && matchType;
   });
 
   const formatMarkdown = (text: string): string => {
@@ -123,6 +129,16 @@ export default function QuestionBankTab({
             <option value="medium">Thông hiểu</option>
             <option value="hard">Vận dụng</option>
             <option value="very_hard">Vận dụng cao</option>
+          </select>
+
+          <select
+            value={questionTypeFilter}
+            onChange={(e) => setQuestionTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+          >
+            <option value="">Tất cả loại câu</option>
+            <option value="multiple_choice">Trắc nghiệm</option>
+            <option value="essay">Tự luận</option>
           </select>
         </div>
 
@@ -231,6 +247,13 @@ export default function QuestionBankTab({
                       Cập nhật: {formatDate((q as any).updatedAt || (q as any).createdAt)}
                     </span>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleTagQuestion(q)}
+                        className="p-1.5 rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all cursor-pointer"
+                        title="Gắn topic thủ công"
+                      >
+                        <Tags size={12} />
+                      </button>
                       <button
                         onClick={() => {
                           setEditingNode(matchedNode || null);

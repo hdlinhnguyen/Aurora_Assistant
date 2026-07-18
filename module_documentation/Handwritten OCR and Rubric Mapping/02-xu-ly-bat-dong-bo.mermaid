@@ -20,7 +20,7 @@ sequenceDiagram
         API-->>APP: Xác nhận phần đã lưu
     end
 
-    GV->>APP: Chọn AI-assisted
+    GV->>APP: Bật tùy chọn OCR + Qwen hỗ trợ
     APP->>API: Yêu cầu bắt đầu xử lý
     API->>Q: Enqueue OCR Job
     Q->>OCR: Gửi tài liệu tới Datalab

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"backend/internal/model"
@@ -15,6 +16,18 @@ import (
 
 var DB *gorm.DB
 
+func ExamExportDir() string {
+	dir := os.Getenv("EXAM_EXPORT_DIR")
+	if dir == "" {
+		dir = "./data/exam-exports"
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(".", dir)
+	}
+	_ = os.MkdirAll(dir, 0o700)
+	return dir
+}
+
 func ConnectDB() {
 	host := os.Getenv("DB_HOST")
 	user := os.Getenv("DB_USER")
@@ -23,12 +36,24 @@ func ConnectDB() {
 	port := os.Getenv("DB_PORT")
 	sslmode := os.Getenv("DB_SSLMODE")
 
-	if host == "" { host = "localhost" }
-	if user == "" { user = "aurora" }
-	if password == "" { password = "password123" }
-	if dbname == "" { dbname = "aurora_dev" }
-	if port == "" { port = "5434" }
-	if sslmode == "" { sslmode = "disable" }
+	if host == "" {
+		host = "localhost"
+	}
+	if user == "" {
+		user = "aurora"
+	}
+	if password == "" {
+		password = "password123"
+	}
+	if dbname == "" {
+		dbname = "aurora_dev"
+	}
+	if port == "" {
+		port = "5434"
+	}
+	if sslmode == "" {
+		sslmode = "disable"
+	}
 
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		host, user, password, dbname, port, sslmode)
@@ -54,11 +79,30 @@ func ConnectDB() {
 		&model.Node{},
 		&model.Edge{},
 		&model.Question{},
+		&model.QuestionRubricItem{},
+		&model.QuestionTopicMapping{},
+		&model.QuestionRubricItemTopicMapping{},
+		&model.QuestionTaggingState{},
 		&model.StudentState{},
 		&model.ActivityLog{},
 		&model.AICache{},
 		&model.LearningPath{},
 		&model.GuardrailEvent{},
+		&model.Exam{},
+		&model.ExamQuestion{},
+		&model.ExamRubricItem{},
+		&model.ExamSnapshot{},
+		&model.ExamGradingProgress{},
+		&model.ExamInternalEvent{},
+		&model.ExamExport{},
+		&model.ExamAuditLog{},
+		&model.GradingBatch{},
+		&model.ScoringSubmission{},
+		&model.ScoringQuestionResult{},
+		&model.ScoringRubricResult{},
+		&model.ScoringApprovalSnapshot{},
+		&model.ScoringAuditLog{},
+		&model.ScoringInternalEvent{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)

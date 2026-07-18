@@ -1,220 +1,134 @@
 package service
 
 import (
-	"backend/internal/model"
 	"encoding/json"
-	"fmt"
-	"os"
 	"testing"
 
+	"backend/internal/model"
+	"backend/internal/testutil"
+
 	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func setupTestDB() (*gorm.DB, error) {
-	host := os.Getenv("DB_HOST")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-	port := os.Getenv("DB_PORT")
-	sslmode := os.Getenv("DB_SSLMODE")
-
-	if host == "" { host = "localhost" }
-	if user == "" { user = "aurora" }
-	if password == "" { password = "password123" }
-	if dbname == "" { dbname = "aurora_dev" }
-	if port == "" { port = "5434" }
-	if sslmode == "" { sslmode = "disable" }
-
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
-		host, user, password, dbname, port, sslmode)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, err
+func setupDiagnosticsDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db := testutil.OpenPostgres(t)
+	if err := db.AutoMigrate(
+		&model.User{},
+		&model.Node{},
+		&model.Edge{},
+		&model.Question{},
+		&model.StudentState{},
+		&model.ActivityLog{},
+	); err != nil {
+		t.Fatal(err)
 	}
-	return db, nil
+	return db
 }
 
-func TestTutorService_SubmitAnswer_DistractorMapping(t *testing.T) {
-	db, err := setupTestDB()
-	if err != nil {
-		t.Skip("Bỏ qua test DB: Không thể kết nối tới PostgreSQL local:", err)
-		return
-	}
-
-	// Clean up potential leftovers
-	db.Exec("DELETE FROM activity_logs")
-	db.Exec("DELETE FROM student_states")
-	db.Exec("DELETE FROM questions")
-	db.Exec("DELETE FROM edges")
-	db.Exec("DELETE FROM nodes")
-	db.Exec("DELETE FROM users WHERE role = 'student'")
-
-	svc := NewTutorService(db, nil) // passing nil for aiService for simple GORM tests
-
+func TestTutorServiceSubmitAnswerDistractorMapping(t *testing.T) {
+	db := setupDiagnosticsDB(t)
+	svc := NewTutorService(db, nil)
 	studentID := uuid.New()
-	student := model.User{
-		ID:       studentID,
-		Email:    "test-student@aurora.edu.vn",
-		Password: "password",
-		Name:     "Học sinh kiểm thử",
-		Role:     "student",
-	}
-	if err := db.Create(&student).Error; err != nil {
-		t.Fatalf("Lỗi tạo học sinh test: %v", err)
+	if err := db.Create(&model.User{
+		ID: studentID, Email: "diagnostics-student@example.test",
+		Password: "test", Name: "Diagnostics Student", Role: "student",
+	}).Error; err != nil {
+		t.Fatal(err)
 	}
 
-	// 1. Setup two nodes
-	subject := "Toán đại số"
-	n1 := model.Node{
-		ID:        uuid.New(),
-		Subject:   subject,
-		Name:      "Quy đồng mẫu số",
-		StableKey: "l5-alg-quydong",
-		Status:    "active",
+	subject := "Toan dai so"
+	source := model.Node{ID: uuid.New(), Subject: subject, Name: "Quy dong mau so", StableKey: "source", Status: "active"}
+	target := model.Node{ID: uuid.New(), Subject: subject, Name: "Cong phan so", StableKey: "target", Status: "active"}
+	if err := db.Create(&[]model.Node{source, target}).Error; err != nil {
+		t.Fatal(err)
 	}
-	n2 := model.Node{
-		ID:        uuid.New(),
-		Subject:   subject,
-		Name:      "Cộng phân số khác mẫu",
-		StableKey: "l5-alg-congkhacmau",
-		Status:    "active",
+	if err := db.Create(&model.Edge{
+		ID: uuid.New(), Subject: subject, SourceID: source.ID, TargetID: target.ID,
+		Status: "active", SourceType: "rule",
+	}).Error; err != nil {
+		t.Fatal(err)
 	}
-	db.Create(&n1)
-	db.Create(&n2)
+	mappings, _ := json.Marshal(map[string]string{"1": source.ID.String()})
+	question := model.Question{
+		ID: uuid.New(), NodeID: target.ID, Content: "1/2 + 1/3",
+		OptionsJSON: `["5/6","2/5","2/6","5/5"]`, CorrectOption: 0,
+		Difficulty: "medium", DistractorMappings: string(mappings),
+	}
+	if err := db.Create(&question).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&model.StudentState{
+		ID: uuid.New(), StudentID: studentID, Subject: subject,
+		InitialLevelNodeID: target.ID, CurrentLevelNodeID: target.ID,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
 
-	// Prerequisite Edge: n1 -> n2
-	edge := model.Edge{
-		ID:        uuid.New(),
-		Subject:   subject,
-		SourceID:  n1.ID,
-		TargetID:  n2.ID,
-		Status:    "active",
-		SourceType: "rule",
-	}
-	db.Create(&edge)
-
-	// 2. Setup Question on n2 with Distractor mapping pointing to n1 for option index 1 (incorrect option)
-	mappings := map[string]string{
-		"1": n1.ID.String(), // index 1 incorrect answers point to n1 (Quy đồng mẫu số)
-	}
-	mappingsJSON, _ := json.Marshal(mappings)
-
-	q := model.Question{
-		ID:                 uuid.New(),
-		NodeID:             n2.ID,
-		Content:            "Tính 1/2 + 1/3",
-		OptionsJSON:        `["5/6", "2/5", "2/6", "5/5"]`,
-		CorrectOption:      0, // correct is "5/6"
-		Difficulty:         "medium",
-		DistractorMappings: string(mappingsJSON),
-	}
-	db.Create(&q)
-
-	// Create initial StudentState at n2
-	state := model.StudentState{
-		ID:                 uuid.New(),
-		StudentID:          studentID,
-		Subject:            subject,
-		InitialLevelNodeID: n2.ID,
-		CurrentLevelNodeID: n2.ID,
-	}
-	db.Create(&state)
-
-	// 3. Submit INCORRECT answer on index 1 (should trigger diagnostic jump to n1)
-	isCorrect, _, err := svc.SubmitAnswer(studentID, n2.ID, q.ID, 1)
+	correct, _, err := svc.SubmitAnswer(studentID, target.ID, question.ID, 1)
 	if err != nil {
-		t.Fatalf("Lỗi SubmitAnswer: %v", err)
+		t.Fatal(err)
 	}
-	if isCorrect {
-		t.Error("Expected answer to be incorrect, got isCorrect = true")
+	if correct {
+		t.Fatal("expected an incorrect answer")
 	}
-
-	// Verify diagnostic path redirection to n1
-	var updatedState model.StudentState
-	db.Where("student_id = ? AND subject = ?", studentID, subject).First(&updatedState)
-	if updatedState.CurrentLevelNodeID != n1.ID {
-		t.Errorf("Expected current diagnostic level redirected to %s (n1), but got %s", n1.ID, updatedState.CurrentLevelNodeID)
+	var state model.StudentState
+	if err := db.Where("student_id = ? AND subject = ?", studentID, subject).First(&state).Error; err != nil {
+		t.Fatal(err)
 	}
-
-	// Verify logged struggle on n1
+	if state.CurrentLevelNodeID != source.ID {
+		t.Fatalf("current node = %s, want distractor node %s", state.CurrentLevelNodeID, source.ID)
+	}
 	var logs []model.ActivityLog
-	db.Where("student_id = ? AND node_id = ?", studentID, n1.ID).Find(&logs)
-	var hasStruggle bool
-	for _, l := range logs {
-		if l.Action == "struggle" {
-			hasStruggle = true
+	if err := db.Where("student_id = ? AND node_id = ?", studentID, source.ID).Find(&logs).Error; err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, log := range logs {
+		if log.Action == "struggle" {
+			found = true
 		}
 	}
-	if !hasStruggle {
-		t.Error("Expected to find struggle activity log on the mapped node, but none found")
+	if !found {
+		t.Fatal("expected struggle activity on distractor node")
 	}
 }
 
-func TestTutorService_GetClassInterventionGroups(t *testing.T) {
-	db, err := setupTestDB()
-	if err != nil {
-		t.Skip("Bỏ qua test DB: Không thể kết nối tới PostgreSQL local:", err)
-		return
-	}
-
-	db.Exec("DELETE FROM activity_logs")
-	db.Exec("DELETE FROM student_states")
-	db.Exec("DELETE FROM questions")
-	db.Exec("DELETE FROM edges")
-	db.Exec("DELETE FROM nodes")
-	db.Exec("DELETE FROM users WHERE role = 'student'")
-
+func TestTutorServiceGetClassInterventionGroups(t *testing.T) {
+	db := setupDiagnosticsDB(t)
 	svc := NewTutorService(db, nil)
-
-	subject := "Toán đại số"
-	node := model.Node{
-		ID:        uuid.New(),
-		Subject:   subject,
-		Name:      "Cộng phân số khác mẫu",
-		StableKey: "l5-alg-congkhacmau",
-		Status:    "active",
+	subject := "Toan dai so"
+	node := model.Node{ID: uuid.New(), Subject: subject, Name: "Cong phan so", StableKey: "gap", Status: "active"}
+	if err := db.Create(&node).Error; err != nil {
+		t.Fatal(err)
 	}
-	db.Create(&node)
+	st1 := model.User{ID: uuid.New(), Email: "student-one@example.test", Name: "Student One", Role: "student"}
+	st2 := model.User{ID: uuid.New(), Email: "student-two@example.test", Name: "Student Two", Role: "student"}
+	if err := db.Create(&[]model.User{st1, st2}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.LogActivity(st1.ID, subject, node.ID, "struggle", "wrong"); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.LogActivity(st2.ID, subject, node.ID, "mastered", "correct"); err != nil {
+		t.Fatal(err)
+	}
 
-	// Create 2 students
-	st1 := model.User{ID: uuid.New(), Email: "st1@aurora.edu.vn", Name: "Student One", Role: "student"}
-	st2 := model.User{ID: uuid.New(), Email: "st2@aurora.edu.vn", Name: "Student Two", Role: "student"}
-	db.Create(&st1)
-	db.Create(&st2)
-
-	// Student 1 struggles, Student 2 masters
-	svc.LogActivity(st1.ID, subject, node.ID, "struggle", "Lỗi sai")
-	svc.LogActivity(st2.ID, subject, node.ID, "mastered", "Làm tốt")
-
-	res, err := svc.GetClassInterventionGroups(subject)
+	result, err := svc.GetClassInterventionGroups(subject)
 	if err != nil {
-		t.Fatalf("Lỗi GetClassInterventionGroups: %v", err)
+		t.Fatal(err)
 	}
-
-	topGaps := res["topGaps"].([]map[string]interface{})
-	groups := res["groups"].([]map[string]interface{})
-
-	if len(topGaps) != 1 {
-		t.Fatalf("Expected 1 top gap node, got %d", len(topGaps))
+	topGaps := result["topGaps"].([]map[string]interface{})
+	groups := result["groups"].([]map[string]interface{})
+	if len(topGaps) != 1 || topGaps[0]["struggleCount"].(int) != 1 {
+		t.Fatalf("top gaps = %#v", topGaps)
 	}
-	struggleCount := topGaps[0]["struggleCount"].(int)
-	if struggleCount != 1 {
-		t.Errorf("Expected struggle count to be 1 (only st1), got %d", struggleCount)
-	}
-
 	if len(groups) != 1 {
-		t.Fatalf("Expected 1 intervention group, got %d", len(groups))
+		t.Fatalf("groups = %#v", groups)
 	}
-	studentsList := groups[0]["students"].([]map[string]interface{})
-	if len(studentsList) != 1 {
-		t.Fatalf("Expected 1 student in group, got %d", len(studentsList))
-	}
-
-	matchedStudentName := studentsList[0]["studentName"].(string)
-	if matchedStudentName != "Student One" {
-		t.Errorf("Expected struggling student to be 'Student One', got %s", matchedStudentName)
+	students := groups[0]["students"].([]map[string]interface{})
+	if len(students) != 1 || students[0]["studentName"] != "Student One" {
+		t.Fatalf("group students = %#v", students)
 	}
 }
