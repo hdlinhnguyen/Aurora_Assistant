@@ -1421,13 +1421,20 @@ func postLearningPathPython(path string, payload any) ([]byte, int, error) {
 		return nil, 0, err
 	}
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Post("http://127.0.0.1:8000"+path, "application/json", bytes.NewBuffer(jsonBytes))
+	resp, err := client.Post(learningPathBaseURL()+path, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return nil, 0, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	return body, resp.StatusCode, err
+}
+
+func learningPathBaseURL() string {
+	if value := strings.TrimRight(strings.TrimSpace(os.Getenv("LEARNING_PATH_URL")), "/"); value != "" {
+		return value
+	}
+	return "http://127.0.0.1:8000"
 }
 
 func (h *TutorHandler) GetLearningPathSuggestions(c fiber.Ctx) error {
@@ -1489,13 +1496,19 @@ func (h *TutorHandler) CreateAutomaticLearningPathDrafts(c fiber.Ctx) error {
 	if !req.Refresh {
 		var existing []model.LearningPath
 		if err := config.DB.Where(
-			"teacher_id = ? AND class_id = ? AND subject = ? AND source = ? AND evidence_fingerprint = ? AND status = ?",
-			teacherID, classroom.ID.String(), req.Subject, "automatic", fingerprint, "Draft",
+			"teacher_id = ? AND class_id = ? AND subject = ? AND source = ? AND evidence_fingerprint = ? AND status IN ?",
+			teacherID, classroom.ID.String(), req.Subject, "automatic", fingerprint, []string{"Draft", "Approved"},
 		).Order("student_id").Find(&existing).Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể đọc lộ trình nháp"})
 		}
 		if len(existing) > 0 {
-			return c.JSON(buildAutomaticDraftResponse(req.Subject, existing[0].AnalysisID, existing, recommendations))
+			pending := make([]model.LearningPath, 0, len(existing))
+			for _, row := range existing {
+				if row.Status == "Draft" {
+					pending = append(pending, row)
+				}
+			}
+			return c.JSON(buildAutomaticDraftResponse(req.Subject, existing[0].AnalysisID, pending, recommendations))
 		}
 	}
 
@@ -1515,7 +1528,7 @@ func (h *TutorHandler) CreateAutomaticLearningPathDrafts(c fiber.Ctx) error {
 	body, status, err := postLearningPathPython("/learning-path", CreatePathFastAPIBody{
 		Request: CreatePathBodyRequest{
 			ClassID: classroom.ID.String(), StudentIDs: selectedStudents,
-			TargetTopicIDsByStudent: recommendations.TargetsByStudent, TeacherID: teacherID.String(),
+			TargetTopicIDs: []string{}, TargetTopicIDsByStudent: recommendations.TargetsByStudent, TeacherID: teacherID.String(),
 			TargetMasteryThreshold: 0.80, MinimumConfidenceThreshold: 0.60,
 		},
 		RawQuiz: rawQuiz, RawPaper: []interface{}{}, AsOf: time.Now().UTC().Format(time.RFC3339),
@@ -1658,7 +1671,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
 	}
 
-	fastAPIURL := "http://127.0.0.1:8000/learning-path"
+	fastAPIURL := learningPathBaseURL() + "/learning-path"
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
