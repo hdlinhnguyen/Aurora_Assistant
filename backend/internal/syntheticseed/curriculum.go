@@ -3,7 +3,13 @@ package syntheticseed
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
+
+	"backend/internal/model"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type curriculumTopic struct {
@@ -25,6 +31,13 @@ type curriculumClosure struct {
 	Targets     []curriculumTopic
 	Edges       []curriculumEdge
 	ByStableKey map[string]curriculumTopic
+}
+
+type seededCurriculum struct {
+	Root        model.Node
+	Topics      []model.Node
+	Targets     []model.Node
+	ByStableKey map[string]model.Node
 }
 
 func grade7TargetKeys() []string {
@@ -163,4 +176,90 @@ func resolveCurriculumClosure(catalog []curriculumTopic, targetKeys []string) (c
 		return closure.Edges[i].SourceKey < closure.Edges[j].SourceKey
 	})
 	return closure, nil
+}
+
+func createSyntheticCurriculum(tx *gorm.DB, config Config, teacher model.User) (seededCurriculum, error) {
+	closure, err := resolveCurriculumClosure(syntheticCurriculumCatalog(), grade7TargetKeys())
+	if err != nil {
+		return seededCurriculum{}, err
+	}
+	root := model.Node{
+		ID: stableSyntheticUUID("curriculum", "root"), Subject: config.Subject, Name: config.Subject,
+		Theory: "Chương trình Số và Đại số lớp 7 cùng kiến thức tiên quyết.", PosX: 500, PosY: 40,
+		IsRoot: true, StableKey: "synthetic-grade7-number-algebra-root", Status: "active",
+	}
+	if err := tx.Create(&root).Error; err != nil {
+		return seededCurriculum{}, fmt.Errorf("create synthetic curriculum root: %w", err)
+	}
+
+	result := seededCurriculum{
+		Root: root, Topics: make([]model.Node, 0, len(closure.Topics)),
+		Targets:     make([]model.Node, 0, len(closure.Targets)),
+		ByStableKey: make(map[string]model.Node, len(closure.Topics)),
+	}
+	gradePosition := make(map[int]int)
+	for _, topic := range closure.Topics {
+		position := gradePosition[topic.GradeLevel]
+		gradePosition[topic.GradeLevel] = position + 1
+		node := model.Node{
+			ID: stableSyntheticUUID("curriculum", topic.StableKey), Subject: config.Subject,
+			Name: topic.Name, Theory: fmt.Sprintf("Lớp %d · %s", topic.GradeLevel, topic.Theory),
+			PosX: float64(140 + (topic.GradeLevel-4)*240), PosY: float64(140 + position*95),
+			StableKey: topic.StableKey, Status: "active",
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return seededCurriculum{}, fmt.Errorf("create curriculum node %s: %w", topic.StableKey, err)
+		}
+		teacherTopic := model.Topic{
+			ID: stableSyntheticUUID("curriculum-topic", topic.StableKey), TeacherID: teacher.ID,
+			Name: topic.Name, Subject: config.Subject, GradeLevel: strconv.Itoa(topic.GradeLevel),
+			Modes: "socratic,feynman", Published: true,
+		}
+		if err := tx.Create(&teacherTopic).Error; err != nil {
+			return seededCurriculum{}, fmt.Errorf("create teacher topic %s: %w", topic.StableKey, err)
+		}
+		result.Topics = append(result.Topics, node)
+		result.ByStableKey[topic.StableKey] = node
+	}
+
+	edges := make([]model.Edge, 0, len(closure.Edges)+len(closure.Topics))
+	for _, edge := range closure.Edges {
+		edges = append(edges, model.Edge{
+			ID:      stableSyntheticUUID("curriculum-edge", edge.SourceKey, edge.TargetKey),
+			Subject: config.Subject, SourceID: result.ByStableKey[edge.SourceKey].ID,
+			TargetID: result.ByStableKey[edge.TargetKey].ID, Status: "active", SourceType: "synthetic",
+		})
+	}
+	for _, topic := range closure.Topics {
+		if len(topic.Prerequisites) != 0 {
+			continue
+		}
+		edges = append(edges, model.Edge{
+			ID: stableSyntheticUUID("curriculum-edge", "root", topic.StableKey), Subject: config.Subject,
+			SourceID: root.ID, TargetID: result.ByStableKey[topic.StableKey].ID,
+			Status: "active", SourceType: "synthetic",
+		})
+	}
+	if len(edges) > 0 {
+		if err := tx.Create(&edges).Error; err != nil {
+			return seededCurriculum{}, fmt.Errorf("create synthetic curriculum edges: %w", err)
+		}
+	}
+	for _, key := range grade7TargetKeys() {
+		node, exists := result.ByStableKey[key]
+		if !exists {
+			return seededCurriculum{}, fmt.Errorf("missing seeded Grade 7 target %s", key)
+		}
+		result.Targets = append(result.Targets, node)
+	}
+	return result, nil
+}
+
+func curriculumNodeIDs(curriculum seededCurriculum) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, 1+len(curriculum.Topics))
+	ids = append(ids, curriculum.Root.ID)
+	for _, node := range curriculum.Topics {
+		ids = append(ids, node.ID)
+	}
+	return ids
 }

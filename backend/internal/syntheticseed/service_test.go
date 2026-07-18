@@ -2,6 +2,7 @@ package syntheticseed
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,6 +101,33 @@ func TestResetAndSeedCreatesApprovedHistoricalResultsForEveryStudent(t *testing.
 	require.True(t, studentTotals[1].Decimal.GreaterThan(studentTotals[2].Decimal))
 }
 
+func TestResetAndSeedPersistsGrade7CurriculumClosure(t *testing.T) {
+	service := setupSeedDatabase(t)
+	result, err := service.ResetAndSeed(context.Background())
+	require.NoError(t, err)
+
+	var nodes []model.Node
+	require.NoError(t, service.db.Where("subject = ?", result.Subject).Find(&nodes).Error)
+	require.GreaterOrEqual(t, len(nodes), 25)
+	nodeIDs := make(map[uuid.UUID]struct{}, len(nodes))
+	for _, node := range nodes {
+		nodeIDs[node.ID] = struct{}{}
+		require.NotContains(t, strings.ToLower(node.Name), "hình")
+	}
+	var targetNodes []model.Node
+	require.NoError(t, service.db.Where("subject = ? AND stable_key IN ?", result.Subject, grade7TargetKeys()).Find(&targetNodes).Error)
+	require.Len(t, targetNodes, 8)
+
+	var edges []model.Edge
+	require.NoError(t, service.db.Where("subject = ?", result.Subject).Find(&edges).Error)
+	require.NotEmpty(t, edges)
+	for _, edge := range edges {
+		require.Contains(t, nodeIDs, edge.SourceID)
+		require.Contains(t, nodeIDs, edge.TargetID)
+		require.NotEqual(t, edge.SourceID, edge.TargetID)
+	}
+}
+
 func TestResetAndSeedPreservesRealData(t *testing.T) {
 	service := setupSeedDatabase(t)
 	realUser := model.User{ID: uuid.New(), Email: "real@example.com", Password: "hash", Name: "Real User", Role: "teacher"}
@@ -138,8 +166,8 @@ func TestResetAndSeedIsIdempotentAndCreatesAnswerEvidence(t *testing.T) {
 	require.NoError(t, service.db.Model(&model.Question{}).Where("node_id IN ?", second.NodeIDs).Count(&questions).Error)
 	require.NoError(t, service.db.Model(&model.ActivityLog{}).Where("student_id IN ?", studentIDs(second.Students)).Count(&logs).Error)
 	require.EqualValues(t, 4, users)
-	require.EqualValues(t, 5, nodes)
-	require.EqualValues(t, 12, questions)
+	require.EqualValues(t, 25, nodes)
+	require.EqualValues(t, 24, questions)
 	require.EqualValues(t, 54, logs)
 
 	for _, student := range second.Students {
