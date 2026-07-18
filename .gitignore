@@ -47,3 +47,4 @@ generate_log.py
 proposal_analysis.md
 reusable_modules.md
 run.ps1
+.local-go/
