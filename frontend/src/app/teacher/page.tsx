@@ -1013,6 +1013,7 @@ export default function TeacherDashboard() {
       const res = await apiFetch("/teacher/learning-path", {
         method: "POST",
         body: JSON.stringify(buildLearningPathRequest(
+          selectedSubject,
           studentsProgress.map((student) => student.studentId),
           selectedTargetTopics,
         )),

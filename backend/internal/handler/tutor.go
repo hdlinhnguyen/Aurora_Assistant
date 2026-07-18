@@ -1724,6 +1724,7 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 	var req struct {
 		Approve     bool                   `json:"approve"`
 		Note        string                 `json:"note"`
+		StudentIDs  []string               `json:"studentIds"`
 		CustomPaths map[string]interface{} `json:"custom_paths"`
 	}
 	if err := c.Bind().JSON(&req); err != nil {
@@ -1741,99 +1742,103 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Không có quyền duyệt lộ trình này"})
 	}
 	classID := drafts[0].ClassID
-	allowedStudents := make(map[string]struct{}, len(drafts))
+	allowedStudents := make(map[string]model.LearningPath, len(drafts))
 	for _, draft := range drafts {
 		if draft.ClassID != classID {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Thread lộ trình không nhất quán"})
 		}
-		allowedStudents[draft.StudentID.String()] = struct{}{}
+		allowedStudents[draft.StudentID.String()] = draft
 	}
 
-	// We still notify FastAPI server of approval to update the thread status
-	reqToFastAPI := struct {
-		Approve bool   `json:"approve"`
-		Note    string `json:"note"`
-	}{
-		Approve: req.Approve,
-		Note:    req.Note,
+	selected := req.StudentIDs
+	if len(selected) == 0 {
+		selected = make([]string, 0, len(allowedStudents))
+		for studentID := range allowedStudents {
+			selected = append(selected, studentID)
+		}
+		sort.Strings(selected)
 	}
-	jsonBytes, err := json.Marshal(reqToFastAPI)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi mã hóa JSON"})
-	}
-
-	fastAPIURL := fmt.Sprintf("http://127.0.0.1:8000/learning-path/%s/approve", threadID)
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
-	if err != nil {
-		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi đọc phản hồi"})
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return c.Status(resp.StatusCode).JSON(fiber.Map{"error": "Máy chủ tính toán báo lỗi: " + string(bodyBytes)})
-	}
-
-	var result struct {
-		ThreadID     string                 `json:"thread_id"`
-		Status       string                 `json:"status"`
-		Paths        map[string]interface{} `json:"paths"`
-		ClassInsight interface{}            `json:"class_insight"`
-	}
-	if err := json.Unmarshal(bodyBytes, &result); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã JSON phản hồi"})
-	}
-
-	pathsToSave := result.Paths
-	if len(req.CustomPaths) > 0 {
-		pathsToSave = req.CustomPaths
-	}
-	if !req.Approve {
-		config.DB.Where("thread_id = ? AND teacher_id = ? AND status = ?", threadID, teacherID, "Draft").Delete(&model.LearningPath{})
-		h.publishLearningPathApproved(teacherID, threadID, false, req.Note, 0)
-		return c.JSON(result)
-	}
-
-	for studentIDStr, pathData := range pathsToSave {
-		if _, ok := allowedStudents[studentIDStr]; !ok {
+	for _, studentID := range selected {
+		if _, ok := allowedStudents[studentID]; !ok {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Lộ trình chứa học sinh ngoài bản nháp được phép"})
 		}
-		studentID, err := uuid.Parse(studentIDStr)
-		if err != nil {
-			continue
-		}
+	}
 
-		stepsBytes, _ := json.Marshal(pathData)
-
-		config.DB.Where("student_id = ? AND class_id = ? AND status = ?", studentID, classID, "Approved").Delete(&model.LearningPath{})
-
-		newPath := model.LearningPath{
-			ID:        uuid.New(),
-			TeacherID: teacherID,
-			StudentID: studentID,
-			ClassID:   classID,
-			ThreadID:  threadID,
-			Status:    "Approved",
-			StepsJSON: string(stepsBytes),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+	if !req.Approve {
+		if err := config.DB.Model(&model.LearningPath{}).Where(
+			"thread_id = ? AND teacher_id = ? AND student_id IN ? AND status = ?", threadID, teacherID, selected, "Draft",
+		).Update("status", "Skipped").Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể bỏ qua lộ trình"})
 		}
-		if err := config.DB.Create(&newPath).Error; err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể lưu lộ trình đã duyệt"})
+		h.publishLearningPathApproved(teacherID, threadID, false, req.Note, len(selected))
+		return c.JSON(fiber.Map{"thread_id": threadID, "status": "partial", "skippedStudentIds": selected})
+	}
+
+	approved := make([]model.LearningPath, 0, len(selected))
+	approvedPaths := make(map[string]interface{}, len(selected))
+	err := config.DB.Transaction(func(tx *gorm.DB) error {
+		for _, studentIDRaw := range selected {
+			draft := allowedStudents[studentIDRaw]
+			pathData, ok := req.CustomPaths[studentIDRaw]
+			if !ok {
+				if err := json.Unmarshal([]byte(draft.StepsJSON), &pathData); err != nil {
+					return err
+				}
+			}
+			stepsBytes, err := json.Marshal(setLearningPathStatus(pathData, "Approved"))
+			if err != nil {
+				return err
+			}
+			if err := tx.Model(&model.LearningPath{}).Where(
+				"student_id = ? AND class_id = ? AND subject = ? AND status = ? AND id <> ?",
+				draft.StudentID, classID, draft.Subject, "Approved", draft.ID,
+			).Update("status", "Superseded").Error; err != nil {
+				return err
+			}
+			draft.Status = "Approved"
+			draft.StepsJSON = string(stepsBytes)
+			draft.UpdatedAt = time.Now().UTC()
+			if err := tx.Save(&draft).Error; err != nil {
+				return err
+			}
+			approved = append(approved, draft)
+			approvedPaths[studentIDRaw] = setLearningPathStatus(pathData, "Approved")
 		}
-		if err := h.initializeApprovedLearningPath(&newPath); err != nil {
+		return nil
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể lưu lộ trình đã duyệt"})
+	}
+	for index := range approved {
+		if err := h.initializeApprovedLearningPath(&approved[index]); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể khởi tạo tiến độ lộ trình"})
 		}
 	}
-	config.DB.Where("thread_id = ? AND teacher_id = ? AND status = ?", threadID, teacherID, "Draft").Delete(&model.LearningPath{})
-	h.publishLearningPathApproved(teacherID, threadID, req.Approve, req.Note, len(pathsToSave))
+	var remaining int64
+	_ = config.DB.Model(&model.LearningPath{}).Where(
+		"thread_id = ? AND teacher_id = ? AND status = ?", threadID, teacherID, "Draft",
+	).Count(&remaining).Error
+	h.publishLearningPathApproved(teacherID, threadID, true, req.Note, len(approved))
+	status := "partial"
+	if remaining == 0 {
+		status = "finalized"
+	}
+	return c.JSON(fiber.Map{
+		"thread_id": threadID, "status": status, "paths": approvedPaths,
+		"approvedStudentIds": selected, "remainingDraftCount": remaining,
+	})
+}
 
-	return c.JSON(result)
+func setLearningPathStatus(pathData interface{}, status string) interface{} {
+	if path, ok := pathData.(map[string]interface{}); ok {
+		copy := make(map[string]interface{}, len(path)+1)
+		for key, value := range path {
+			copy[key] = value
+		}
+		copy["status"] = status
+		return copy
+	}
+	return pathData
 }
 
 func (h *TutorHandler) GetStudentLearningPath(c fiber.Ctx) error {
