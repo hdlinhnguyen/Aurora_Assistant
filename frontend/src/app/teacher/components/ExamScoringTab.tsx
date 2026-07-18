@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import {
   Check,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   History,
@@ -179,55 +180,75 @@ export default function ExamScoringTab() {
     ? (submission.questions?.length || 0) + (submission.rubrics?.length || 0)
     : 0;
 
+  if (!exam) {
+    return (
+      <div data-testid="scoring-workspace" className="flex-1 min-h-0 flex justify-center animate-[fadeIn_0.3s_ease-out]">
+        <aside
+          data-testid="scoring-exam-step"
+          className="w-full max-w-xl rounded-3xl border bg-card shadow-sm min-h-0 overflow-hidden flex flex-col"
+        >
+          <div className="p-5 border-b bg-gradient-to-br from-violet-50 to-white">
+            <p className="text-[9px] uppercase tracking-[.2em] text-violet-700 font-black">Bước 1</p>
+            <h2 className="mt-1 text-lg font-black">Chọn đề kiểm tra</h2>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Chỉ hiển thị đề đã sẵn sàng chấm.
+            </p>
+          </div>
+          <div className="p-3 space-y-2 overflow-auto flex-1">
+            {exams.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => selectExam(item)}
+                className="w-full rounded-2xl border border-border p-4 text-left transition-all hover:border-violet-300 hover:bg-violet-50/20 flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between gap-2 w-full">
+                  <b className="text-sm font-bold line-clamp-2">{item.title}</b>
+                  <ChevronRight size={14} className="text-muted-foreground" />
+                </div>
+                <p className="mt-2 text-[10px] font-bold text-muted-foreground">
+                  {item.subject} · {item.totalPoints} điểm
+                </p>
+              </button>
+            ))}
+            {!exams.length && (
+              <p className="p-6 text-center text-xs text-muted-foreground">Chưa có đề sẵn sàng.</p>
+            )}
+          </div>
+        </aside>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="scoring-workspace"
-      className="flex-1 min-h-0 grid gap-4 xl:grid-cols-[270px_310px_minmax(0,1fr)] animate-[fadeIn_0.3s_ease-out]"
+      className="flex-1 min-h-0 grid gap-4 xl:grid-cols-[310px_minmax(0,1fr)] animate-[fadeIn_0.3s_ease-out]"
     >
-      <aside
-        data-testid="scoring-exam-step"
-        className="rounded-3xl border bg-card shadow-sm min-h-0 overflow-hidden flex flex-col"
-      >
-        <div className="p-5 border-b bg-gradient-to-br from-indigo-50 to-white">
-          <p className="text-[9px] uppercase tracking-[.2em] font-black text-indigo-600">Bước 1</p>
-          <h2 className="mt-1 text-lg font-black">Chọn đề kiểm tra</h2>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            Chỉ hiển thị đề đã sẵn sàng chấm.
-          </p>
-        </div>
-        <div className="p-3 space-y-2 overflow-auto">
-          {exams.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => selectExam(item)}
-              className={`w-full rounded-2xl border p-3 text-left transition-all ${exam?.id === item.id ? "border-indigo-300 bg-indigo-50 shadow-sm" : "border-transparent hover:bg-muted"}`}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <b className="text-xs line-clamp-2">{item.title}</b>
-                <ChevronRight size={14} />
-              </div>
-              <p className="mt-2 text-[10px] text-muted-foreground">
-                {item.subject} · {item.totalPoints} điểm
-              </p>
-            </button>
-          ))}
-          {!exams.length && (
-            <p className="p-6 text-center text-xs text-muted-foreground">Chưa có đề sẵn sàng.</p>
-          )}
-        </div>
-      </aside>
-
       <aside
         data-testid="scoring-student-step"
         aria-disabled={!exam}
         className={`rounded-3xl border bg-card shadow-sm min-h-0 overflow-hidden flex flex-col ${!exam ? "opacity-55" : ""}`}
       >
-        <div className="p-5 border-b">
-          <p className="text-[9px] uppercase tracking-[.2em] font-black text-emerald-600">Bước 2</p>
-          <h2 className="mt-1 text-lg font-black">Chọn học sinh</h2>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            Mỗi lần chỉ mở một phiếu cá nhân.
-          </p>
+        <div className="p-5 border-b flex items-start gap-3">
+          <button
+            onClick={() => {
+              setExam(null);
+              setStudent(null);
+              setSubmission(null);
+            }}
+            className="mt-1 h-8 px-2.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground flex items-center gap-1 text-[10px] font-black shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+            title="Quay lại danh sách đề kiểm tra"
+          >
+            <ChevronLeft size={13} />
+            Quay lại
+          </button>
+          <div>
+            <p className="text-[9px] uppercase tracking-[.2em] font-black text-emerald-600">Bước 2</p>
+            <h2 className="mt-1 text-lg font-black leading-none">Chọn học sinh</h2>
+            <p className="mt-1 text-[10px] text-muted-foreground leading-normal">
+              Mỗi lần chỉ mở một phiếu cá nhân.
+            </p>
+          </div>
         </div>
         {exam ? (
           <>

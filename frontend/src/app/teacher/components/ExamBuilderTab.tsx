@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
-import { BookOpen, CheckCircle2, ChevronRight, Clock3, FileDown, FilePenLine, GripVertical, Library, Loader2, Plus, RotateCcw, Search, Sparkles, Trash2 } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileDown, FilePenLine, GripVertical, Library, Loader2, Plus, RotateCcw, Search, Sparkles, Trash2 } from "lucide-react";
 
 type Exam = { id: string; title: string; subject: string; gradeLevel: string; durationMinutes: number; totalPoints: string; status: string; version: number; questions?: any[] };
 const statusCopy: Record<string, string> = { drafting: "Bản nháp", preparing_exam: "Sẵn sàng chấm", done: "Hoàn tất" };
@@ -241,47 +241,71 @@ export default function ExamBuilderTab({ subjects }: { subjects: string[] }) {
     </div>;
   }
 
-  return <div data-testid="exam-workspace" className="flex-1 min-h-0 grid gap-4 xl:grid-cols-[250px_minmax(0,1fr)_320px] animate-[fadeIn_0.3s_ease-out]">
-    <aside className="min-h-0 rounded-3xl border border-border bg-card shadow-sm flex flex-col overflow-hidden">
-      <div className="p-4 border-b border-border bg-gradient-to-br from-emerald-50 to-white"><div className="flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-emerald-600">Kho đề</p><h2 className="font-black">Đề kiểm tra</h2></div><button onClick={() => { setCreating(true); setDetail(null); }} className="h-9 w-9 rounded-xl bg-foreground text-background grid place-items-center cursor-pointer hover:opacity-90 active:scale-95 transition-all"><Plus size={16}/></button></div></div>
-      <div className="p-3 space-y-2 overflow-auto">
-        {exams.map((exam) => (
-          <div
-            key={exam.id}
-            onClick={() => selectExam(exam.id)}
-            className={`group/exam w-full p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-              detail?.id === exam.id
-                ? "border-emerald-300 bg-emerald-50 shadow-sm"
-                : "border-transparent hover:border-border hover:bg-muted/60"
-            }`}
-          >
-            <div className="flex justify-between items-start gap-2">
-              <b className="text-xs line-clamp-2 flex-1 leading-normal font-bold text-foreground">{exam.title}</b>
-              <div className="flex items-center gap-1 shrink-0">
-                {exam.status === "drafting" && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteExam(exam.id, exam.version);
-                    }}
-                    className="p-1 rounded-lg text-rose-500 hover:bg-rose-100 opacity-0 group-hover/exam:opacity-100 transition-all cursor-pointer"
-                    title="Xóa nhanh đề thi"
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                )}
-                <ChevronRight size={14} className="text-muted-foreground" />
-              </div>
+  if (!detail) {
+    return (
+      <div data-testid="exam-workspace" className="flex-1 min-h-0 flex justify-center animate-[fadeIn_0.3s_ease-out]">
+        <aside className="w-full max-w-xl rounded-3xl border border-border bg-card shadow-sm flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-border bg-gradient-to-br from-violet-50 to-white flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[.2em] text-violet-700">Bước 1</p>
+              <h2 className="font-black text-lg">Chọn đề kiểm tra</h2>
             </div>
-            <div className="mt-2 flex items-center justify-between text-[9px] font-bold text-muted-foreground">
-              <span>{exam.subject}</span>
-              <span className="rounded-full bg-white px-2 py-1 border">{statusCopy[exam.status] || exam.status}</span>
-            </div>
+            <button
+              onClick={() => {
+                setCreating(true);
+                setForm({ title: "", subject: subjects[0] || "", gradeLevel: "Lớp 5", durationMinutes: 45, totalPoints: "10.00" });
+              }}
+              className="h-9 w-9 rounded-xl bg-slate-950 text-white grid place-items-center cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-sm"
+              title="Tạo đề thi mới"
+            >
+              <Plus size={16} />
+            </button>
           </div>
-        ))}
+          <div className="p-3 space-y-2 overflow-auto flex-1">
+            {exams.map((exam) => (
+              <div
+                key={exam.id}
+                onClick={() => selectExam(exam.id)}
+                className="group/exam w-full p-3.5 rounded-2xl border border-border hover:border-violet-300 hover:bg-violet-50/20 text-left transition-all cursor-pointer flex flex-col justify-between"
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <b className="text-xs line-clamp-2 flex-1 leading-normal font-bold text-foreground">{exam.title}</b>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {exam.status === "drafting" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteExam(exam.id, exam.version);
+                        }}
+                        className="p-1 rounded-lg text-rose-500 hover:bg-rose-100 opacity-0 group-hover/exam:opacity-100 transition-all cursor-pointer"
+                        title="Xóa nhanh đề thi"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                    <ChevronRight size={14} className="text-muted-foreground" />
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[9px] font-bold text-muted-foreground">
+                  <span>{exam.subject}</span>
+                  <span className="rounded-full bg-background px-2 py-0.5 border">{statusCopy[exam.status] || exam.status}</span>
+                </div>
+              </div>
+            ))}
+            {exams.length === 0 && (
+              <div className="py-16 text-center border border-dashed rounded-3xl border-border">
+                <BookOpen className="mx-auto text-muted-foreground" />
+                <p className="mt-3 text-sm font-black">Chưa có đề thi nào</p>
+                <p className="text-xs text-muted-foreground">Bấm nút + ở góc trên bên phải để tạo đề mới.</p>
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
-    </aside>
+    );
+  }
 
+  return <div data-testid="exam-workspace" className="flex-1 min-h-0 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] animate-[fadeIn_0.3s_ease-out]">
     <main className="min-h-0 rounded-3xl border border-border bg-card shadow-sm overflow-auto">
       {creating ? <div className="p-6"><div className="max-w-2xl mx-auto"><div className="mb-6 flex items-center gap-3"><div className="p-3 rounded-2xl bg-[var(--mint)]/20"><FilePenLine/></div><div><p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Khởi tạo</p><h2 className="text-xl font-black">Tạo một đề rõ ràng, vừa sức</h2></div></div><div className="grid sm:grid-cols-2 gap-4">{[["Tên đề","title"],["Khối lớp","gradeLevel"],["Thời lượng (phút)","durationMinutes"],["Tổng điểm","totalPoints"]].map(([label,key]) => <label key={key} className="space-y-1.5 text-xs font-bold"><span>{label}</span><input value={(form as any)[key]} type={key === "durationMinutes" ? "number" : "text"} onChange={(e) => setForm({ ...form, [key]: key === "durationMinutes" ? Number(e.target.value) : e.target.value })} className="w-full rounded-xl border bg-background px-3 py-3"/></label>)}<label className="sm:col-span-2 space-y-1.5 text-xs font-bold"><span>Môn học</span><select value={form.subject} onChange={(e) => setForm({...form,subject:e.target.value})} className="w-full rounded-xl border bg-background px-3 py-3">{subjects.map(s=><option key={s}>{s}</option>)}</select></label></div><div className="mt-6 flex items-center gap-3">
             <button onClick={createExam} disabled={!form.title || busy === "create"} className="rounded-xl bg-foreground text-background px-5 py-3 text-xs font-black flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all">{busy === "create" ? <Loader2 className="animate-spin" size={15}/> : <Sparkles size={15}/>}Tạo đề nháp</button>
@@ -289,7 +313,24 @@ export default function ExamBuilderTab({ subjects }: { subjects: string[] }) {
           </div></div></div>
       : !detail ? <div className="h-full grid place-items-center text-center py-16"><div><Clock3 className="mx-auto text-muted-foreground"/><p className="mt-3 text-sm font-black">Chọn một đề từ danh sách bên trái</p><p className="text-xs text-muted-foreground">Hoặc bấm nút + để tạo đề mới.</p></div></div>
       : <>
-        <div className="sticky top-0 z-10 p-5 border-b bg-card/95 backdrop-blur flex flex-wrap gap-4 justify-between"><div><div className="flex items-center gap-2"><span className="rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 text-[9px] font-black uppercase">{statusCopy[detail.status]}</span><span className="text-[10px] text-muted-foreground">Phiên bản {detail.version}</span></div><h2 className="mt-2 text-xl font-black">{detail.title}</h2><p className="text-xs text-muted-foreground">{detail.subject} · {detail.gradeLevel} · {detail.durationMinutes} phút</p></div><div className="flex gap-2 items-center">{detail.status === "drafting" && <><button onClick={() => deleteExam(detail.id, detail.version)} className="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 px-3 py-2 text-xs font-black cursor-pointer transition-all" title="Xóa đề thi">Xóa đề</button><button onClick={() => transition("prepare","Đã lưu và hoàn tất đề thi.")} disabled={validationErrors.length > 0} className="rounded-xl bg-foreground text-background px-3 py-2 text-xs font-black cursor-pointer hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all" title={validationErrors.length > 0 ? "Vui lòng sửa các lỗi cấu trúc trước khi lưu đề" : "Lưu đề thi"}>Lưu đề</button></>}{detail.status === "preparing_exam" && <button onClick={() => transition("return-to-draft","Đã đưa đề về bản nháp.")} className="rounded-xl border px-3 py-2 text-xs font-black flex gap-1 cursor-pointer hover:bg-muted transition-all"><RotateCcw size={14}/>Sửa lại</button>}<button onClick={exportDocx} className="rounded-xl bg-[var(--mint)] px-3 py-2 text-xs font-black flex gap-1 cursor-pointer hover:brightness-95 active:scale-95 transition-all"><FileDown size={14}/>DOCX</button></div></div>
+        <div className="sticky top-0 z-10 p-5 border-b bg-card/95 backdrop-blur flex flex-wrap gap-4 justify-between">
+          <div className="flex items-start gap-3">
+            <button
+              onClick={() => setDetail(null)}
+              className="mt-1 h-8 px-2.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground flex items-center gap-1 text-[10px] font-black shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+              title="Quay lại danh sách đề thi"
+            >
+              <ChevronLeft size={13} />
+              Quay lại
+            </button>
+            <div>
+              <div className="flex items-center gap-2"><span className="rounded-full bg-emerald-100 text-emerald-700 px-2.5 py-1 text-[9px] font-black uppercase">{statusCopy[detail.status]}</span><span className="text-[10px] text-muted-foreground">Phiên bản {detail.version}</span></div>
+              <h2 className="mt-2 text-xl font-black">{detail.title}</h2>
+              <p className="text-xs text-muted-foreground">{detail.subject} · {detail.gradeLevel} · {detail.durationMinutes} phút</p>
+            </div>
+          </div>
+          <div className="flex gap-2 items-center">{detail.status === "drafting" && <><button onClick={() => deleteExam(detail.id, detail.version)} className="rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 px-3 py-2 text-xs font-black cursor-pointer transition-all" title="Xóa đề thi">Xóa đề</button><button onClick={() => transition("prepare","Đã lưu và hoàn tất đề thi.")} disabled={validationErrors.length > 0} className="rounded-xl bg-foreground text-background px-3 py-2 text-xs font-black cursor-pointer hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all" title={validationErrors.length > 0 ? "Vui lòng sửa các lỗi cấu trúc trước khi lưu đề" : "Lưu đề thi"}>Lưu đề</button></>}{detail.status === "preparing_exam" && <button onClick={() => transition("return-to-draft","Đã đưa đề về bản nháp.")} className="rounded-xl border px-3 py-2 text-xs font-black flex gap-1 cursor-pointer hover:bg-muted transition-all"><RotateCcw size={14}/>Sửa lại</button>}<button onClick={exportDocx} className="rounded-xl bg-[var(--mint)] px-3 py-2 text-xs font-black flex gap-1 cursor-pointer hover:brightness-95 active:scale-95 transition-all"><FileDown size={14}/>DOCX</button></div>
+        </div>
         <div className="p-5"><div className="mb-5 rounded-2xl bg-slate-950 text-white p-4 flex items-center justify-between"><div><p className="text-[9px] uppercase tracking-[.2em] text-emerald-300 font-black">Tiến trình đề</p><p className="mt-1 text-sm font-bold">{detail.questions?.length || 0} câu hỏi · {pointsUsed.toFixed(2)}/{detail.totalPoints} điểm</p></div><div className="w-40 h-2 rounded-full bg-white/15 overflow-hidden"><div className={`h-full ${pointsUsed > Number(detail.totalPoints) ? "bg-rose-500 animate-pulse" : "bg-[var(--mint)]"}`} style={{width:`${Math.min(100, pointsUsed/Number(detail.totalPoints)*100)}%`}}/></div></div>
           {validationErrors.length > 0 && (
             <div className="mb-5 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1 animate-[fadeIn_0.2s_ease-out]">
