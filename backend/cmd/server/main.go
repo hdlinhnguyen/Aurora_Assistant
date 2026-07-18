@@ -17,6 +17,7 @@ import (
 	"backend/internal/adminmetrics"
 	"backend/internal/config"
 	"backend/internal/exam"
+	"backend/internal/gamification"
 	"backend/internal/handler"
 	masteryprofile "backend/internal/mastery"
 	"backend/internal/middleware"
@@ -92,6 +93,8 @@ func main() {
 		config.DB, masteryRepo, masteryClient,
 		masteryprofile.WithTelemetryPublisher(telemetryPublisher),
 	)
+	gamificationRepo := gamification.NewRepository(config.DB)
+	gamificationSvc := gamification.NewService(config.DB, gamificationRepo)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
@@ -103,6 +106,7 @@ func main() {
 	questionBankHandler := handler.NewQuestionBankHandler(questionBankSvc)
 	examHandler := handler.NewExamHandler(examSvc, os.Getenv("EXAM_INTERNAL_TOKEN"))
 	masteryHandler := handler.NewMasteryHandler(masterySvc)
+	gamificationHandler := handler.NewGamificationHandler(gamificationSvc)
 	studentExamHandler := handler.NewStudentExamHandler(config.DB)
 	scoringSvc := scoring.NewService(scoring.NewRepository(config.DB), func(db *gorm.DB) exam.ScoringGateway {
 		return exam.NewScoringGateway(db)
@@ -137,6 +141,11 @@ func main() {
 	seedService := syntheticseed.New(config.DB, syntheticseed.DefaultConfig())
 	if err := runSyntheticSeed(context.Background(), os.Getenv("ENABLE_SYNTHETIC_DATA"), seedService, masterySvc, log.Default()); err != nil {
 		log.Fatalf("synthetic startup failed: %v", err)
+	}
+
+	// Seed catalog huy hiệu (dữ liệu hệ thống, idempotent — không cần env gate).
+	if err := gamificationSvc.SeedBadges(context.Background()); err != nil {
+		log.Fatalf("badge seed failed: %v", err)
 	}
 
 	// Public Routes
@@ -189,6 +198,7 @@ func main() {
 	teacherExams.Post("/students/:studentId/mastery/recalculate", masteryHandler.RecalculateTeacherProfile)
 	studentMastery.Get("/mastery", masteryHandler.GetStudentProfile)
 	studentMastery.Get("/mastery/:topicId/history", masteryHandler.GetStudentHistory)
+	studentMastery.Get("/badges", gamificationHandler.GetStudentBadges)
 	studentMastery.Get("/exams", studentExamHandler.GetStudentExams)
 	studentMastery.Get("/exams/:examId", studentExamHandler.GetStudentExam)
 	studentMastery.Post("/exams/:examId/submit", studentExamHandler.SubmitStudentExam)

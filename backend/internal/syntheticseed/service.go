@@ -214,8 +214,8 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 		for questionIndex := 0; questionIndex < 3; questionIndex++ {
 			question := model.Question{
 				ID: uuid.New(), NodeID: node.ID,
-				Content:     fmt.Sprintf("Synthetic question %d.%d", nodeIndex+1, questionIndex+1),
-				OptionsJSON: `["Option A","Option B","Option C","Option D"]`, CorrectOption: questionIndex % 4,
+				Content:     fmt.Sprintf("Câu hỏi %d.%d — bài \"%s\"", nodeIndex+1, questionIndex+1, node.Name),
+				OptionsJSON: `["Đáp án A","Đáp án B","Đáp án C","Đáp án D"]`, CorrectOption: questionIndex % 4,
 				Difficulty: []string{"easy", "medium", "hard"}[questionIndex], QuestionType: "multiple_choice", GradeLevel: "7",
 			}
 			questions = append(questions, question)

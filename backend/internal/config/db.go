@@ -55,6 +55,8 @@ func migrationModels() []any {
 		&model.ScoringApprovalSnapshot{},
 		&model.ScoringAuditLog{},
 		&model.ScoringInternalEvent{},
+		&model.Badge{},
+		&model.StudentBadge{},
 	}
 }
 

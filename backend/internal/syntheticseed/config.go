@@ -24,7 +24,7 @@ func Enabled(raw string) bool {
 
 func DefaultConfig() Config {
 	return Config{
-		Subject: "Synthetic - To\u00e1n \u0111\u1ea1i s\u1ed1",
+		Subject: "S\u1ed1 v\u00e0 \u0110\u1ea1i s\u1ed1",
 		Teacher: Account{
 			Email: "synthetic.teacher@aurora.local", Password: DefaultPassword,
 			Name: "Synthetic Teacher", Role: "teacher",
