@@ -41,6 +41,10 @@ type MasteryReader interface {
 	TopicMastery(context.Context, uuid.UUID, uuid.UUID) (mastery float64, confidence float64, found bool, err error)
 }
 
+type MasteryRefresher interface {
+	RefreshTopicMastery(context.Context, uuid.UUID, uuid.UUID) (mastery float64, confidence float64, found bool, err error)
+}
+
 type ApplyEvidenceInput struct {
 	StudentID  uuid.UUID
 	TopicID    uuid.UUID

@@ -95,7 +95,7 @@ func main() {
 		masteryprofile.WithTelemetryPublisher(telemetryPublisher),
 	)
 	learningPathProgressSvc := learningpath.NewService(
-		config.DB, telemetryPublisher, learningpath.NewDatabaseMasteryReader(config.DB),
+		config.DB, telemetryPublisher, learningpath.NewDatabaseMasteryReader(config.DB, masterySvc),
 	)
 	gamificationRepo := gamification.NewRepository(config.DB)
 	gamificationSvc := gamification.NewService(config.DB, gamificationRepo)

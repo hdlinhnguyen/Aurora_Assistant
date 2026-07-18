@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	masteryprofile "backend/internal/mastery"
 	"backend/internal/model"
 	"backend/internal/telemetry"
 	"backend/internal/testutil"
@@ -21,6 +22,14 @@ type fakeMasteryReader struct {
 
 type recordingPublisher struct {
 	events []telemetry.Event
+}
+
+type fakeMasteryRecalculator struct {
+	profile masteryprofile.Profile
+}
+
+func (f fakeMasteryRecalculator) RecalculateStudent(context.Context, uuid.UUID, string) (masteryprofile.Profile, error) {
+	return f.profile, nil
 }
 
 func (p *recordingPublisher) PublishActor(_ context.Context, _ uuid.UUID, _ string, event telemetry.Event) (telemetry.PublishResult, error) {
@@ -225,11 +234,27 @@ func TestDatabaseMasteryReaderReturnsPersistedTopicState(t *testing.T) {
 		EvidenceSummaryJSON: "{}", SourceBreakdownJSON: "{}", Version: 1,
 	}).Error)
 
-	mastery, confidence, found, err := NewDatabaseMasteryReader(db).TopicMastery(context.Background(), studentID, topicID)
+	mastery, confidence, found, err := NewDatabaseMasteryReader(db, nil).TopicMastery(context.Background(), studentID, topicID)
 	require.NoError(t, err)
 	require.True(t, found)
 	require.Equal(t, .82, mastery)
 	require.Equal(t, .67, confidence)
+}
+
+func TestDatabaseMasteryReaderRefreshesTopicFromNewEvidence(t *testing.T) {
+	db := setupLearningPathDB(t)
+	studentID, topicID := uuid.New(), uuid.New()
+	require.NoError(t, db.AutoMigrate(&model.Node{}))
+	require.NoError(t, db.Create(&model.Node{ID: topicID, Subject: "Toán", Name: "Phân số"}).Error)
+	recalculator := fakeMasteryRecalculator{profile: masteryprofile.Profile{Topics: map[string]masteryprofile.TopicState{
+		topicID.String(): {TopicID: topicID, MasteryProbability: .83, ConfidenceScore: .64},
+	}}}
+
+	mastery, confidence, found, err := NewDatabaseMasteryReader(db, recalculator).RefreshTopicMastery(context.Background(), studentID, topicID)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, .83, mastery)
+	require.Equal(t, .64, confidence)
 }
 
 func setupLearningPathDB(t *testing.T) *gorm.DB {

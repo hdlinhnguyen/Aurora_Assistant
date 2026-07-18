@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	masteryprofile "backend/internal/mastery"
 	"backend/internal/model"
 	"backend/internal/telemetry"
 
@@ -22,11 +23,35 @@ type Service struct {
 }
 
 type DatabaseMasteryReader struct {
-	db *gorm.DB
+	db           *gorm.DB
+	recalculator MasteryRecalculator
 }
 
-func NewDatabaseMasteryReader(db *gorm.DB) *DatabaseMasteryReader {
-	return &DatabaseMasteryReader{db: db}
+type MasteryRecalculator interface {
+	RecalculateStudent(context.Context, uuid.UUID, string) (masteryprofile.Profile, error)
+}
+
+func NewDatabaseMasteryReader(db *gorm.DB, recalculator MasteryRecalculator) *DatabaseMasteryReader {
+	return &DatabaseMasteryReader{db: db, recalculator: recalculator}
+}
+
+func (r *DatabaseMasteryReader) RefreshTopicMastery(ctx context.Context, studentID, topicID uuid.UUID) (float64, float64, bool, error) {
+	if r.recalculator == nil {
+		return r.TopicMastery(ctx, studentID, topicID)
+	}
+	var node model.Node
+	if err := r.db.WithContext(ctx).Select("id", "subject").Where("id = ?", topicID).First(&node).Error; err != nil {
+		return 0, 0, false, err
+	}
+	profile, err := r.recalculator.RecalculateStudent(ctx, studentID, node.Subject)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	state, found := profile.Topics[topicID.String()]
+	if !found {
+		return 0, 0, false, nil
+	}
+	return state.MasteryProbability, state.ConfidenceScore, true, nil
 }
 
 func (r *DatabaseMasteryReader) TopicMastery(ctx context.Context, studentID, topicID uuid.UUID) (float64, float64, bool, error) {
@@ -146,7 +171,11 @@ func (s *Service) ApplyEvidence(ctx context.Context, input ApplyEvidenceInput) (
 			input.Reason = BlockedReasonAdaptiveDowngrade
 		}
 		if (input.Mastery == nil || input.Confidence == nil) && s.mastery != nil {
-			mastery, confidence, found, masteryErr := s.mastery.TopicMastery(ctx, input.StudentID, input.TopicID)
+			readMastery := s.mastery.TopicMastery
+			if refresher, ok := s.mastery.(MasteryRefresher); ok {
+				readMastery = refresher.RefreshTopicMastery
+			}
+			mastery, confidence, found, masteryErr := readMastery(ctx, input.StudentID, input.TopicID)
 			if masteryErr != nil {
 				log.Printf("learning path mastery lookup failed: %v", masteryErr)
 			} else if found {
