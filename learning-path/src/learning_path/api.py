@@ -89,7 +89,7 @@ def fetch_dynamic_graph() -> CurriculumGraph:
             
         topics: dict[str, Topic] = {}
         edges: list[PrerequisiteEdge] = []
-        for node in raw["nodes"]:
+        for node in raw.get("nodes") or []:
             topics[node["id"]] = Topic(
                 topic_id=node["id"],
                 subject_id="toan",
@@ -97,9 +97,9 @@ def fetch_dynamic_graph() -> CurriculumGraph:
                 name=node["ten"],
                 estimated_learning_time=DEFAULT_MINUTES_BY_CAP.get(node["cap"], 30),
                 content_available=not node["mo"],
-                learning_outcomes=node.get("yccd", []),
+                learning_outcomes=node.get("yccd") or [],
             )
-            for prereq_id in node["tienQuyet"]:
+            for prereq_id in node.get("tienQuyet") or []:
                 edges.append(
                     PrerequisiteEdge(prerequisite_topic_id=prereq_id, dependent_topic_id=node["id"])
                 )
