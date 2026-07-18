@@ -21,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"backend/internal/config"
 	"backend/internal/learningpath"
@@ -1349,9 +1350,17 @@ func resolveLearningPathClass(teacherID uuid.UUID) (model.Classroom, []string, e
 	return classrooms[0], ids, nil
 }
 
-func learningPathEvidence(studentIDs []string) ([]RawQuizEvidence, error) {
+func learningPathEvidence(studentIDs []string, subject string) ([]RawQuizEvidence, error) {
+	return learningPathEvidenceForDB(config.DB, studentIDs, subject)
+}
+
+func learningPathEvidenceForDB(db *gorm.DB, studentIDs []string, subject string) ([]RawQuizEvidence, error) {
 	var logs []model.ActivityLog
-	if err := config.DB.Where("student_id IN ?", studentIDs).Find(&logs).Error; err != nil {
+	query := db.Where("student_id IN ?", studentIDs)
+	if strings.TrimSpace(subject) != "" {
+		query = query.Where("subject = ?", subject)
+	}
+	if err := query.Find(&logs).Error; err != nil {
 		return nil, err
 	}
 	evidence := make([]RawQuizEvidence, 0, len(logs))
@@ -1415,7 +1424,7 @@ func (h *TutorHandler) GetLearningPathSuggestions(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
 	}
-	rawQuiz, err := learningPathEvidence(studentIDs)
+	rawQuiz, err := learningPathEvidence(studentIDs, c.Query("subject"))
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn lịch sử học tập"})
 	}
@@ -1447,6 +1456,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 
 	var req struct {
 		ClassID        string   `json:"classId"`
+		Subject        string   `json:"subject"`
 		StudentIDs     []string `json:"studentIds"`
 		TargetTopicIDs []string `json:"targetTopicIds"`
 	}
@@ -1464,7 +1474,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
 	}
 	req.ClassID = classroom.ID.String()
-	rawQuiz, err := learningPathEvidence(req.StudentIDs)
+	rawQuiz, err := learningPathEvidence(req.StudentIDs, req.Subject)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn lịch sử học tập"})
 	}
