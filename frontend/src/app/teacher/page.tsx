@@ -1546,23 +1546,26 @@ export default function TeacherDashboard() {
         </div>
 
         {/* Subject Selection inside Sidebar */}
-        {selectedSubject && (
+        {subjects.length > 0 && (
           <div className="p-5 border-b border-border bg-muted/40 space-y-2">
             <div className="flex items-center justify-between">
               <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">Môn Học</label>
-              <button
-                onClick={() => setSelectedSubject("")}
-                title="Quay lại bảng chọn môn học"
-                className="text-[10px] font-black text-[var(--mint)] hover:underline flex items-center gap-1 cursor-pointer font-bold"
-              >
-                <GraduationCap size={13} /> Bảng môn học
-              </button>
+              {selectedSubject && (
+                <button
+                  onClick={() => setSelectedSubject("")}
+                  title="Quay lại bảng chọn môn học"
+                  className="text-[10px] font-black text-[var(--mint)] hover:underline flex items-center gap-1 cursor-pointer font-bold"
+                >
+                  <GraduationCap size={13} /> Bảng môn học
+                </button>
+              )}
             </div>
             <select
               value={selectedSubject}
               onChange={(e) => setSelectedSubject(e.target.value)}
               className="w-full rounded-xl bg-card border border-border px-3 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground shadow-sm"
             >
+              <option value="">-- Chọn môn học --</option>
               {subjects.map((s) => (
                 <option key={s} value={s}>
                   {s}
