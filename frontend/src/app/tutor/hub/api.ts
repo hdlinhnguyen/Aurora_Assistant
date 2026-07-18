@@ -12,6 +12,8 @@ export interface HubNode {
   theory: string;
   topicGroup: string;
   isRoot: boolean;
+  posX: number;
+  posY: number;
 }
 export interface HubEdge {
   id: string;

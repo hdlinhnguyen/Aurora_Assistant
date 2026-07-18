@@ -36,6 +36,7 @@ import {
 } from "./hub/api";
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 import { SafeHtml } from "@/components/ui/safe-html";
+import KnowledgeTree from "../components/KnowledgeTree";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
@@ -86,6 +87,7 @@ export default function TutorHubPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [nodes, setNodes] = useState<HubNode[]>([]);
+  const [edges, setEdges] = useState<any[]>([]);
   const [mastery, setMastery] = useState<MasteryProfile>({ topics: {} });
   const [roadmap, setRoadmap] = useState<RoadmapStep[]>([]);
   const [summary, setSummary] = useState<GameSummary | null>(null);
@@ -97,7 +99,7 @@ export default function TutorHubPage() {
 
   // ---- quiz / ui ----
   const [screen, setScreen] = useState<"lesson" | "complete">("lesson");
-  const [activeTab, setActiveTab] = useState<"theory" | "practice" | "chat" | "exams">("theory");
+  const [activeTab, setActiveTab] = useState<"theory" | "practice" | "chat" | "exams" | "graph">("graph");
   const [qIndex, setQIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [answered, setAnswered] = useState(false);
@@ -120,7 +122,7 @@ export default function TutorHubPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ---- diagnostic & exam states ----
-  const [studentState, setStudentState] = useState<{ needsDiagnostic: boolean } | null>(null);
+  const [studentState, setStudentState] = useState<any | null>(null);
   const [examsList, setExamsList] = useState<any[]>([]);
   const [activeExam, setActiveExam] = useState<any | null>(null);
   const [examQuestions, setExamQuestions] = useState<any[]>([]);
@@ -193,6 +195,7 @@ export default function TutorHubPage() {
       ]);
       const rm = buildRoadmap(tree.nodes ?? [], tree.edges ?? [], pathRes.ordered_steps ?? [], masteryRes);
       setNodes(tree.nodes ?? []);
+      setEdges(tree.edges ?? []);
       setMastery(masteryRes);
       setRoadmap(rm);
       setSummary(summaryRes);
@@ -982,6 +985,9 @@ export default function TutorHubPage() {
           <div style={{ display: "flex", gap: 9, margin: "22px 0 18px", alignItems: "center" }}>
             {!needsDiagnostic ? (
               <>
+                <div onClick={() => setActiveTab("graph")} style={activeTab === "graph" ? tabOn : tabOff}>
+                  📊 Sơ đồ năng lực
+                </div>
                 <div onClick={() => setActiveTab("theory")} style={activeTab === "theory" ? tabOn : tabOff}>
                   📖 Học lý thuyết
                 </div>
@@ -1013,6 +1019,65 @@ export default function TutorHubPage() {
               ✍️ Đề thi & Kiểm tra
             </div>
           </div>
+
+          {/* ===== GRAPH (KNOWLEDGE TREE) PANEL ===== */}
+          {activeTab === "graph" && (
+            <div className="ah-panel" style={{ height: 600, position: "relative", border: "1px solid #eef1f4", borderRadius: 22, overflow: "hidden", background: "#fff", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+              {nodes.length > 0 ? (
+                <KnowledgeTree
+                  subject={subject}
+                  nodes={nodes}
+                  edges={edges}
+                  masteryByTopic={mastery.topics as any}
+                  mode="student"
+                  studentNodeStatus={(() => {
+                    const statusMap: Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial"> = {};
+                    roadmap.forEach((st) => {
+                      if (st.status === "done") {
+                        statusMap[st.id] = "mastered";
+                      } else if (st.status === "current") {
+                        statusMap[st.id] = "learning";
+                      } else {
+                        statusMap[st.id] = "locked";
+                      }
+                    });
+                    if (studentState?.initialLevelNodeId) {
+                      statusMap[studentState.initialLevelNodeId] = "initial";
+                    }
+                    return statusMap;
+                  })()}
+                  initialNodeId={studentState?.initialLevelNodeId}
+                  currentNodeId={studentState?.currentLevelNodeId || currentStepId}
+                  focusedNodeId={currentStepId}
+                  onFocusedNodeChange={(id) => {
+                    const step = roadmap.find((st) => st.id === id);
+                    if (step) {
+                      setCurrentStepId(id);
+                      resetChat(step.name);
+                      loadQuestions(id);
+                    }
+                  }}
+                  onShowContentClick={(node: any) => {
+                    const step = roadmap.find((st) => st.id === node.id);
+                    if (step) {
+                      selectStep(step);
+                    }
+                  }}
+                  onNodeClick={(node: any) => {
+                    const step = roadmap.find((st) => st.id === node.id);
+                    if (step) {
+                      selectStep(step);
+                    }
+                  }}
+                  onRefresh={() => loadAll()}
+                />
+              ) : (
+                <div style={{ padding: 40, textAlign: "center", color: "#9aa1b0" }}>
+                  Đang tải sơ đồ học tập...
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ===== THEORY PANEL ===== */}
           {activeTab === "theory" && (
