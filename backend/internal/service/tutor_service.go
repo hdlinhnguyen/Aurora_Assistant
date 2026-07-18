@@ -69,6 +69,7 @@ type TutorService interface {
 	GetStudentsProgress() ([]map[string]interface{}, error)
 	GetStudentSubjectProgress(studentID uuid.UUID, subject string) (map[string]interface{}, error)
 	GetMonitoringData(subject string) ([]StudentStat, error)
+	GetClassInterventionGroups(subject string) (map[string]interface{}, error)
 
 	// Socratic RAG Chat
 	ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string) (string, error)
@@ -456,6 +457,41 @@ func (s *tutorService) SubmitAnswer(studentID uuid.UUID, nodeID uuid.UUID, quest
 			state.CurrentLevelNodeID = nodeID
 			state.UpdatedAt = time.Now()
 			s.db.Save(&state)
+		}
+
+		// Success state propagation
+		var parentEdges []model.Edge
+		if err := s.db.Where("target_id = ? AND status = 'active'", nodeID).Find(&parentEdges).Error; err == nil {
+			for _, edge := range parentEdges {
+				s.LogActivity(studentID, node.Subject, edge.SourceID, "mastered", "Lan truyền trạng thái Đạt (Success Propagation)")
+			}
+		}
+	} else {
+		// First-Principle Diagnostics via Distractor Mapping
+		if q.DistractorMappings != "" {
+			var mappings map[string]string
+			if err := json.Unmarshal([]byte(q.DistractorMappings), &mappings); err == nil {
+				optionKey := fmt.Sprintf("%d", selectedOption)
+				mappedNodeIDStr, hasMap := mappings[optionKey]
+				if !hasMap {
+					optionLetterKey := "option_" + string(rune('a'+selectedOption))
+					mappedNodeIDStr, hasMap = mappings[optionLetterKey]
+				}
+
+				if hasMap && mappedNodeIDStr != "" {
+					if mappedNodeID, err := uuid.Parse(mappedNodeIDStr); err == nil {
+						s.LogActivity(studentID, node.Subject, mappedNodeID, "struggle", fmt.Sprintf("Chẩn đoán lỗi sai nền tảng (First-Principle) từ câu hỏi %s", q.ID))
+
+						var state model.StudentState
+						if err := s.db.Where("student_id = ? AND subject = ?", studentID, node.Subject).First(&state).Error; err == nil {
+							state.CurrentLevelNodeID = mappedNodeID
+							state.UpdatedAt = time.Now()
+							s.db.Save(&state)
+						}
+						detail += fmt.Sprintf(" -> Chuyển chẩn đoán về chủ đề nền tảng: %s", mappedNodeIDStr)
+					}
+				}
+			}
 		}
 	}
 
@@ -1536,6 +1572,104 @@ func (s *tutorService) GetMonitoringData(subject string) ([]StudentStat, error) 
 		})
 	}
 	return stats, nil
+}
+
+func (s *tutorService) GetClassInterventionGroups(subject string) (map[string]interface{}, error) {
+	var nodes []model.Node
+	if err := s.db.Where("subject = ?", subject).Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	nodeNameMap := make(map[uuid.UUID]string)
+	for _, n := range nodes {
+		nodeNameMap[n.ID] = n.Name
+	}
+
+	var students []model.User
+	if err := s.db.Where("role = ?", "student").Find(&students).Error; err != nil {
+		return nil, err
+	}
+	studentNameMap := make(map[uuid.UUID]string)
+	for _, st := range students {
+		studentNameMap[st.ID] = st.Name
+	}
+
+	var logs []model.ActivityLog
+	if err := s.db.Where("subject = ?", subject).Order("created_at asc").Find(&logs).Error; err != nil {
+		return nil, err
+	}
+
+	studentNodeStates := make(map[uuid.UUID]map[uuid.UUID]bool)
+	for _, log := range logs {
+		if log.NodeID == uuid.Nil {
+			continue
+		}
+		if _, exists := studentNodeStates[log.StudentID]; !exists {
+			studentNodeStates[log.StudentID] = make(map[uuid.UUID]bool)
+		}
+
+		if log.Action == "answer_correct" || log.Action == "mastered" {
+			studentNodeStates[log.StudentID][log.NodeID] = false
+		} else if log.Action == "answer_incorrect" || log.Action == "click_cant_do" || log.Action == "struggle" {
+			studentNodeStates[log.StudentID][log.NodeID] = true
+		}
+	}
+
+	nodeStruggleCount := make(map[uuid.UUID]int)
+	nodeStruggleStudents := make(map[uuid.UUID][]map[string]interface{})
+
+	for stID, nodeStates := range studentNodeStates {
+		stName, ok := studentNameMap[stID]
+		if !ok {
+			continue
+		}
+		for ndID, struggling := range nodeStates {
+			if struggling {
+				nodeStruggleCount[ndID]++
+				nodeStruggleStudents[ndID] = append(nodeStruggleStudents[ndID], map[string]interface{}{
+					"studentId":   stID.String(),
+					"studentName": stName,
+				})
+			}
+		}
+	}
+
+	var topGaps []map[string]interface{}
+	var groups []map[string]interface{}
+
+	for ndID, count := range nodeStruggleCount {
+		ndName, ok := nodeNameMap[ndID]
+		if !ok {
+			continue
+		}
+		topGaps = append(topGaps, map[string]interface{}{
+			"nodeId":        ndID.String(),
+			"nodeName":      ndName,
+			"struggleCount": count,
+		})
+
+		groups = append(groups, map[string]interface{}{
+			"nodeId":   ndID.String(),
+			"nodeName": ndName,
+			"students": nodeStruggleStudents[ndID],
+		})
+	}
+
+	// Sort descending
+	for i := 0; i < len(topGaps)-1; i++ {
+		for j := i + 1; j < len(topGaps); j++ {
+			countI := topGaps[i]["struggleCount"].(int)
+			countJ := topGaps[j]["struggleCount"].(int)
+			if countI < countJ {
+				topGaps[i], topGaps[j] = topGaps[j], topGaps[i]
+				groups[i], groups[j] = groups[j], groups[i]
+			}
+		}
+	}
+
+	return map[string]interface{}{
+		"topGaps": topGaps,
+		"groups":  groups,
+	}, nil
 }
 
 
