@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"io"
 
 	"backend/internal/service"
 
@@ -33,8 +36,8 @@ type TaggingHandler struct {
 }
 
 type UpdateTopicsRequest struct {
-	TopicIDs        []uuid.UUID `json:"topicIds"`
-	ExpectedVersion int         `json:"expectedVersion"`
+	TopicIDs        *[]uuid.UUID `json:"topicIds"`
+	ExpectedVersion int          `json:"expectedVersion"`
 }
 
 type taggingRequestError struct {
@@ -97,7 +100,7 @@ func (h *TaggingHandler) SetQuestionTopics(c fiber.Ctx) error {
 	}
 	context, err := h.service.SetQuestionTopics(
 		questionID,
-		request.TopicIDs,
+		*request.TopicIDs,
 		request.ExpectedVersion,
 		actorID,
 	)
@@ -127,7 +130,7 @@ func (h *TaggingHandler) SetRubricItemTopics(c fiber.Ctx) error {
 	context, err := h.service.SetRubricItemTopics(
 		questionID,
 		rubricItemID,
-		request.TopicIDs,
+		*request.TopicIDs,
 		request.ExpectedVersion,
 		actorID,
 	)
@@ -154,20 +157,20 @@ func requireTeacherActor(c fiber.Ctx) (uuid.UUID, error) {
 			Message: "Teacher role is required.",
 		}
 	}
-	userIDValue, ok := c.Locals("userID").(string)
+	subject, ok := claims["sub"].(string)
 	if !ok {
 		return uuid.Nil, &taggingRequestError{
 			Status:  fiber.StatusUnauthorized,
 			Code:    "invalid_actor",
-			Message: "Authenticated user ID is missing.",
+			Message: "Authenticated token subject is missing.",
 		}
 	}
-	userID, err := uuid.Parse(userIDValue)
+	userID, err := uuid.Parse(subject)
 	if err != nil {
 		return uuid.Nil, &taggingRequestError{
 			Status:  fiber.StatusUnauthorized,
 			Code:    "invalid_actor",
-			Message: "Authenticated user ID is invalid.",
+			Message: "Authenticated token subject is invalid.",
 		}
 	}
 	return userID, nil
@@ -188,14 +191,22 @@ func parseUUIDParam(c fiber.Ctx, name string) (uuid.UUID, error) {
 
 func bindUpdateTopics(c fiber.Ctx) (UpdateTopicsRequest, error) {
 	var request UpdateTopicsRequest
-	if err := c.Bind().JSON(&request); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(c.Request().Body()))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		return request, invalidUpdateTopicsPayload()
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return request, invalidUpdateTopicsPayload()
+	}
+	if request.TopicIDs == nil {
 		return request, &taggingRequestError{
 			Status:  fiber.StatusUnprocessableEntity,
 			Code:    "request_validation_error",
-			Message: "Request payload is invalid.",
+			Message: "topicIds is required and must be an array.",
 		}
 	}
-	if request.ExpectedVersion < 1 || len(request.TopicIDs) > 200 {
+	if request.ExpectedVersion < 1 || len(*request.TopicIDs) > 200 {
 		return request, &taggingRequestError{
 			Status:  fiber.StatusUnprocessableEntity,
 			Code:    "request_validation_error",
@@ -203,6 +214,14 @@ func bindUpdateTopics(c fiber.Ctx) (UpdateTopicsRequest, error) {
 		}
 	}
 	return request, nil
+}
+
+func invalidUpdateTopicsPayload() *taggingRequestError {
+	return &taggingRequestError{
+		Status:  fiber.StatusUnprocessableEntity,
+		Code:    "request_validation_error",
+		Message: "Request payload is invalid.",
+	}
 }
 
 func writeTaggingError(c fiber.Ctx, err error) error {

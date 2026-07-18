@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type QuestionBankService struct {
@@ -147,80 +148,139 @@ func (s *QuestionBankService) UpdateQuestion(
 	questionID uuid.UUID,
 	update QuestionBankQuestionUpdate,
 ) (*model.Question, error) {
-	var question model.Question
-	if err := s.db.First(&question, "id = ?", questionID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, &DomainError{Code: "question_not_found", Message: "Question does not exist."}
-		}
-		return nil, err
-	}
-	if update.QuestionType != nil && *update.QuestionType == "multiple_choice" &&
-		question.QuestionType == "essay" {
-		var rubricCount int64
-		if err := s.db.Model(&model.QuestionRubricItem{}).
-			Where("question_id = ?", questionID).
-			Count(&rubricCount).Error; err != nil {
-			return nil, err
-		}
-		if rubricCount > 0 {
-			return nil, &DomainError{
-				Code:    "rubric_items_exist",
-				Message: "Remove essay rubric items before changing the question type.",
+	var updated *model.Question
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var question model.Question
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&question, "id = ?", questionID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return &DomainError{Code: "question_not_found", Message: "Question does not exist."}
 			}
+			return err
+		}
+		if update.QuestionType != nil && *update.QuestionType == "multiple_choice" &&
+			question.QuestionType == "essay" {
+			var rubricCount int64
+			if err := tx.Model(&model.QuestionRubricItem{}).
+				Where("question_id = ?", questionID).
+				Count(&rubricCount).Error; err != nil {
+				return err
+			}
+			if rubricCount > 0 {
+				return &DomainError{
+					Code:    "rubric_items_exist",
+					Message: "Remove essay rubric items before changing the question type.",
+				}
+			}
+		}
+
+		input := QuestionBankQuestionInput{
+			NodeID:        question.NodeID,
+			Content:       question.Content,
+			CorrectOption: question.CorrectOption,
+			Difficulty:    question.Difficulty,
+			QuestionType:  question.QuestionType,
+			GradeLevel:    question.GradeLevel,
+		}
+		_ = json.Unmarshal([]byte(question.OptionsJSON), &input.Options)
+		if update.NodeID != nil {
+			input.NodeID = *update.NodeID
+		}
+		if update.Content != nil {
+			input.Content = *update.Content
+		}
+		if update.Options != nil {
+			input.Options = *update.Options
+		}
+		if update.CorrectOption != nil {
+			input.CorrectOption = *update.CorrectOption
+		}
+		if update.Difficulty != nil {
+			input.Difficulty = *update.Difficulty
+		}
+		if update.QuestionType != nil {
+			input.QuestionType = *update.QuestionType
+		}
+		if update.GradeLevel != nil {
+			input.GradeLevel = *update.GradeLevel
+		}
+		if update.NodeID != nil {
+			if err := validateQuestionSourceChange(tx, questionID, input.NodeID); err != nil {
+				return err
+			}
+		}
+		replacement, err := buildQuestion(input)
+		if err != nil {
+			return err
+		}
+		replacement.UpdatedAt = time.Now().UTC()
+		if err := tx.Model(&question).Updates(map[string]any{
+			"node_id":        replacement.NodeID,
+			"content":        replacement.Content,
+			"options_json":   replacement.OptionsJSON,
+			"correct_option": replacement.CorrectOption,
+			"difficulty":     replacement.Difficulty,
+			"question_type":  replacement.QuestionType,
+			"grade_level":    replacement.GradeLevel,
+			"updated_at":     replacement.UpdatedAt,
+		}).Error; err != nil {
+			return err
+		}
+		if err := tx.First(&question, "id = ?", questionID).Error; err != nil {
+			return err
+		}
+		updated = &question
+		return nil
+	})
+	return updated, err
+}
+
+func validateQuestionSourceChange(
+	tx *gorm.DB,
+	questionID uuid.UUID,
+	nodeID uuid.UUID,
+) error {
+	var target model.Node
+	targetResult := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+		Where("id = ?", nodeID).
+		Limit(1).
+		Find(&target)
+	if targetResult.Error != nil {
+		return targetResult.Error
+	}
+	if targetResult.RowsAffected != 1 {
+		return &DomainError{
+			Code:    "topic_not_found",
+			Message: "Source topic does not exist.",
 		}
 	}
 
-	input := QuestionBankQuestionInput{
-		NodeID:        question.NodeID,
-		Content:       question.Content,
-		CorrectOption: question.CorrectOption,
-		Difficulty:    question.Difficulty,
-		QuestionType:  question.QuestionType,
-		GradeLevel:    question.GradeLevel,
+	var mismatchedMappings int64
+	if err := tx.Table("question_topic_mappings AS mapping").
+		Joins("LEFT JOIN nodes ON nodes.id = mapping.node_id").
+		Where("mapping.question_id = ?", questionID).
+		Where("nodes.id IS NULL OR nodes.deleted_at IS NOT NULL OR nodes.subject <> ?", target.Subject).
+		Count(&mismatchedMappings).Error; err != nil {
+		return err
 	}
-	_ = json.Unmarshal([]byte(question.OptionsJSON), &input.Options)
-	if update.NodeID != nil {
-		input.NodeID = *update.NodeID
+	if mismatchedMappings == 0 {
+		if err := tx.Table("question_rubric_item_topic_mappings AS mapping").
+			Joins("JOIN question_rubric_items AS rubric ON rubric.id = mapping.rubric_item_id").
+			Joins("LEFT JOIN nodes ON nodes.id = mapping.node_id").
+			Where("rubric.question_id = ?", questionID).
+			Where("nodes.id IS NULL OR nodes.deleted_at IS NOT NULL OR nodes.subject <> ?", target.Subject).
+			Count(&mismatchedMappings).Error; err != nil {
+			return err
+		}
 	}
-	if update.Content != nil {
-		input.Content = *update.Content
+	if mismatchedMappings > 0 {
+		return &DomainError{
+			Code:    "topic_subject_mismatch",
+			Message: "Existing question tags must belong to the source topic subject.",
+			Details: map[string]any{"expectedSubject": target.Subject},
+		}
 	}
-	if update.Options != nil {
-		input.Options = *update.Options
-	}
-	if update.CorrectOption != nil {
-		input.CorrectOption = *update.CorrectOption
-	}
-	if update.Difficulty != nil {
-		input.Difficulty = *update.Difficulty
-	}
-	if update.QuestionType != nil {
-		input.QuestionType = *update.QuestionType
-	}
-	if update.GradeLevel != nil {
-		input.GradeLevel = *update.GradeLevel
-	}
-	replacement, err := buildQuestion(input)
-	if err != nil {
-		return nil, err
-	}
-	replacement.UpdatedAt = time.Now().UTC()
-	if err := s.db.Model(&question).Updates(map[string]any{
-		"node_id":        replacement.NodeID,
-		"content":        replacement.Content,
-		"options_json":   replacement.OptionsJSON,
-		"correct_option": replacement.CorrectOption,
-		"difficulty":     replacement.Difficulty,
-		"question_type":  replacement.QuestionType,
-		"grade_level":    replacement.GradeLevel,
-		"updated_at":     replacement.UpdatedAt,
-	}).Error; err != nil {
-		return nil, err
-	}
-	if err := s.db.First(&question, "id = ?", questionID).Error; err != nil {
-		return nil, err
-	}
-	return &question, nil
+	return nil
 }
 
 func (s *QuestionBankService) DeleteQuestion(questionID uuid.UUID) error {
@@ -238,31 +298,37 @@ func (s *QuestionBankService) CreateRubricItem(
 	questionID uuid.UUID,
 	input RubricItemInput,
 ) (*model.QuestionRubricItem, error) {
-	if err := s.requireEssay(questionID); err != nil {
-		return nil, err
-	}
 	if strings.TrimSpace(input.Content) == "" || !input.Points.GreaterThan(model.MustScore("0").Decimal) {
 		return nil, &DomainError{Code: "invalid_rubric_item", Message: "Rubric content and positive points are required."}
 	}
-	var maxPosition *int
-	if err := s.db.Model(&model.QuestionRubricItem{}).
-		Where("question_id = ?", questionID).
-		Select("MAX(position)").
-		Scan(&maxPosition).Error; err != nil {
-		return nil, err
-	}
-	position := 0
-	if maxPosition != nil {
-		position = *maxPosition + 1
-	}
-	item := model.QuestionRubricItem{
-		ID:         uuid.New(),
-		QuestionID: questionID,
-		Content:    strings.TrimSpace(input.Content),
-		Points:     input.Points,
-		Position:   position,
-	}
-	if err := s.db.Create(&item).Error; err != nil {
+
+	var item model.QuestionRubricItem
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockEssayQuestion(tx, questionID); err != nil {
+			return err
+		}
+
+		var maxPosition *int
+		if err := tx.Model(&model.QuestionRubricItem{}).
+			Where("question_id = ?", questionID).
+			Select("MAX(position)").
+			Scan(&maxPosition).Error; err != nil {
+			return err
+		}
+		position := 0
+		if maxPosition != nil {
+			position = *maxPosition + 1
+		}
+		item = model.QuestionRubricItem{
+			ID:         uuid.New(),
+			QuestionID: questionID,
+			Content:    strings.TrimSpace(input.Content),
+			Points:     input.Points,
+			Position:   position,
+		}
+		return tx.Create(&item).Error
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &item, nil
@@ -273,36 +339,45 @@ func (s *QuestionBankService) UpdateRubricItem(
 	rubricItemID uuid.UUID,
 	input RubricItemInput,
 ) (*model.QuestionRubricItem, error) {
-	if err := s.requireEssay(questionID); err != nil {
-		return nil, err
-	}
-	var item model.QuestionRubricItem
-	if err := s.db.First(&item, "id = ? AND question_id = ?", rubricItemID, questionID).Error; err != nil {
-		return nil, &DomainError{Code: "rubric_item_not_found", Message: "Rubric item does not exist."}
-	}
 	if strings.TrimSpace(input.Content) == "" || !input.Points.GreaterThan(model.MustScore("0").Decimal) {
 		return nil, &DomainError{Code: "invalid_rubric_item", Message: "Rubric content and positive points are required."}
 	}
-	if err := s.db.Model(&item).Updates(map[string]any{
-		"content":    strings.TrimSpace(input.Content),
-		"points":     input.Points,
-		"updated_at": time.Now().UTC(),
-	}).Error; err != nil {
+	var item model.QuestionRubricItem
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockEssayQuestion(tx, questionID); err != nil {
+			return err
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&item, "id = ? AND question_id = ?", rubricItemID, questionID).Error; err != nil {
+			return &DomainError{Code: "rubric_item_not_found", Message: "Rubric item does not exist."}
+		}
+		return tx.Model(&item).Updates(map[string]any{
+			"content":    strings.TrimSpace(input.Content),
+			"points":     input.Points,
+			"updated_at": time.Now().UTC(),
+		}).Error
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &item, nil
 }
 
 func (s *QuestionBankService) DeleteRubricItem(questionID, rubricItemID uuid.UUID) error {
-	result := s.db.Where("id = ? AND question_id = ?", rubricItemID, questionID).
-		Delete(&model.QuestionRubricItem{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected != 1 {
-		return &DomainError{Code: "rubric_item_not_found", Message: "Rubric item does not exist."}
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockEssayQuestion(tx, questionID); err != nil {
+			return err
+		}
+		result := tx.Where("id = ? AND question_id = ?", rubricItemID, questionID).
+			Delete(&model.QuestionRubricItem{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return &DomainError{Code: "rubric_item_not_found", Message: "Rubric item does not exist."}
+		}
+		return nil
+	})
 }
 
 func (s *QuestionBankService) ReorderRubricItems(
@@ -310,6 +385,9 @@ func (s *QuestionBankService) ReorderRubricItems(
 	orderedIDs []uuid.UUID,
 ) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockEssayQuestion(tx, questionID); err != nil {
+			return err
+		}
 		var existing []uuid.UUID
 		if err := tx.Model(&model.QuestionRubricItem{}).
 			Where("question_id = ?", questionID).
@@ -348,10 +426,14 @@ func (s *QuestionBankService) ReorderRubricItems(
 	})
 }
 
-func (s *QuestionBankService) requireEssay(questionID uuid.UUID) error {
+func lockEssayQuestion(tx *gorm.DB, questionID uuid.UUID) error {
 	var question model.Question
-	if err := s.db.First(&question, "id = ?", questionID).Error; err != nil {
-		return &DomainError{Code: "question_not_found", Message: "Question does not exist."}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		First(&question, "id = ?", questionID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &DomainError{Code: "question_not_found", Message: "Question does not exist."}
+		}
+		return err
 	}
 	if question.QuestionType != "essay" {
 		return &DomainError{Code: "invalid_question_type", Message: "Rubric items require an essay question."}

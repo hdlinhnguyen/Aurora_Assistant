@@ -1,6 +1,7 @@
 package service
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"sort"
@@ -63,6 +64,25 @@ type EffectiveQuestionTopics struct {
 	UpdatedAt  time.Time   `json:"updatedAt"`
 }
 
+type QuestionRubricSnapshot struct {
+	ID       uuid.UUID   `json:"id"`
+	Content  string      `json:"content"`
+	Points   model.Score `json:"points"`
+	Position int         `json:"position"`
+	TopicIDs []uuid.UUID `json:"topicIds"`
+}
+
+type QuestionTaggingSnapshot struct {
+	Question          model.Question           `json:"question"`
+	Subject           string                   `json:"subject"`
+	RubricItems       []QuestionRubricSnapshot `json:"rubricItems"`
+	DirectTopicIDs    []uuid.UUID              `json:"directTopicIds"`
+	EffectiveTopicIDs []uuid.UUID              `json:"effectiveTopicIds"`
+	TaggingVersion    int                      `json:"taggingVersion"`
+	UpdatedBy         *uuid.UUID               `json:"updatedBy"`
+	UpdatedAt         time.Time                `json:"updatedAt"`
+}
+
 type TaggingService struct {
 	db *gorm.DB
 }
@@ -72,7 +92,16 @@ func NewTaggingService(db *gorm.DB) *TaggingService {
 }
 
 func (s *TaggingService) GetContext(questionID uuid.UUID) (*TaggingContext, error) {
-	return s.getContext(s.db, questionID)
+	var context *TaggingContext
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		context, err = s.getContext(tx, questionID)
+		return err
+	}, &sql.TxOptions{
+		Isolation: sql.LevelRepeatableRead,
+		ReadOnly:  true,
+	})
+	return context, err
 }
 
 func (s *TaggingService) GetEffectiveTopics(questionID uuid.UUID) (*EffectiveQuestionTopics, error) {
@@ -93,6 +122,62 @@ func (s *TaggingService) GetEffectiveTopics(questionID uuid.UUID) (*EffectiveQue
 	}, nil
 }
 
+func (s *TaggingService) GetQuestionSnapshot(
+	questionID uuid.UUID,
+) (*QuestionTaggingSnapshot, error) {
+	var snapshot *QuestionTaggingSnapshot
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		context, err := s.getContext(tx, questionID)
+		if err != nil {
+			return err
+		}
+
+		var question model.Question
+		if err := tx.First(&question, "id = ?", questionID).Error; err != nil {
+			return err
+		}
+		var rubricModels []model.QuestionRubricItem
+		if err := tx.Where("question_id = ?", questionID).
+			Order("position ASC, id ASC").
+			Find(&rubricModels).Error; err != nil {
+			return err
+		}
+		rubricTopics := make(map[uuid.UUID][]uuid.UUID, len(context.RubricItems))
+		for _, rubric := range context.RubricItems {
+			rubricTopics[rubric.ID] = rubric.TopicIDs
+		}
+		rubrics := make([]QuestionRubricSnapshot, 0, len(rubricModels))
+		for _, rubric := range rubricModels {
+			rubrics = append(rubrics, QuestionRubricSnapshot{
+				ID:       rubric.ID,
+				Content:  rubric.Content,
+				Points:   rubric.Points,
+				Position: rubric.Position,
+				TopicIDs: rubricTopics[rubric.ID],
+			})
+		}
+		effectiveTopicIDs := make([]uuid.UUID, 0, len(context.EffectiveTopics))
+		for _, topic := range context.EffectiveTopics {
+			effectiveTopicIDs = append(effectiveTopicIDs, topic.ID)
+		}
+		snapshot = &QuestionTaggingSnapshot{
+			Question:          question,
+			Subject:           context.Question.Subject,
+			RubricItems:       rubrics,
+			DirectTopicIDs:    context.DirectTopicIDs,
+			EffectiveTopicIDs: effectiveTopicIDs,
+			TaggingVersion:    context.Version,
+			UpdatedBy:         context.UpdatedBy,
+			UpdatedAt:         context.UpdatedAt,
+		}
+		return nil
+	}, &sql.TxOptions{
+		Isolation: sql.LevelRepeatableRead,
+		ReadOnly:  true,
+	})
+	return snapshot, err
+}
+
 func (s *TaggingService) SetQuestionTopics(
 	questionID uuid.UUID,
 	topicIDs []uuid.UUID,
@@ -101,7 +186,7 @@ func (s *TaggingService) SetQuestionTopics(
 ) (*TaggingContext, error) {
 	var context *TaggingContext
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		question, sourceNode, err := s.loadQuestionAndSourceNode(tx, questionID)
+		question, sourceNode, err := s.loadQuestionAndSourceNodeForUpdate(tx, questionID)
 		if err != nil {
 			return err
 		}
@@ -159,7 +244,7 @@ func (s *TaggingService) SetRubricItemTopics(
 ) (*TaggingContext, error) {
 	var context *TaggingContext
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		question, sourceNode, err := s.loadQuestionAndSourceNode(tx, questionID)
+		question, sourceNode, err := s.loadQuestionAndSourceNodeForUpdate(tx, questionID)
 		if err != nil {
 			return err
 		}
@@ -233,8 +318,27 @@ func (s *TaggingService) loadQuestionAndSourceNode(
 	db *gorm.DB,
 	questionID uuid.UUID,
 ) (*model.Question, *model.Node, error) {
+	return s.loadQuestionAndSourceNodeWithLock(db, questionID, false)
+}
+
+func (s *TaggingService) loadQuestionAndSourceNodeForUpdate(
+	db *gorm.DB,
+	questionID uuid.UUID,
+) (*model.Question, *model.Node, error) {
+	return s.loadQuestionAndSourceNodeWithLock(db, questionID, true)
+}
+
+func (s *TaggingService) loadQuestionAndSourceNodeWithLock(
+	db *gorm.DB,
+	questionID uuid.UUID,
+	lock bool,
+) (*model.Question, *model.Node, error) {
 	var question model.Question
-	if err := db.First(&question, "id = ?", questionID).Error; err != nil {
+	query := db
+	if lock {
+		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	if err := query.First(&question, "id = ?", questionID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, &DomainError{
 				Code:    "question_not_found",
@@ -244,7 +348,11 @@ func (s *TaggingService) loadQuestionAndSourceNode(
 		return nil, nil, err
 	}
 	var sourceNode model.Node
-	if err := db.First(&sourceNode, "id = ?", question.NodeID).Error; err != nil {
+	nodeQuery := db
+	if lock {
+		nodeQuery = nodeQuery.Clauses(clause.Locking{Strength: "SHARE"})
+	}
+	if err := nodeQuery.First(&sourceNode, "id = ?", question.NodeID).Error; err != nil {
 		return nil, nil, err
 	}
 	return &question, &sourceNode, nil
@@ -271,7 +379,11 @@ func (s *TaggingService) validateTopicIDs(
 			}
 		}
 		if _, exists := unique[topicID]; exists {
-			continue
+			return nil, &DomainError{
+				Code:    "request_validation_error",
+				Message: "Topic IDs must be unique.",
+				Details: map[string]any{"topicId": topicID},
+			}
 		}
 		unique[topicID] = struct{}{}
 		normalized = append(normalized, topicID)
@@ -284,7 +396,11 @@ func (s *TaggingService) validateTopicIDs(
 	}
 
 	var topics []model.Node
-	if err := db.Where("id IN ?", normalized).Find(&topics).Error; err != nil {
+	topicQuery := db
+	if len(normalized) > 0 {
+		topicQuery = topicQuery.Clauses(clause.Locking{Strength: "SHARE"})
+	}
+	if err := topicQuery.Where("id IN ?", normalized).Find(&topics).Error; err != nil {
 		return nil, err
 	}
 	found := make(map[uuid.UUID]model.Node, len(topics))
@@ -325,6 +441,24 @@ func (s *TaggingService) lockTaggingState(
 	question *model.Question,
 	expectedVersion int,
 ) (*model.QuestionTaggingState, error) {
+	var state model.QuestionTaggingState
+	stateResult := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("question_id = ?", question.ID).
+		Limit(1).
+		Find(&state)
+	if stateResult.Error != nil {
+		return nil, stateResult.Error
+	}
+	if stateResult.RowsAffected == 1 {
+		if state.Version != expectedVersion {
+			return nil, s.newVersionConflict(tx, question.ID, expectedVersion)
+		}
+		return &state, nil
+	}
+	if expectedVersion != 1 {
+		return nil, s.newVersionConflict(tx, question.ID, expectedVersion)
+	}
+
 	initial := model.QuestionTaggingState{
 		QuestionID: question.ID,
 		Version:    1,
@@ -334,7 +468,6 @@ func (s *TaggingService) lockTaggingState(
 		return nil, err
 	}
 
-	var state model.QuestionTaggingState
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		First(&state, "question_id = ?", question.ID).Error; err != nil {
 		return nil, err
