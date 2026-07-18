@@ -155,7 +155,7 @@ type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-ban
 export default function TeacherDashboard() {
   const router = useRouter();
   const [userName, setUserName] = useState("Giáo viên");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("student-mgmt");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("graph-designer");
   const [subjects, setSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("");
 
