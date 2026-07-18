@@ -372,17 +372,13 @@ export default function TeacherDashboard() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ["Chủ đề", "Câu hỏi", "Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D", "Đáp án đúng (0-3)", "Độ khó (easy/medium/hard)"];
-    const sampleRows = [
-      ["Cộng phân số cùng mẫu", "Tính 1/5 + 2/5 = ?", "3/5", "4/5", "5/5", "2/5", 0, "easy"],
-      ["Cộng phân số cùng mẫu", "Tính 3/7 + 2/7 = ?", "5/14", "5/7", "1/7", "6/7", 1, "easy"],
-      ["Cộng phân số khác mẫu", "Tính 1/2 + 1/3 = ?", "2/5", "5/6", "1/5", "5/5", 1, "medium"]
-    ];
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "mau_nhap_cau_hoi.xlsx");
-    toast.success("Đã tải xuống file mẫu Excel!");
+    const link = document.createElement("a");
+    link.href = "/mau_nhap_cau_hoi.xlsx";
+    link.download = "mau_nhap_cau_hoi.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Đã tải xuống file mẫu câu hỏi (chứa dữ liệu từ Đề 1 & Master Bank)!");
   };
 
   const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -795,6 +791,7 @@ export default function TeacherDashboard() {
   };
 
   const handleImportMockTree = async () => {
+    console.log("[DEBUG] handleImportMockTree triggered. selectedSubject:", selectedSubject);
     if (!selectedSubject) {
       toast.warning("Vui lòng chọn hoặc tạo môn học trước khi nạp cây mẫu!");
       return;
@@ -802,23 +799,38 @@ export default function TeacherDashboard() {
     try {
       setLoading(true);
       setLoadingMessage("Đang nạp Sơ đồ Cây Mẫu...");
+      console.log("[DEBUG] Fetching /mock_knowledge_tree.json...");
       const res = await fetch("/mock_knowledge_tree.json");
       const mockGraph = await res.json();
+      console.log("[DEBUG] Fetched mock graph:", mockGraph);
 
-      await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/save-tree`, {
+      console.log("[DEBUG] Calling /save-tree API endpoint...");
+      const saveTreeResult = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/save-tree`, {
         method: "POST",
         body: JSON.stringify({
           nodes: mockGraph.nodes,
           edges: mockGraph.edges
         })
       });
+      console.log("[DEBUG] save-tree API result:", saveTreeResult);
 
       toast.success(`🎉 Đã nạp thành công Cây Tri Thức Mẫu vào môn "${selectedSubject}"!`);
+      
+      console.log("[DEBUG] Reloading subjects list...");
       await loadSubjects(selectedSubject);
+      
+      console.log("[DEBUG] Reloading tree data...");
       await loadTreeData();
+      
+      console.log("[DEBUG] Reloading subject questions...");
       await loadSubjectQuestions();
+      
+      console.log("[DEBUG] Reloading exams status...");
       await loadExamsStatus();
+      
+      console.log("[DEBUG] handleImportMockTree completed successfully.");
     } catch (err: any) {
+      console.error("[DEBUG] Error inside handleImportMockTree:", err);
       toast.error("Lỗi khi nạp Cây Mẫu: " + (err.message || err));
     } finally {
       setLoading(false);
@@ -2856,14 +2868,12 @@ export default function TeacherDashboard() {
                 handleStartAddQuestion={handleStartAddQuestion}
                 handleDownloadTemplate={handleDownloadTemplate}
                 handleExcelImport={handleExcelImport}
-                handleMasterBankImport={handleMasterBankImport}
                 handleStartEditQuestion={handleStartEditQuestion}
                 handleDeleteQuestion={handleDeleteQuestion}
                 handleDeleteQuestionsBulk={handleDeleteQuestionsBulk}
                 handleTagQuestion={(question) => setTaggingQuestionId(question.id)}
                 setEditingNode={setEditingNode}
                 formatDate={formatDate}
-                handleLoadDemoQuestions={handleLoadDemoQuestions}
               />
             ) : (
               <MonitoringTab

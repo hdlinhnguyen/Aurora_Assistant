@@ -212,14 +212,14 @@ export default function KnowledgeTree({
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.15, 0.4));
   const handleResetZoom = () => {
     const container = containerRef.current;
-    if (!container || localNodes.length === 0) {
+    if (!container || displayNodes.length === 0) {
       setPan({ x: 0, y: 0 });
       setScale(1);
       return;
     }
 
-    const xs = localNodes.map(n => n.posX);
-    const ys = localNodes.map(n => n.posY);
+    const xs = displayNodes.map(n => n.posX);
+    const ys = displayNodes.map(n => n.posY);
     const minX = Math.min(...xs);
     const maxX = Math.max(...xs) + 230; // node width
     const minY = Math.min(...ys);
