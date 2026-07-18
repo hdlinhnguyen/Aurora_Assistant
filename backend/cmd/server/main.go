@@ -112,6 +112,10 @@ func main() {
 		config.DB.Exec("DELETE FROM student_states WHERE student_id IN (SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?))", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
 		config.DB.Exec("DELETE FROM activity_logs WHERE student_id IN (SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?))", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
 		config.DB.Exec("DELETE FROM topics WHERE teacher_id IN (SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?))", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
+		
+		// Remove classrooms referencing the teacher first to avoid foreign key violations
+		config.DB.Exec("DELETE FROM classrooms WHERE teacher_id IN (SELECT id FROM users WHERE email = ?)", "teacher@aurora.edu.vn")
+		
 		config.DB.Exec("DELETE FROM users WHERE email IN (?, ?, ?, ?, ?)", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
 		
 		authSvc.Register("student@aurora.edu.vn", "demo123", "Học sinh Demo", "student")
@@ -184,9 +188,9 @@ func main() {
 			`[{"id":"ax1","text":"Chia cho một phân số bằng nhân với nghịch đảo.","category":"Axiom Gốc"},{"id":"ax2","text":"Nghịch đảo: đổi tử thành mẫu, mẫu thành tử.","category":"Quy tắc"}]`)
 
 		// Seed Tree Nodes and Questions if not exists
-		var nodeCount int64
-		config.DB.Model(&model.Node{}).Count(&nodeCount)
-		if nodeCount == 0 {
+		var mathNodeCount int64
+		config.DB.Model(&model.Node{}).Where("subject = ?", "Toán đại số").Count(&mathNodeCount)
+		if mathNodeCount == 0 {
 			log.Println("Seeding tree nodes and questions...")
 			// 1. Math nodes
 			mathRootID := uuid.New()
