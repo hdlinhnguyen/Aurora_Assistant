@@ -1,0 +1,81 @@
+# Track C — is_correct_step (Track C trong docs/eval-socratic-chat.md).
+# Mỗi case: 1 hội thoại ngắn kết thúc bằng phát biểu của học sinh có lỗi (hoặc
+# đúng) đã biết trước, chấm is_correct_step + detected_gap trả về ở lượt CUỐI.
+# expect.gap_contains: substring (đã fold dấu) phải xuất hiện trong detected_gap
+# khi expect.is_correct_step = false; bỏ qua nếu is_correct_step = true.
+
+- id: frac-add-wrong-denominator-confident
+  topic: "Cộng phân số khác mẫu số"
+  mode: socratic
+  turns:
+    - "Em chào thầy, mình học cộng phân số khác mẫu ạ"
+    - "Em chắc chắn 1/2 cộng 1/3 bằng 2/5, cộng tử với tử, mẫu với mẫu ạ, cô em dạy thế mà"
+  expect:
+    is_correct_step: false
+    gap_contains: "quy đồng"
+
+- id: frac-add-correct-hesitant
+  topic: "Cộng phân số khác mẫu số"
+  mode: socratic
+  turns:
+    - "Em chào thầy, mình học cộng phân số khác mẫu ạ"
+    - "Em đoán là phải quy đồng mẫu số trước rồi mới cộng tử, nhưng em không chắc lắm ạ, có khi em sai"
+  expect:
+    is_correct_step: true
+
+- id: subtraction-borrow-forgotten
+  topic: "Phép trừ có nhớ"
+  mode: socratic
+  turns:
+    - "Em chào thầy, em học phép trừ có nhớ ạ"
+    - "52 trừ 27, em lấy 2 trừ 7 không được nên em ghi 5, rồi 5 trừ 2 bằng 3, ra 53 ạ"
+  expect:
+    is_correct_step: false
+    gap_contains: "nhớ"
+
+- id: fraction-compare-numerator-only
+  topic: "So sánh phân số"
+  mode: socratic
+  turns:
+    - "Em chào thầy, em học so sánh phân số ạ"
+    - "3/8 lớn hơn 2/5 vì 3 lớn hơn 2 ạ"
+  expect:
+    is_correct_step: false
+    gap_contains: "quy đồng"
+
+- id: multiplication-table-wrong
+  topic: "Bảng cửu chương"
+  mode: socratic
+  turns:
+    - "Em chào thầy, em ôn bảng cửu chương 7 ạ"
+    - "7 nhân 8 bằng 54 ạ"
+  expect:
+    is_correct_step: false
+
+- id: division-remainder-dropped
+  topic: "Phép chia có dư"
+  mode: socratic
+  turns:
+    - "Em chào thầy, em học phép chia có dư ạ"
+    - "29 chia 4 em được 7 ạ"
+  expect:
+    is_correct_step: false
+    gap_contains: "dư"
+
+- id: unit-conversion-mismatch
+  topic: "Đổi đơn vị đo độ dài"
+  mode: socratic
+  turns:
+    - "Em chào thầy, em học đổi đơn vị đo ạ"
+    - "3 mét 5 xăng-ti-mét em đổi thành 35 mét ạ"
+  expect:
+    is_correct_step: false
+
+- id: decimal-multiplication-correct-confident
+  topic: "Nhân số thập phân"
+  mode: socratic
+  turns:
+    - "Em chào thầy, em học nhân số thập phân ạ"
+    - "2.5 nhân 3, em nhân 25 nhân 3 bằng 75, rồi đếm 1 chữ số thập phân nên ra 7.5 ạ, em chắc chắn đúng"
+  expect:
+    is_correct_step: true

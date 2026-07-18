@@ -1,0 +1,88 @@
+# Track M — Monotonicity ladders (feynman_score, xem
+# docs/superpowers/specs/2026-07-18-feynman-clarity-meta-eval.md mục 6).
+#
+# Mỗi ladder: 1 topic + list "rungs" xếp từ TỐT NHẤT -> TỆ NHẤT theo đúng thứ
+# tự suy biến chuẩn: 0 gốc (rõ ràng + ví dụ trực quan) -> 1 bỏ ví dụ -> 2 thay
+# từ trẻ con bằng thuật ngữ hàn lâm -> 3 làm rối logic trình bày -> 4 sai kiến
+# thức. mode luôn là feynman vì feynman_score chỉ có ý nghĩa ở mode này (mode
+# socratic model được dặn luôn trả feynman_score=0, xem ai_service.go:142).
+#
+# Mỗi rung được gửi trong 1 session RIÊNG (không chia sẻ lịch sử với rung khác)
+# để tránh nhiễu "context sensitivity" giữa các nấc (xem Track R mục 3 của spec)
+# — turns[0] luôn là câu chào mở màn trung tính, turns[1] là nội dung được
+# chấm điểm (feynman_score của response ứng với turns[1]).
+#
+# fully_ordered kỳ vọng = true cho toàn bộ ladder (giảm đơn điệu yếu); gate đề
+# xuất ở mục 9: 100% ladder đúng thứ tự.
+
+- id: fraction-add-different-denominator
+  topic: "Cộng phân số khác mẫu số"
+  rungs:
+    - "Muốn cộng hai phân số khác mẫu, đầu tiên mình phải quy đồng mẫu số, giống như đổi kẹo và táo về chung một cái hộp bằng nhau rồi mới đếm được tổng, ví dụ 1/2 với 1/3 thì đổi thành 3/6 với 2/6, cộng tử lại là 5/6 con nhé."
+    - "Muốn cộng hai phân số khác mẫu, đầu tiên mình phải quy đồng mẫu số rồi mới cộng tử số lại, ví dụ 1/2 với 1/3 thì đổi thành 3/6 với 2/6, cộng tử lại là 5/6."
+    - "Đối với phép cộng phân số dị mẫu, ta tiến hành quy đồng mẫu số chung nhỏ nhất của hai phân số, sau đó thực hiện phép cộng các tử số tương ứng để thu được kết quả tối giản."
+    - "Muốn cộng phân số thì lấy mẫu số kia nhân chéo lên tử rồi cộng ngược lại, xong đem chia cho tổng hai mẫu, nói chung là đảo lộn thứ tự các bước lại với nhau cho ra số là được."
+    - "Muốn cộng hai phân số khác mẫu, mình cứ cộng tử với tử, mẫu với mẫu là ra kết quả luôn á, dễ ẹc."
+
+- id: subtraction-with-borrowing
+  topic: "Phép trừ có nhớ"
+  rungs:
+    - "Khi trừ mà số bị trừ nhỏ hơn số trừ ở hàng đơn vị, mình mượn 1 chục từ hàng chục bên cạnh, giống như đổi một tờ 10 nghìn thành 10 tờ 1 nghìn để có đủ tiền trả, ví dụ 52 trừ 27 thì mượn 1 chục từ số 5 thành 4, rồi 12 trừ 7 bằng 5, 4 trừ 2 bằng 2, ra 25."
+    - "Khi trừ mà số bị trừ nhỏ hơn số trừ ở hàng đơn vị, mình mượn 1 chục từ hàng chục bên cạnh, ví dụ 52 trừ 27 thì mượn 1 chục từ số 5 thành 4, rồi 12 trừ 7 bằng 5, 4 trừ 2 bằng 2, ra 25."
+    - "Trong phép trừ có nhớ, khi hàng đơn vị của số bị trừ nhỏ hơn số trừ, ta thực hiện mượn một đơn vị từ hàng chục liền kề rồi tiến hành trừ tuần tự theo từng hàng."
+    - "Con số ở dưới mà bé hơn con số ở trên thì mình đảo ngược lại, lấy số dưới trừ số trên trước, rồi nhớ cộng thêm 1 vào đâu đó ở hàng bên cạnh là ra."
+    - "52 trừ 27, mình lấy 2 trừ 7 không được nên ghi đại số 5, rồi 5 trừ 2 bằng 3, vậy kết quả là 53."
+
+- id: comparing-fractions
+  topic: "So sánh phân số khác mẫu"
+  rungs:
+    - "Muốn so sánh hai phân số khác mẫu, mình quy đồng mẫu số trước rồi so tử số, giống như cắt hai cái bánh pizza thành cùng số miếng bằng nhau rồi đếm xem ai có nhiều miếng hơn, ví dụ 3/8 với 2/5 thì quy đồng thành 15/40 và 16/40, vậy 2/5 lớn hơn."
+    - "Muốn so sánh hai phân số khác mẫu, mình quy đồng mẫu số trước rồi so tử số, ví dụ 3/8 với 2/5 thì quy đồng thành 15/40 và 16/40, vậy 2/5 lớn hơn."
+    - "Để so sánh các phân số có mẫu số không đồng nhất, ta thực hiện quy đồng mẫu số chung rồi đối chiếu giá trị tử số tương ứng để xác định phân số lớn hơn."
+    - "So sánh phân số thì cứ lấy tử nhân chéo với mẫu bên kia, được số nào lớn thì mẫu số bên đó thắng, nói vòng vòng khó nhớ lắm nhưng đại khái vậy."
+    - "3/8 lớn hơn 2/5 vì 3 lớn hơn 2 thôi con, tử số nào lớn hơn thì phân số đó lớn hơn."
+
+- id: decimal-multiplication
+  topic: "Nhân số thập phân"
+  rungs:
+    - "Muốn nhân số thập phân, mình nhân như số tự nhiên bình thường trước, sau đó đếm tổng số chữ số sau dấu phẩy của cả hai số rồi đặt dấu phẩy vào kết quả, giống như đếm xem có bao nhiêu viên kẹo lẻ để chia phần cho đúng, ví dụ 2.5 nhân 3 thì nhân 25 với 3 bằng 75, có 1 chữ số sau dấu phẩy nên kết quả là 7.5."
+    - "Muốn nhân số thập phân, mình nhân như số tự nhiên trước, sau đó đếm số chữ số sau dấu phẩy rồi đặt dấu phẩy vào kết quả, ví dụ 2.5 nhân 3 thì nhân 25 với 3 bằng 75, có 1 chữ số sau dấu phẩy nên ra 7.5."
+    - "Đối với phép nhân số thập phân, ta thực hiện phép nhân trên các chữ số như số nguyên, sau đó xác định vị trí dấu phẩy dựa trên tổng số chữ số thập phân của các thừa số."
+    - "Nhân số thập phân thì mình dịch dấu phẩy qua trái rồi nhân, xong dịch ngược lại qua phải bao nhiêu chỗ tùy hứng là ra kết quả gần đúng."
+    - "2.5 nhân 3 thì mình lấy 2 nhân 3 bằng 6, rồi thêm dấu phẩy y chang chỗ cũ vào, ra 6.5."
+
+- id: unit-conversion-length
+  topic: "Đổi đơn vị đo độ dài"
+  rungs:
+    - "Muốn đổi mét sang xăng-ti-mét, mình nhớ 1 mét bằng 100 xăng-ti-mét, giống như đổi 1 tờ tiền to thành 100 đồng xu nhỏ, ví dụ 3 mét 5 xăng-ti-mét thì đổi 3 mét thành 300 xăng-ti-mét rồi cộng thêm 5, ra 305 xăng-ti-mét."
+    - "Muốn đổi mét sang xăng-ti-mét, mình nhớ 1 mét bằng 100 xăng-ti-mét, ví dụ 3 mét 5 xăng-ti-mét thì đổi 3 mét thành 300 xăng-ti-mét rồi cộng thêm 5, ra 305 xăng-ti-mét."
+    - "Trong hệ đo lường độ dài, việc quy đổi giữa các đơn vị được thực hiện dựa trên hệ số 100 giữa mét và xăng-ti-mét, áp dụng phép nhân hoặc chia tương ứng."
+    - "Đổi đơn vị đo độ dài thì cứ dịch dấu phẩy hai chỗ theo hướng nào cũng được, tùy con thấy hợp lý thì dịch, không cần nhớ chiều."
+    - "3 mét 5 xăng-ti-mét thì mình đổi thành 35 mét luôn, vì cứ ghép số lại với nhau là ra."
+
+- id: multiplication-table-seven
+  topic: "Bảng cửu chương 7"
+  rungs:
+    - "Bảng cửu chương 7 là cộng dồn số 7 lên nhiều lần, giống như xếp từng chồng 7 viên kẹo lại với nhau, ví dụ 7 nhân 8 nghĩa là có 8 chồng kẹo, mỗi chồng 7 viên, cộng tất cả lại được 56 viên."
+    - "Bảng cửu chương 7 là cộng dồn số 7 lên nhiều lần, ví dụ 7 nhân 8 nghĩa là có 8 nhóm, mỗi nhóm 7, cộng lại được 56."
+    - "Phép nhân trong bảng cửu chương 7 biểu thị tổng của nhiều số hạng bằng nhau, mỗi số hạng có giá trị 7, được lặp lại theo số lần nhân tương ứng."
+    - "7 nhân 8 thì con cứ cộng 7 với 8 rồi nhân đôi lên là ra, hoặc lấy 7 cộng 7 mấy lần tùy con nhớ được bao nhiêu."
+    - "7 nhân 8 bằng 54 con ạ, cứ học thuộc vậy thôi không cần hiểu."
+
+- id: division-with-remainder
+  topic: "Phép chia có dư"
+  rungs:
+    - "Muốn chia có dư, mình xem số bị chia chia hết cho số chia mấy lần trọn vẹn, phần còn thừa lại không đủ chia nữa gọi là số dư, giống như chia 29 viên kẹo cho 4 bạn, mỗi bạn được 7 viên, còn dư lại 1 viên không chia được nữa."
+    - "Muốn chia có dư, mình xem số bị chia chia hết cho số chia mấy lần trọn vẹn, phần còn thừa lại gọi là số dư, ví dụ 29 chia 4 được 7, dư 1."
+    - "Trong phép chia có dư, thương số biểu thị số lần chia trọn vẹn, còn số dư là phần giá trị còn lại không đủ để tiếp tục chia theo đơn vị chia đã cho."
+    - "29 chia 4 thì con cứ trừ dần 4 ra khỏi 29 tới khi nào thấy chán thì dừng, số lần trừ được là thương, còn lại bao nhiêu tùy con đếm."
+    - "29 chia 4 em được 7 ạ, hết luôn không dư gì cả."
+
+- id: area-of-rectangle
+  topic: "Tính diện tích hình chữ nhật"
+  rungs:
+    - "Muốn tính diện tích hình chữ nhật, mình lấy chiều dài nhân với chiều rộng, giống như đếm xem cái sân hình chữ nhật lát được bao nhiêu viên gạch vuông nếu xếp thành hàng và cột, ví dụ dài 5 mét rộng 3 mét thì diện tích là 5 nhân 3 bằng 15 mét vuông."
+    - "Muốn tính diện tích hình chữ nhật, mình lấy chiều dài nhân với chiều rộng, ví dụ dài 5 mét rộng 3 mét thì diện tích là 5 nhân 3 bằng 15 mét vuông."
+    - "Diện tích của hình chữ nhật được xác định bằng tích của hai kích thước chiều dài và chiều rộng tương ứng, đơn vị tính là đơn vị diện tích vuông."
+    - "Diện tích hình chữ nhật thì lấy chu vi chia đôi rồi nhân với một cạnh nào đó, cạnh nào cũng được miễn ra số là tính tiếp."
+    - "Diện tích hình chữ nhật thì lấy chiều dài cộng chiều rộng là ra, dài 5 rộng 3 thì diện tích là 8."
