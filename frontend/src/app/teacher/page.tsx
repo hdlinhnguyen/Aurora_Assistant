@@ -66,6 +66,8 @@ import {
   Database,
   TrendingUp,
   BarChart2,
+  FilePenLine,
+  ClipboardCheck,
   FlaskConical,
   GitCommit,
   PlusCircle,
