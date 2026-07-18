@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, FilePlus2, Flame, Loader2, RefreshCw, ShieldAlert, Sparkles, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Check, FilePlus2, Flame, Loader2, Pencil, RefreshCw, ShieldAlert, Sparkles, Trash2, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 
 import type { NodeItem, StudentProgress } from "../page";
@@ -33,6 +33,7 @@ export default function LearningPathTab({ selectedSubject, nodes, studentsProgre
   const [manualTopics, setManualTopics] = useState<string[]>([]);
   const [manualSearch, setManualSearch] = useState("");
   const [workingStudent, setWorkingStudent] = useState<string | null>(null);
+  const [editingStudent, setEditingStudent] = useState<string | null>(null);
 
   const topicById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const studentById = useMemo(() => new Map(studentsProgress.map((student) => [student.studentId, student])), [studentsProgress]);
@@ -116,6 +117,29 @@ export default function LearningPathTab({ selectedSubject, nodes, studentsProgre
     }
   };
 
+  const updateDraftSteps = (studentId: string, source: "automatic" | "manual", update: (steps: NonNullable<AutomaticDraftResponse["drafts"][string]["ordered_steps"]>) => NonNullable<AutomaticDraftResponse["drafts"][string]["ordered_steps"]>) => {
+    const updateDraftMap = (drafts: AutomaticDraftResponse["drafts"]) => {
+      const draft = drafts[studentId];
+      if (!draft) return drafts;
+      const steps = update([...(draft.ordered_steps || [])]).map((step, index) => ({ ...step, order: index + 1 }));
+      return { ...drafts, [studentId]: { ...draft, ordered_steps: steps } };
+    };
+    if (source === "automatic") {
+      setWorkspace((current) => current ? { ...current, drafts: updateDraftMap(current.drafts) } : current);
+    } else {
+      setManualQueue((current) => current ? { ...current, drafts: updateDraftMap(current.drafts) } : current);
+    }
+  };
+
+  const moveStep = (studentId: string, source: "automatic" | "manual", index: number, direction: -1 | 1) => {
+    updateDraftSteps(studentId, source, (steps) => {
+      const destination = index + direction;
+      if (destination < 0 || destination >= steps.length) return steps;
+      [steps[index], steps[destination]] = [steps[destination], steps[index]];
+      return steps;
+    });
+  };
+
   const renderDraft = (studentId: string, draft: AutomaticDraftResponse["drafts"][string], source: "automatic" | "manual", threadId: string) => {
     const student = studentById.get(studentId);
     const weakTopics = workspace?.recommendationsByStudent?.[studentId] || [];
@@ -145,17 +169,19 @@ export default function LearningPathTab({ selectedSubject, nodes, studentsProgre
           </div>
         )}
         <div className="mt-4 space-y-2">
-          {(draft.ordered_steps || []).map((step) => (
+          {(draft.ordered_steps || []).map((step, index) => (
             <div key={`${studentId}-${step.order}-${step.topic_id}`} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
               <span className="text-[10px] font-black text-slate-400">{step.order}</span>
               <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{topicById.get(step.topic_id)?.name || step.topic_id}</span>
               <span className="text-[10px] font-black text-slate-400">{pct(step.current_mastery)} → {pct(step.target_mastery)}</span>
+              {editingStudent === studentId && <span className="flex items-center gap-1"><button onClick={() => moveStep(studentId, source, index, -1)} disabled={index === 0} aria-label="Đưa bước lên" className="rounded p-1 text-slate-500 hover:bg-white disabled:opacity-30"><ArrowUp size={12} /></button><button onClick={() => moveStep(studentId, source, index, 1)} disabled={index === (draft.ordered_steps?.length || 0) - 1} aria-label="Đưa bước xuống" className="rounded p-1 text-slate-500 hover:bg-white disabled:opacity-30"><ArrowDown size={12} /></button><button onClick={() => updateDraftSteps(studentId, source, (steps) => steps.filter((_, stepIndex) => stepIndex !== index))} aria-label="Xóa bước" className="rounded p-1 text-rose-500 hover:bg-rose-50"><Trash2 size={12} /></button></span>}
             </div>
           ))}
           {!draft.ordered_steps?.length && <p className="text-xs font-semibold text-slate-500">Không có bước khả dụng trong bản nháp.</p>}
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           <button onClick={() => void approve(threadId, [studentId], { [studentId]: draft })} disabled={Boolean(workingStudent)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50"><Check size={14} /> Duyệt</button>
+          <button onClick={() => setEditingStudent((current) => current === studentId ? null : studentId)} className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-black text-slate-600"><Pencil size={12} /> {editingStudent === studentId ? "Xong" : "Chỉnh sửa"}</button>
           <button onClick={() => void skip(threadId, studentId)} disabled={Boolean(workingStudent)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-black text-slate-600 disabled:opacity-50">Bỏ qua</button>
         </div>
         {isWorking && <p className="mt-2 text-center text-[10px] font-bold text-slate-400">Đang cập nhật…</p>}
