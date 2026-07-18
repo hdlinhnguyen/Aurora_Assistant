@@ -59,6 +59,14 @@ func ConnectDB() {
 		&model.AICache{},
 		&model.LearningPath{},
 		&model.GuardrailEvent{},
+		&model.Exam{},
+		&model.ExamQuestion{},
+		&model.ExamRubricItem{},
+		&model.ExamSnapshot{},
+		&model.ExamGradingProgress{},
+		&model.ExamInternalEvent{},
+		&model.ExamExport{},
+		&model.ExamAuditLog{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
