@@ -3,6 +3,7 @@ package syntheticseed
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"backend/internal/model"
@@ -224,7 +225,7 @@ func createHistoricalExamData(
 	for _, fixture := range fixtures {
 		createdAt := now.Add(-fixture.Age)
 		exam := model.Exam{
-			ID: uuid.New(), Title: fixture.Title, Subject: config.Subject, GradeLevel: "Synthetic",
+			ID: stableSyntheticUUID("exam", fixture.Key), Title: fixture.Title, Subject: config.Subject, GradeLevel: "Synthetic",
 			DurationMinutes: fixture.DurationMinutes, Instructions: fixture.Instructions,
 			TotalPoints: model.MustScore("10.00"), Status: model.ExamStatusPreparingExam,
 			Version: 1, CreatedBy: teacher.ID, CreatedAt: createdAt, UpdatedAt: createdAt,
@@ -246,7 +247,7 @@ func createHistoricalExamData(
 				return nil, 0, fmt.Errorf("marshal topics for %s: %w", questionFixture.Key, err)
 			}
 			question := model.ExamQuestion{
-				ID: uuid.New(), ExamID: exam.ID, SourceType: "manual", QuestionType: questionFixture.QuestionType,
+				ID: stableSyntheticUUID("exam", fixture.Key, "question", questionFixture.Key), ExamID: exam.ID, SourceType: "manual", QuestionType: questionFixture.QuestionType,
 				Content: questionFixture.Content, Points: questionFixture.Points, Position: questionIndex,
 				ChoicesJSON: string(choicesJSON), TopicNodeIDsJSON: string(topicsJSON),
 				CreatedAt: createdAt, UpdatedAt: createdAt,
@@ -265,7 +266,7 @@ func createHistoricalExamData(
 			}
 			for rubricIndex, rubricFixture := range questionFixture.Rubrics {
 				rubric := model.ExamRubricItem{
-					ID: uuid.New(), ExamQuestionID: question.ID, Description: rubricFixture.Description,
+					ID: stableSyntheticUUID("exam", fixture.Key, "rubric", rubricFixture.Key), ExamQuestionID: question.ID, Description: rubricFixture.Description,
 					Points: rubricFixture.Points, Position: rubricIndex, TopicNodeIDsJSON: string(topicsJSON),
 					CreatedAt: createdAt, UpdatedAt: createdAt,
 				}
@@ -287,7 +288,7 @@ func createHistoricalExamData(
 			return nil, 0, fmt.Errorf("marshal historical snapshot %s: %w", fixture.Key, err)
 		}
 		snapshot := model.ExamSnapshot{
-			ID: uuid.New(), ExamID: exam.ID, ExamVersion: exam.Version, Purpose: "grading_lock",
+			ID: stableSyntheticUUID("exam", fixture.Key, "snapshot"), ExamID: exam.ID, ExamVersion: exam.Version, Purpose: "grading_lock",
 			SnapshotJSON: string(snapshotJSON), CreatedAt: createdAt.Add(5 * time.Minute),
 		}
 		if err := tx.Create(&snapshot).Error; err != nil {
@@ -317,7 +318,7 @@ func createHistoricalExamData(
 			}
 			approvedAt := firstSubmissionAt.Add(time.Duration(studentIndex+1) * time.Hour)
 			batch := model.GradingBatch{
-				ID: uuid.New(), ExamID: exam.ID, ExamSnapshotID: snapshot.ID, CreatedBy: teacher.ID,
+				ID: stableSyntheticUUID("exam", fixture.Key, "batch", student.Email), ExamID: exam.ID, ExamSnapshotID: snapshot.ID, CreatedBy: teacher.ID,
 				Status: model.GradingBatchStatusCompleted, TotalSubmissions: 1, ApprovedSubmissions: 1,
 				CreatedAt: firstSubmissionAt, CompletedAt: &approvedAt,
 			}
@@ -325,7 +326,7 @@ func createHistoricalExamData(
 				return nil, 0, fmt.Errorf("create historical batch %s student %d: %w", fixture.Key, studentIndex, err)
 			}
 			submission := model.ScoringSubmission{
-				ID: uuid.New(), GradingBatchID: batch.ID, StudentID: student.ID,
+				ID: stableSyntheticUUID("exam", fixture.Key, "submission", student.Email), GradingBatchID: batch.ID, StudentID: student.ID,
 				Status: model.ScoringSubmissionStatusApproved, Version: 2, AwardedPoints: outcome.Total,
 				EffectiveApprovalVersion: 1, ApprovedBy: &teacher.ID, ApprovedAt: &approvedAt,
 				CreatedAt: firstSubmissionAt, UpdatedAt: approvedAt,
@@ -369,7 +370,7 @@ func createHistoricalExamData(
 				return nil, 0, fmt.Errorf("marshal historical approval %s student %d: %w", fixture.Key, studentIndex, err)
 			}
 			approval := model.ScoringApprovalSnapshot{
-				ID: uuid.New(), SubmissionID: submission.ID, ApprovalVersion: 1,
+				ID: stableSyntheticUUID("exam", fixture.Key, "approval", student.Email), SubmissionID: submission.ID, ApprovalVersion: 1,
 				ResultJSON: string(approvalJSON), TotalPoints: outcome.Total,
 				ApprovedBy: teacher.ID, ApprovedAt: approvedAt,
 			}
@@ -377,7 +378,7 @@ func createHistoricalExamData(
 				return nil, 0, fmt.Errorf("create historical approval %s student %d: %w", fixture.Key, studentIndex, err)
 			}
 			audit := model.ScoringAuditLog{
-				ID: uuid.New(), BatchID: batch.ID, SubmissionID: &submission.ID,
+				ID: stableSyntheticUUID("exam", fixture.Key, "audit", student.Email), BatchID: batch.ID, SubmissionID: &submission.ID,
 				Action: "submission_approved", ActorID: teacher.ID,
 				NewValueJSON: string(approvalJSON), OccurredAt: approvedAt,
 			}
@@ -451,4 +452,8 @@ func resetHistoricalExamData(tx *gorm.DB, teacherIDs []uuid.UUID) error {
 		}
 	}
 	return tx.Unscoped().Where("id IN ?", examIDs).Delete(&model.Exam{}).Error
+}
+
+func stableSyntheticUUID(parts ...string) uuid.UUID {
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte("aurora-synthetic-seed:"+strings.Join(parts, ":")))
 }
