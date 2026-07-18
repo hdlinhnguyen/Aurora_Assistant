@@ -10,6 +10,11 @@ import GuidedTour from "../components/GuidedTour";
 import QuickRoleSwitcher from "../components/QuickRoleSwitcher";
 import StudentMasteryDashboard from "./components/StudentMasteryDashboard";
 import { TopicMastery } from "@/lib/mastery";
+import {
+  buildQuestionAttemptProperties,
+  QuestionTimer,
+  telemetry,
+} from "@/lib/telemetry";
 
 
 interface NodeItem {
@@ -168,6 +173,9 @@ export default function StudentTutorPage() {
   const [nextRecommendedNode, setNextRecommendedNode] = useState<NodeItem | null>(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCodeInput, setJoinCodeInput] = useState("");
+  const learningSessionIdRef = useRef("");
+  const questionTimerRef = useRef(new QuestionTimer());
+  const attemptSubmittedRef = useRef(false);
 
   const handleJoinClassByCode = (codeToJoin?: string) => {
     const code = (codeToJoin || joinCodeInput).trim().toUpperCase();
@@ -424,6 +432,16 @@ export default function StudentTutorPage() {
     setHintLoading(true);
     try {
       const nextPressCount = hintPressCount + 1;
+      const timing = questionTimerRef.current.snapshot();
+      telemetry.track(
+        "hint_requested",
+        { hint_level: nextPressCount },
+        {
+          session_id: learningSessionIdRef.current || undefined,
+          attempt_id: timing.attemptId || undefined,
+          topic_id: selectedNode.id,
+        },
+      );
       const res = await apiFetch("/student/hints", {
         method: "POST",
         body: JSON.stringify({
@@ -432,6 +450,17 @@ export default function StudentTutorPage() {
         })
       });
       setHintPressCount(nextPressCount);
+      questionTimerRef.current.markHintViewed();
+      telemetry.track(
+        "hint_rendered",
+        { hint_level: nextPressCount },
+        {
+          session_id: learningSessionIdRef.current || undefined,
+          attempt_id: timing.attemptId || undefined,
+          topic_id: selectedNode.id,
+        },
+      );
+      void telemetry.flush().catch(() => undefined);
       setActiveHint(res.content || "Chưa có gợi ý nào cho cấp độ này.");
     } catch (err: any) {
       toast.error("Không thể tải gợi ý: " + err.message);
@@ -704,6 +733,16 @@ export default function StudentTutorPage() {
     setAnswerFeedback(null);
 
     try {
+      const timing = questionTimerRef.current.snapshot();
+      telemetry.track(
+        "question_answer_submitted",
+        buildQuestionAttemptProperties(currentQ.id, selectedOption, timing),
+        {
+          session_id: learningSessionIdRef.current || undefined,
+          attempt_id: timing.attemptId || undefined,
+          topic_id: selectedNode.id,
+        },
+      );
       const res = await apiFetch(`/nodes/${selectedNode.id}/answer`, {
         method: "POST",
         body: JSON.stringify({
@@ -711,6 +750,17 @@ export default function StudentTutorPage() {
           selectedOption,
         }),
       });
+      attemptSubmittedRef.current = true;
+      telemetry.track(
+        "question_graded",
+        { question_id: currentQ.id, is_correct: Boolean(res.isCorrect) },
+        {
+          session_id: learningSessionIdRef.current || undefined,
+          attempt_id: timing.attemptId || undefined,
+          topic_id: selectedNode.id,
+        },
+      );
+      void telemetry.flush().catch(() => undefined);
 
       if (res.isCorrect) {
         setAnswerFeedback({ isCorrect: true, message: "🎉 Tuyệt vời! Câu trả lời của em hoàn toàn chính xác." });
@@ -804,6 +854,79 @@ export default function StudentTutorPage() {
   const filteredQuestions = questions.filter(
     (q) => !difficultyFilter || q.difficulty === difficultyFilter
   );
+  const telemetryQuestion = filteredQuestions[currentQIndex];
+
+  useEffect(() => {
+    const sessionId = window.crypto.randomUUID();
+    learningSessionIdRef.current = sessionId;
+    telemetry.track(
+      "learning_session_started",
+      { session_id: sessionId },
+      { session_id: sessionId },
+    );
+    void telemetry.flush().catch(() => undefined);
+
+    const handleFocus = () => questionTimerRef.current.setFocused(true);
+    const handleBlur = () => questionTimerRef.current.setFocused(false);
+    const handleVisibility = () => questionTimerRef.current.setVisible(!document.hidden);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      telemetry.track(
+        "learning_session_ended",
+        { session_id: sessionId },
+        { session_id: sessionId },
+      );
+      void telemetry.flush().catch(() => undefined);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!telemetryQuestion || !selectedNode) return;
+    const attemptId = window.crypto.randomUUID();
+    questionTimerRef.current.present(attemptId);
+    attemptSubmittedRef.current = false;
+    telemetry.track(
+      "question_presented",
+      { question_id: telemetryQuestion.id, difficulty: telemetryQuestion.difficulty },
+      {
+        session_id: learningSessionIdRef.current || undefined,
+        attempt_id: attemptId,
+        topic_id: selectedNode.id,
+      },
+    );
+    void telemetry.flush().catch(() => undefined);
+
+    return () => {
+      if (attemptSubmittedRef.current) return;
+      const timing = questionTimerRef.current.snapshot();
+      telemetry.track(
+        "question_abandoned",
+        {
+          question_id: telemetryQuestion.id,
+          elapsed_time_ms: timing.elapsedTimeMs,
+          active_time_ms: timing.activeTimeMs,
+          hint_count: timing.hintCount,
+        },
+        {
+          session_id: learningSessionIdRef.current || undefined,
+          attempt_id: attemptId,
+          topic_id: selectedNode.id,
+        },
+      );
+    };
+  }, [telemetryQuestion?.id, selectedNode?.id]);
+
+  useEffect(() => {
+    if (selectedOption !== null) {
+      questionTimerRef.current.recordAnswerChange();
+    }
+  }, [selectedOption]);
 
   // Render the student tutor workspace interface
   return (

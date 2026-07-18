@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { telemetry } from "@/lib/telemetry";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
@@ -860,6 +861,12 @@ export default function TeacherDashboard() {
       setActiveThreadId(res.thread_id);
       setInsights(res.class_insight);
       setDraftPaths(res.paths);
+      telemetry.track("learning_path_generated", {
+        thread_id: res.thread_id,
+        path_count: Object.keys(res.paths || {}).length,
+        model_version: "frontend-observation-v1",
+      });
+      void telemetry.flush().catch(() => undefined);
       toast.success("Lập lộ trình nháp thành công!");
     } catch (err: any) {
       const detail = formatBackendError(err.message || err.toString());
@@ -882,6 +889,13 @@ export default function TeacherDashboard() {
           custom_paths: draftPaths,
         }),
       });
+      telemetry.track("learning_path_approved", {
+        thread_id: activeThreadId,
+        approved: true,
+        note_length: "PhÃª duyá»‡t bá»Ÿi giÃ¡o viÃªn".length,
+        path_count: Object.keys(draftPaths || {}).length,
+      });
+      void telemetry.flush().catch(() => undefined);
       toast.success("Đã phê duyệt và kích hoạt lộ trình học tập cho học sinh!");
       setActiveThreadId(null);
       setInsights(null);
@@ -919,6 +933,12 @@ export default function TeacherDashboard() {
       ...draftPaths,
       [studentId]: studentPath
     });
+    telemetry.track("path_step_moved", {
+      thread_id: activeThreadId || "draft",
+      step_index: stepIndex,
+      direction,
+      resulting_step_count: steps.length,
+    });
   };
 
   const handleDeleteStep = (studentId: string, stepIndex: number) => {
@@ -936,6 +956,11 @@ export default function TeacherDashboard() {
     setDraftPaths({
       ...draftPaths,
       [studentId]: studentPath
+    });
+    telemetry.track("path_step_deleted", {
+      thread_id: activeThreadId || "draft",
+      step_index: stepIndex,
+      resulting_step_count: steps.length,
     });
   };
 

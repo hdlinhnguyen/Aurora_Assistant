@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizeEndpoint,
+  buildQuestionAttemptProperties,
   QuestionTimer,
   sanitizeProperties,
   TelemetryClient,
@@ -110,5 +111,29 @@ describe("normalizeEndpoint", () => {
         "/nodes/4d2a4a84-5c64-4e21-90ce-78b1cf5d9a3a/answer?studentEmail=secret@example.test",
       ),
     ).toBe("/nodes/:id/answer");
+  });
+});
+
+describe("question attempt properties", () => {
+  it("contains timing and selected index but no answer content", () => {
+    const properties = buildQuestionAttemptProperties("question-1", 2, {
+      attemptId: "attempt-1",
+      elapsedTimeMs: 14_000,
+      activeTimeMs: 9_000,
+      hintTimeMs: 2_000,
+      answerChangeCount: 3,
+      hintCount: 1,
+    });
+
+    expect(properties).toEqual({
+      question_id: "question-1",
+      selected_option: 2,
+      elapsed_time_ms: 14_000,
+      active_time_ms: 9_000,
+      hint_time_ms: 2_000,
+      answer_change_count: 3,
+      hint_count: 1,
+    });
+    expect(properties).not.toHaveProperty("answer_text");
   });
 });

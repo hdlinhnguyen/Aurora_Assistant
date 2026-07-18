@@ -14,6 +14,22 @@ export type QuestionTimingSnapshot = {
   hintCount: number;
 };
 
+export function buildQuestionAttemptProperties(
+  questionId: string,
+  selectedOption: number,
+  timing: QuestionTimingSnapshot,
+) {
+  return {
+    question_id: questionId,
+    selected_option: selectedOption,
+    elapsed_time_ms: timing.elapsedTimeMs,
+    active_time_ms: timing.activeTimeMs,
+    hint_time_ms: timing.hintTimeMs,
+    answer_change_count: timing.answerChangeCount,
+    hint_count: timing.hintCount,
+  };
+}
+
 const SENSITIVE_KEYS = new Set([
   "answer_text",
   "content",
