@@ -33,6 +33,35 @@ export interface OrderedStep {
   current_mastery?: number;
   target_mastery?: number;
 }
+export type LearningPathStepStatus = "pending" | "in_progress" | "completed" | "blocked";
+export interface LearningPathStepProgress {
+  learningPathId: string;
+  topicId: string;
+  stepOrder: number;
+  status: LearningPathStepStatus;
+  attempts: number;
+  correctAnswers: number;
+  hintCount: number;
+  masteryBefore: number | null;
+  masteryAfter: number | null;
+  confidenceBefore: number | null;
+  confidenceAfter: number | null;
+  blockedReason: string | null;
+}
+export interface LearningPathProgressSummary {
+  completedSteps: number;
+  totalSteps: number;
+  completionPercent: number;
+  nextStep: LearningPathStepProgress | null;
+  blockedSteps: LearningPathStepProgress[];
+  steps: LearningPathStepProgress[];
+}
+export interface LearningPathProgressResponse {
+  id?: string;
+  classId?: string;
+  ordered_steps: OrderedStep[];
+  progress?: LearningPathProgressSummary;
+}
 export interface MasteryTopic {
   masteryProbability: number; // 0..1
   confidenceScore: number;
@@ -81,7 +110,10 @@ export const getTree = (subject: string) =>
   }>;
 
 export const getLearningPath = () =>
-  apiFetch("/student/learning-path") as Promise<{ ordered_steps: OrderedStep[] }>;
+  apiFetch("/student/learning-path") as Promise<LearningPathProgressResponse>;
+
+export const startLearningPathStep = (topicId: string) =>
+  apiFetch(`/student/learning-path/steps/${topicId}/start`, { method: "POST" }) as Promise<LearningPathStepProgress>;
 
 export const getMastery = (subject: string) =>
   apiFetch(`/student/mastery?subject=${encodeURIComponent(subject)}`) as Promise<MasteryProfile>;
