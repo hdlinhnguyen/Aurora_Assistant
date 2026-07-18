@@ -95,20 +95,44 @@ func (gv *GraphValidator) DetectBackwardGrades(nodes []model.Node, edges []model
 		// Let's check node attributes. Let's fallback to search inside node name or group.
 		// E.g., "Lớp 5" or "Lớp 6"
 		// If name contains "Lớp 4" -> 4, etc.
-		if containsString(n.Name, "Lớp 4") { return 4 }
-		if containsString(n.Name, "Lớp 5") { return 5 }
-		if containsString(n.Name, "Lớp 6") { return 6 }
-		if containsString(n.Name, "Lớp 7") { return 7 }
-		if containsString(n.Name, "Lớp 8") { return 8 }
-		if containsString(n.Name, "Lớp 9") { return 9 }
-		if containsString(n.Name, "Lớp 10") { return 10 }
-		
-		if containsString(n.TopicGroup, "Lớp 4") { return 4 }
-		if containsString(n.TopicGroup, "Lớp 5") { return 5 }
-		if containsString(n.TopicGroup, "Lớp 6") { return 6 }
-		if containsString(n.TopicGroup, "Lớp 7") { return 7 }
-		if containsString(n.TopicGroup, "Lớp 8") { return 8 }
-		
+		if containsString(n.Name, "Lớp 4") {
+			return 4
+		}
+		if containsString(n.Name, "Lớp 5") {
+			return 5
+		}
+		if containsString(n.Name, "Lớp 6") {
+			return 6
+		}
+		if containsString(n.Name, "Lớp 7") {
+			return 7
+		}
+		if containsString(n.Name, "Lớp 8") {
+			return 8
+		}
+		if containsString(n.Name, "Lớp 9") {
+			return 9
+		}
+		if containsString(n.Name, "Lớp 10") {
+			return 10
+		}
+
+		if containsString(n.TopicGroup, "Lớp 4") {
+			return 4
+		}
+		if containsString(n.TopicGroup, "Lớp 5") {
+			return 5
+		}
+		if containsString(n.TopicGroup, "Lớp 6") {
+			return 6
+		}
+		if containsString(n.TopicGroup, "Lớp 7") {
+			return 7
+		}
+		if containsString(n.TopicGroup, "Lớp 8") {
+			return 8
+		}
+
 		return 0 // default fallback
 	}
 

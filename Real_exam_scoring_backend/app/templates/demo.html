@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chấm barem bài viết tay</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#0d1517; --panel:#162124; --panel-2:#10191c; --ink:#eff8f5;
+      --muted:#9eb3ad; --accent:#6be0b4; --accent-2:#ffd479; --line:#304145;
+      --danger:#ff8b8b;
+    }
+    * { box-sizing:border-box }
+    body {
+      margin:0; color:var(--ink); font:15px/1.55 "Segoe UI",system-ui,sans-serif;
+      background:
+        linear-gradient(90deg,transparent 49.8%,#ffffff08 50%,transparent 50.2%),
+        radial-gradient(circle at 12% 0%,#244047 0,transparent 35%),var(--bg);
+    }
+    main { width:min(1180px,94vw); margin:36px auto 64px }
+    header { display:flex; justify-content:space-between; align-items:end; gap:24px; margin-bottom:24px }
+    h1 { margin:0; max-width:760px; font:750 clamp(30px,5vw,58px)/.98 Georgia,serif; letter-spacing:-.04em }
+    h2,h3 { margin:0 0 12px } .eyebrow { color:var(--accent); text-transform:uppercase; letter-spacing:.15em; font-size:12px }
+    .lead,.hint,.meta { color:var(--muted) } .lead { max-width:720px; margin:12px 0 0 }
+    .layout { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(310px,.75fr); gap:18px }
+    section,.question {
+      background:color-mix(in srgb,var(--panel) 96%,transparent); border:1px solid var(--line);
+      border-radius:16px; padding:22px; box-shadow:0 18px 60px #0004;
+    }
+    .controls { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px }
+    label { display:block; color:var(--muted); margin:0 0 5px }
+    select,input,button {
+      width:100%; border:1px solid var(--line); border-radius:10px; background:var(--panel-2);
+      color:var(--ink); padding:11px 13px; font:inherit;
+    }
+    button { border:0; background:var(--accent); color:#082019; font-weight:750; cursor:pointer }
+    button:hover { filter:brightness(1.06) } button:disabled { cursor:wait; opacity:.5 }
+    :focus-visible { outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent); outline-offset:2px }
+    .question { margin:12px 0; background:var(--panel-2); box-shadow:none }
+    .question-head { display:flex; justify-content:space-between; gap:16px; align-items:start }
+    .question-number {
+      display:inline-grid; place-items:center; min-width:38px; height:38px; border-radius:50%;
+      background:var(--accent-2); color:#2a2108; font:800 16px Georgia,serif;
+    }
+    .question-title { flex:1 } .question-title h3 { margin:0 0 3px }
+    .rubric-check {
+      display:grid; grid-template-columns:22px 1fr auto; align-items:center; gap:10px;
+      margin:9px 0; padding:12px; border:1px solid var(--line); border-radius:10px;
+      color:var(--ink); cursor:pointer;
+    }
+    .rubric-check:has(input:checked) { border-color:var(--accent); background:#6be0b410 }
+    .rubric-check input { width:18px; height:18px; accent-color:var(--accent); padding:0 }
+    .points { color:var(--accent-2); font-weight:750; white-space:nowrap }
+    .score-strip {
+      position:sticky; bottom:10px; display:flex; justify-content:space-between; align-items:center;
+      gap:14px; margin-top:16px; padding:14px 16px; border:1px solid var(--accent);
+      border-radius:13px; background:#10211ff2; backdrop-filter:blur(12px);
+    }
+    .score-strip strong { font-size:20px } .score-strip button { width:auto; min-width:190px }
+    #upload-panel { margin-top:16px } #upload-panel button { margin-top:12px }
+    .page { width:100%; max-height:360px; object-fit:contain; background:#fff; border-radius:12px; margin-top:12px }
+    .rubric { border-top:1px solid var(--line); margin-top:14px; padding-top:14px }
+    .rubric button { width:auto; margin:6px 6px 0 0; padding:7px 11px }
+    .block { display:block; padding:8px; margin:6px 0; border:1px solid var(--line); border-radius:9px; color:var(--muted) }
+    .block input { width:auto; margin-right:7px }
+    .confidence,.status { color:var(--accent); font-size:13px }
+    .status { min-height:24px; margin:12px 0 }
+    pre { min-height:330px; max-height:720px; overflow:auto; white-space:pre-wrap; color:#cde9e0; background:#091012; border-radius:12px; padding:14px }
+    [hidden] { display:none !important }
+    @media(max-width:850px){header{display:block}.layout{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.score-strip{position:static;align-items:stretch;flex-direction:column}.score-strip button{width:100%}}
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="eyebrow">Handwritten OCR & Rubric Mapping · backend demo</div>
+      <h1>Chấm theo barem,<br>quyết định bởi giáo viên.</h1>
+      <p class="lead">Chọn đề thi hiện tại và học sinh, sau đó đánh dấu các ý đạt được cho từng câu. Không cần tải bài làm khi chấm thủ công; OCR + Qwen là tùy chọn hỗ trợ.</p>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div>
+      <label for="mode">Cách xử lý</label>
+      <select id="mode">
+        <option value="full_manual" selected>Giảng viên chấm thủ công</option>
+        <option value="ai_assisted">Dùng OCR + Qwen hỗ trợ</option>
+      </select>
+    </div>
+    <div>
+      <label for="assessment">Đề thi hiện tại</label>
+      <select id="assessment"></select>
+    </div>
+    <div>
+      <label for="student">Học sinh</label>
+      <select id="student"></select>
+    </div>
+  </div>
+
+  <div class="layout">
+    <section>
+      <div id="manual-workspace">
+        <div class="question-head">
+          <div>
+            <div class="eyebrow">Barem theo từng câu</div>
+            <h2 id="assessment-title"></h2>
+          </div>
+          <span class="meta" id="assessment-meta"></span>
+        </div>
+        <div id="questions"></div>
+        <div class="score-strip">
+          <div><span class="meta">Điểm đang chọn</span><br><strong id="score-live">0 / 0</strong></div>
+          <button id="approve-manual">Lưu và phê duyệt</button>
+        </div>
+      </div>
+
+      <div id="upload-panel" hidden>
+        <div class="eyebrow">Tùy chọn hỗ trợ</div>
+        <h2>OCR + Qwen</h2>
+        <p class="hint">Tải ảnh/PDF để tạo gợi ý cho câu đầu tiên. Giáo viên vẫn duyệt kết quả cuối.</p>
+        <label for="file">Ảnh hoặc PDF</label>
+        <input id="file" type="file" accept="image/png,image/jpeg,image/webp,application/pdf">
+        <button id="run">Tạo gợi ý OCR + Qwen</button>
+        <div id="preview"></div>
+        <div id="review"></div>
+      </div>
+      <p class="status" id="status"></p>
+    </section>
+
+    <section>
+      <div class="eyebrow">Dữ liệu đã lưu</div>
+      <h2>Backend response</h2>
+      <pre id="output">Sẵn sàng. API docs: /docs</pre>
+    </section>
+  </div>
+</main>
+
+<script>
+const headers={"X-Teacher-Id":"demo-teacher","X-Role":"teacher"};
+const assessments=[{
+ id:"math-current-v1",classId:"demo-7A",title:"Toán 7 · Kiểm tra phân số",duration:"45 phút",
+ questions:[
+  {id:"q1",content:"Tính 1/2 + 1/4",rubrics:[
+   {id:"q1-r1",description:"Quy đồng đúng mẫu số",max_points:1,topic_tags:["fraction","common_denominator"]},
+   {id:"q1-r2",description:"Tính đúng kết quả 3/4",max_points:1,topic_tags:["fraction","addition"]}
+  ]},
+  {id:"q2",content:"Rút gọn phân số 12/18",rubrics:[
+   {id:"q2-r1",description:"Xác định đúng ước chung lớn nhất là 6",max_points:1,topic_tags:["fraction","gcd"]},
+   {id:"q2-r2",description:"Rút gọn đúng thành 2/3",max_points:2,topic_tags:["fraction","simplification"]}
+  ]}
+ ]
+}];
+const students=[
+ {id:"student-an",name:"Nguyễn Minh An"},
+ {id:"student-binh",name:"Trần Gia Bình"},
+ {id:"student-chi",name:"Lê Hà Chi"}
+];
+const $=selector=>document.querySelector(selector);
+const out=$("#output"),statusEl=$("#status"),review=$("#review");
+let current;
+const show=value=>out.textContent=JSON.stringify(value,null,2);
+const selectedAssessment=()=>assessments.find(item=>item.id===$("#assessment").value);
+async function api(url,options={}){
+ const response=await fetch(url,{...options,headers:{...headers,...(options.headers||{})}});
+ const text=await response.text();let body;
+ try{body=JSON.parse(text)}catch{throw new Error(`Backend trả lỗi ${response.status}: ${text}`)}
+ if(!response.ok)throw new Error(body.detail||JSON.stringify(body));return body
+}
+async function waitForReview(submissionId){
+ for(let attempt=0;attempt<50;attempt++){
+  const submission=await api(`/api/submissions/${submissionId}`);
+  if(submission.status==="awaiting_review")return submission;
+  if(submission.status==="failed")throw new Error("Xử lý submission thất bại.");
+  await new Promise(resolve=>setTimeout(resolve,100));
+ }
+ throw new Error("Quá thời gian chờ phiếu duyệt.");
+}
+async function sha256(file){return [...new Uint8Array(await crypto.subtle.digest("SHA-256",await file.arrayBuffer()))].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function formatPoints(value){return Number.isInteger(value)?String(value):value.toFixed(1)}
+function fillSelectors(){
+ $("#assessment").innerHTML=assessments.map(item=>`<option value="${item.id}">${item.title}</option>`).join("");
+ $("#student").innerHTML='<option value="">— Chọn học sinh —</option>'+students.map(item=>`<option value="${item.id}">${item.name}</option>`).join("");
+ renderManual();
+}
+function renderManual(){
+ const assessment=selectedAssessment();
+ $("#assessment-title").textContent=assessment.title;
+ $("#assessment-meta").textContent=`${assessment.questions.length} câu · ${assessment.duration}`;
+ $("#questions").innerHTML=assessment.questions.map((question,index)=>`
+  <article class="question" data-question="${question.id}">
+   <div class="question-head">
+    <span class="question-number">${index+1}</span>
+    <div class="question-title"><h3>${question.content}</h3><span class="meta">${formatPoints(question.rubrics.reduce((sum,item)=>sum+item.max_points,0))} điểm</span></div>
+   </div>
+   ${question.rubrics.map(item=>`<label class="rubric-check">
+    <input class="manual-rubric-checkbox" type="checkbox" data-rubric="${item.id}" data-points="${item.max_points}">
+    <span>${item.description}</span><span class="points">${formatPoints(item.max_points)} điểm</span>
+   </label>`).join("")}
+  </article>`).join("");
+ document.querySelectorAll(".manual-rubric-checkbox").forEach(input=>input.addEventListener("change",updateScore));
+ updateScore();
+}
+function updateScore(){
+ const assessment=selectedAssessment();
+ const total=assessment.questions.flatMap(q=>q.rubrics).reduce((sum,item)=>sum+item.max_points,0);
+ const earned=[...document.querySelectorAll(".manual-rubric-checkbox:checked")].reduce((sum,input)=>sum+Number(input.dataset.points),0);
+ $("#score-live").textContent=`${formatPoints(earned)} / ${formatPoints(total)}`;
+}
+function setMode(){
+ const manual=$("#mode").value==="full_manual";
+ $("#manual-workspace").hidden=!manual;
+ $("#upload-panel").hidden=manual;
+ statusEl.textContent=manual?"Chọn học sinh và đánh dấu các ý barem đạt được.":"Chọn file để OCR + Qwen tạo gợi ý.";
+}
+async function createQuestionSubmission(assessment,studentId,question,mode){
+ return api("/api/submissions",{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":crypto.randomUUID()},body:JSON.stringify({
+  class_id:assessment.classId,student_id:studentId,assessment_template_id:assessment.id,processing_mode:mode,
+  question:{question_id:question.id,content:question.content},
+  rubric_items:question.rubrics.map(item=>({rubric_item_id:item.id,description:item.description,topic_tags:item.topic_tags,max_points:item.max_points}))
+ })})
+}
+$("#approve-manual").onclick=async()=>{
+ const button=$("#approve-manual"),studentId=$("#student").value,assessment=selectedAssessment();
+ if(!studentId){statusEl.textContent="Hãy chọn học sinh trước khi lưu.";$("#student").focus();return}
+ button.disabled=true;
+ try{
+  const approvals=[];let earned=0,total=0;
+  for(const question of assessment.questions){
+   statusEl.textContent=`Đang lưu câu ${question.id}…`;
+   const submission=await createQuestionSubmission(assessment,studentId,question,"full_manual");
+   await api(`/api/submissions/${submission.submission_id}/process`,{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()}});
+   await waitForReview(submission.submission_id);
+   for(const item of question.rubrics){
+    const checked=document.querySelector(`[data-rubric="${item.id}"]`).checked;
+    total+=item.max_points;if(checked)earned+=item.max_points;
+    await api(`/api/submissions/${submission.submission_id}/reviews/${item.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:checked?"correct":"incorrect",evidence_block_ids:[]})});
+   }
+   approvals.push(await api(`/api/submissions/${submission.submission_id}/approve`,{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()}}));
+  }
+  show({student_id:studentId,assessment_template_id:assessment.id,score:earned,max_score:total,approved_questions:approvals});
+  statusEl.textContent=`Đã phê duyệt ${approvals.length} câu. Tổng điểm: ${formatPoints(earned)}/${formatPoints(total)}.`;
+ }catch(error){statusEl.textContent=`Không thể lưu: ${error.message}`}finally{button.disabled=false}
+};
+$("#run").onclick=async()=>{
+ const assessment=selectedAssessment(),studentId=$("#student").value,file=$("#file").files[0];
+ if(!studentId){statusEl.textContent="Hãy chọn học sinh trước khi xử lý.";return}
+ if(!file){statusEl.textContent="Hãy chọn một ảnh hoặc PDF.";return}
+ const button=$("#run");button.disabled=true;
+ try{
+  const question=assessment.questions[0];
+  statusEl.textContent="Đang tạo submission…";review.innerHTML="";
+  current=await createQuestionSubmission(assessment,studentId,question,"ai_assisted");
+  statusEl.textContent="Đang upload…";const form=new FormData();form.append("file",file);form.append("page_number","1");form.append("checksum",await sha256(file));
+  await api(`/api/submissions/${current.submission_id}/files`,{method:"POST",body:form});
+  statusEl.textContent="Đang chạy OCR + Qwen hỗ trợ…";
+  await api(`/api/submissions/${current.submission_id}/process`,{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()}});
+  current=await waitForReview(current.submission_id);show(current);await renderPreview();renderAiReview();statusEl.textContent="Sẵn sàng để giảng viên duyệt.";
+ }catch(error){statusEl.textContent=error.message}finally{button.disabled=false}
+};
+function renderAiReview(){
+ review.innerHTML="<h2>Teacher Review</h2>";
+ for(const item of current.rubric_items){
+  const draft=current.draft_mappings.find(value=>value.rubric_item_id===item.rubric_item_id);
+  const div=document.createElement("div");div.className="rubric";div.dataset.rubricReview=item.rubric_item_id;
+  div.innerHTML=`<strong>${item.description}</strong> <span class="points">${formatPoints(item.max_points)} điểm</span><div class="confidence">Mapping confidence: ${draft?.mapping_confidence??"—"}</div>`;
+  for(const block of current.ocr_blocks){
+   const label=document.createElement("label");label.className="block";label.innerHTML=`<input type="checkbox" value="${block.block_id}" ${draft?.evidence_block_ids.includes(block.block_id)?"checked":""}>${block.content}<div class="confidence">OCR: ${block.ocr_confidence??"—"} · trang ${block.page_number}</div>`;div.appendChild(label)
+  }
+  for(const [value,label] of [["correct","Đúng"],["incorrect","Sai"],["unanswered","Không làm"]]){
+   const button=document.createElement("button");button.textContent=label;button.onclick=()=>saveAi(item.rubric_item_id,value);div.appendChild(button)
+  }review.appendChild(div)
+ }
+ const approve=document.createElement("button");approve.textContent="Phê duyệt";approve.onclick=approveAi;review.appendChild(approve)
+}
+async function renderPreview(){
+ const preview=$("#preview");preview.innerHTML="";if(!current.files.length)return;
+ const file=current.files[0],response=await fetch(`/api/files/${file.file_id}/content`,{headers}),url=URL.createObjectURL(await response.blob());
+ preview.innerHTML=file.media_type==="application/pdf"?`<object class="page" data="${url}" type="application/pdf" height="360"></object>`:`<img class="page" src="${url}" alt="Bài làm viết tay">`
+}
+async function saveAi(id,value){
+ const area=document.querySelector(`[data-rubric-review="${id}"]`);
+ const evidence=[...area.querySelectorAll('input:checked')].map(input=>input.value);
+ await api(`/api/submissions/${current.submission_id}/reviews/${id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:value,evidence_block_ids:evidence})});
+ statusEl.textContent=`Đã lưu ${id}: ${value}`;
+}
+async function approveAi(){
+ try{const result=await api(`/api/submissions/${current.submission_id}/approve`,{method:"POST",headers:{"Idempotency-Key":crypto.randomUUID()}});show(result);statusEl.textContent=`Đã phê duyệt version ${result.version}.`}catch(error){statusEl.textContent=error.message}
+}
+$("#mode").addEventListener("change",setMode);
+$("#assessment").addEventListener("change",renderManual);
+fillSelectors();setMode();
+</script>
+</body>
+</html>

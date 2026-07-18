@@ -1,0 +1,9 @@
+data/
+.coverage
+.ruff_cache/
+.venv/
+htmlcov/
+*.db
+__pycache__/
+.pytest_cache/
+*.egg-info/

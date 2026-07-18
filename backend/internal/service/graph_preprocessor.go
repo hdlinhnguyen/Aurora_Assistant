@@ -7,22 +7,22 @@ import (
 )
 
 type PDFRecord struct {
-	StableKey   string   `json:"stableKey"`
-	Grade       int      `json:"grade"`
-	Branch      string   `json:"branch"` // e.g. "Số và Đại số"
-	RawContent  string   `json:"rawContent"`
-	PageNumber  int      `json:"pageNumber"`
-	IsSupplementary bool `json:"isSupplementary"`
+	StableKey       string `json:"stableKey"`
+	Grade           int    `json:"grade"`
+	Branch          string `json:"branch"` // e.g. "Số và Đại số"
+	RawContent      string `json:"rawContent"`
+	PageNumber      int    `json:"pageNumber"`
+	IsSupplementary bool   `json:"isSupplementary"`
 }
 
 type PDFPreprocessor struct {
-	AllowedBranches []string
+	AllowedBranches       []string
 	SupplementaryKeywords []string
 }
 
 func NewPDFPreprocessor() *PDFPreprocessor {
 	return &PDFPreprocessor{
-		AllowedBranches: []string{"Số và Đại số", "Số", "Đại số"},
+		AllowedBranches:       []string{"Số và Đại số", "Số", "Đại số"},
 		SupplementaryKeywords: []string{"biểu đồ", "tỉ lệ phần trăm", "thống kê"},
 	}
 }
@@ -35,10 +35,10 @@ func (pp *PDFPreprocessor) PreprocessPDFText(rawText string) ([]PDFRecord, error
 	}
 
 	var rawRecords []struct {
-		Text       string `json:"text"`
-		Page       int    `json:"page"`
-		Grade      int    `json:"grade"`
-		Branch     string `json:"branch"`
+		Text   string `json:"text"`
+		Page   int    `json:"page"`
+		Grade  int    `json:"grade"`
+		Branch string `json:"branch"`
 	}
 
 	// Try reading structured json mock if input starts with JSON, otherwise split by pages/anchors
@@ -172,7 +172,7 @@ func (pp *PDFPreprocessor) GenerateStableKey(grade int, branch, rawContent strin
 			break
 		}
 	}
-	
+
 	// E.g., l5-sovadai-congphanso
 	branchCode := "num"
 	if strings.Contains(branch, "Đại số") || strings.Contains(branch, "dai-so") {

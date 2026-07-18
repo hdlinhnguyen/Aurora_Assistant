@@ -12,8 +12,8 @@ flowchart LR
     B3 --> C
     B4 --> C
 
-    D[Ảnh/PDF bài làm học sinh] --> C
-    E[Giảng viên chọn thủ công<br/>lớp, học sinh và câu hỏi] --> C
+    D[Ảnh/PDF chỉ khi bật<br/>OCR + Qwen] --> C
+    E[Giảng viên chọn<br/>bài kiểm tra và học sinh] --> C
     F[Datalab.to OCR API] <--> C
     G[Qwen 8B self-host] <--> C
     H[Teacher Review] <--> C
@@ -25,8 +25,9 @@ flowchart LR
     I --> I4[OCR confidence]
     I --> I5[Mapping confidence]
     I --> I6[Version và audit log]
+    I --> I7[max_points và tổng điểm<br/>do giáo viên xác nhận]
 
-    I --> J[Module chấm điểm hoặc<br/>tạo mastery evidence phía sau]
+    I --> J[Module tạo mastery evidence<br/>phía sau nếu cần]
 
     K[Knowledge Graph] -. Không truy vấn trực tiếp .-> C
     L[Core Mastery Module] -. Không cập nhật trực tiếp .-> C

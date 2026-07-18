@@ -23,11 +23,16 @@ import KnowledgeTree from "../components/KnowledgeTree";
 import GuidedTour from "../components/GuidedTour";
 import QuickRoleSwitcher from "../components/QuickRoleSwitcher";
 import QuestionBankTab from "./components/QuestionBankTab";
+import QuestionTaggingPanel from "./components/QuestionTaggingPanel";
 import MonitoringTab from "./components/MonitoringTab";
 import LearningPathTab from "./components/LearningPathTab";
 import StudentsProgressTab from "./components/StudentsProgressTab";
 import StudentMasteryMatrix from "./components/StudentMasteryMatrix";
 import StudentMgmtTab from "./components/StudentMgmtTab";
+import StudentMasteryProfile from "./components/StudentMasteryProfile";
+import StudentActivityFeed from "./components/StudentActivityFeed";
+import ExamBuilderTab from "./components/ExamBuilderTab";
+import ExamScoringTab from "./components/ExamScoringTab";
 import {
   Users,
   GitBranch,
@@ -57,6 +62,8 @@ import {
   Database,
   TrendingUp,
   BarChart2,
+  FilePenLine,
+  ClipboardCheck,
   FlaskConical,
   GitCommit,
   PlusCircle,
@@ -126,9 +133,24 @@ export interface Question {
   optionsJson: string;
   correctOption: number;
   difficulty: string;
+  questionType?: "multiple_choice" | "essay";
+  gradeLevel?: string;
+  rubricItems?: Array<{
+    id: string;
+    questionId: string;
+    content: string;
+    points: string;
+    position: number;
+  }>;
 }
 
-type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "student-mgmt";
+interface RubricDraft {
+  id?: string;
+  content: string;
+  points: string;
+}
+
+type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "student-mgmt" | "exam-builder" | "exam-scoring";
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -161,6 +183,7 @@ export default function TeacherDashboard() {
   const [qbSearchText, setQbSearchText] = useState("");
   const [qbFilterNodeId, setQbFilterNodeId] = useState("");
   const [qbFilterDifficulty, setQbFilterDifficulty] = useState("");
+  const [taggingQuestionId, setTaggingQuestionId] = useState<string | null>(null);
   const [monitoringStats, setMonitoringStats] = useState<any[]>([]);
   const [loadingMonitoring, setLoadingMonitoring] = useState(false);
   const [studentNodeStatus, setStudentNodeStatus] = useState<Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">>({});
@@ -190,6 +213,9 @@ export default function TeacherDashboard() {
   const [qOptions, setQOptions] = useState<string[]>(["", "", "", ""]);
   const [qCorrect, setQCorrect] = useState(0);
   const [qDifficulty, setQDifficulty] = useState("medium");
+  const [qQuestionType, setQQuestionType] = useState<"multiple_choice" | "essay">("multiple_choice");
+  const [qGradeLevel, setQGradeLevel] = useState("");
+  const [qRubrics, setQRubrics] = useState<RubricDraft[]>([]);
   const [qDistractors, setQDistractors] = useState<Record<string, string>>({});
   const [pendingDiff, setPendingDiff] = useState<{ newNodes: any[]; suggestedEdges: any[] } | null>(null);
   const [hasInterventions, setHasInterventions] = useState(false);
@@ -301,7 +327,9 @@ export default function TeacherDashboard() {
   const loadSubjectQuestions = async () => {
     if (!selectedSubject) return;
     try {
-      const data = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/questions`);
+      const data = await apiFetch(
+        `/teacher/question-bank/questions?subject=${encodeURIComponent(selectedSubject)}`,
+      );
       setSubjectQuestions(data || []);
     } catch (err) {
       console.error("Failed to load subject questions:", err);
@@ -1303,6 +1331,9 @@ export default function TeacherDashboard() {
     setQOptions(["", "", "", ""]);
     setQCorrect(0);
     setQDifficulty("medium");
+    setQQuestionType("multiple_choice");
+    setQGradeLevel("");
+    setQRubrics([]);
     setQDistractors({});
     if (nodes.length > 0) {
       setEditingNode(nodes[0]);
@@ -1321,6 +1352,15 @@ export default function TeacherDashboard() {
     setQOptions(opts);
     setQCorrect(q.correctOption);
     setQDifficulty(q.difficulty);
+    setQQuestionType(q.questionType || "multiple_choice");
+    setQGradeLevel(q.gradeLevel || "");
+    setQRubrics(
+      (q.rubricItems || []).map((item) => ({
+        id: item.id,
+        content: item.content,
+        points: item.points,
+      })),
+    );
     try {
       setQDistractors(JSON.parse((q as any).distractorMappings || "{}"));
     } catch (e) {
@@ -1337,26 +1377,80 @@ export default function TeacherDashboard() {
       return;
     }
 
+    if (
+      qQuestionType === "essay" &&
+      qRubrics.some(
+        (rubric) =>
+          !rubric.content.trim() ||
+          !Number.isFinite(Number(rubric.points)) ||
+          Number(rubric.points) <= 0,
+      )
+    ) {
+      toast.warning("Mỗi ý barem cần có nội dung và số điểm lớn hơn 0.");
+      return;
+    }
+
     const payload = {
+      nodeId: editingNode.id,
       content: qContent.trim(),
-      optionsJson: JSON.stringify(qOptions),
+      options: qQuestionType === "multiple_choice" ? qOptions : [],
       correctOption: qCorrect,
       difficulty: qDifficulty,
+      questionType: qQuestionType,
+      gradeLevel: qGradeLevel.trim(),
       distractorMappings: JSON.stringify(qDistractors),
     };
 
     setLoading(true);
     try {
+      let savedQuestion: Question;
       if (editingQuestion.id) {
-        await apiFetch(`/questions/${editingQuestion.id}`, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
+        savedQuestion = await apiFetch(
+          `/teacher/question-bank/questions/${editingQuestion.id}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          },
+        );
       } else {
-        await apiFetch(`/nodes/${editingNode.id}/questions`, {
+        savedQuestion = await apiFetch(`/teacher/question-bank/questions`, {
           method: "POST",
           body: JSON.stringify(payload),
         });
+      }
+
+      if (qQuestionType === "essay") {
+        const originalRubricIds = new Set(
+          (editingQuestion.rubricItems || []).map((item) => item.id),
+        );
+        const retainedRubricIds = new Set(
+          qRubrics.flatMap((item) => (item.id ? [item.id] : [])),
+        );
+        for (const rubricId of originalRubricIds) {
+          if (!retainedRubricIds.has(rubricId)) {
+            await apiFetch(
+              `/teacher/question-bank/questions/${savedQuestion.id}/rubric-items/${rubricId}`,
+              { method: "DELETE" },
+            );
+          }
+        }
+        for (const rubric of qRubrics) {
+          const rubricPayload = {
+            content: rubric.content.trim(),
+            points: rubric.points,
+          };
+          if (rubric.id) {
+            await apiFetch(
+              `/teacher/question-bank/questions/${savedQuestion.id}/rubric-items/${rubric.id}`,
+              { method: "PATCH", body: JSON.stringify(rubricPayload) },
+            );
+          } else {
+            await apiFetch(
+              `/teacher/question-bank/questions/${savedQuestion.id}/rubric-items`,
+              { method: "POST", body: JSON.stringify(rubricPayload) },
+            );
+          }
+        }
       }
       toast.success("Lưu câu hỏi thành công!");
       loadNodeQuestions(editingNode.id);
@@ -1376,7 +1470,7 @@ export default function TeacherDashboard() {
       onConfirm: async () => {
         setLoading(true);
         try {
-          await apiFetch(`/questions/${qId}`, {
+          await apiFetch(`/teacher/question-bank/questions/${qId}`, {
             method: "DELETE",
           });
           toast.success("Xóa câu hỏi thành công!");
@@ -1492,9 +1586,34 @@ export default function TeacherDashboard() {
           >
             <Users size={16} /> 0. Quản lý Lớp & Học sinh
           </button>
-          
-          <div className="border-t border-border/60 my-2" />
 
+          <button
+            onClick={() => {
+              setActiveTab("exam-builder");
+              setSelectedStudent(null);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "exam-builder"
+                ? "bg-foreground border-foreground text-background shadow-md"
+                : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <FilePenLine size={16} /> Tạo đề kiểm tra
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab("exam-scoring");
+              setSelectedStudent(null);
+            }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "exam-scoring"
+                ? "bg-foreground border-foreground text-background shadow-md"
+                : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <ClipboardCheck size={16} /> Chấm bài kiểm tra
+          </button>
+
+          <div className="border-t border-border/60 my-2" />
           {selectedSubject ? (
             <>
               <button
@@ -1596,7 +1715,7 @@ export default function TeacherDashboard() {
         <div className="absolute top-4 right-6 z-30">
           <QuickRoleSwitcher />
         </div>
-        {!selectedSubject ? (
+        {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
           // Subject Selection Screen Dashboard
           <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">
             {isSidebarCollapsed && (
@@ -1758,74 +1877,36 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            {/* Split layout: Tree/Matrix + Activity logs */}
-            <div className="flex-1 flex gap-5 overflow-hidden">
-              {/* Main Workspace (Tree or Matrix) */}
-              <div className="flex-1 relative rounded-3xl overflow-hidden flex flex-col">
-                {studentViewMode === "tree" ? (
-                  <div className="flex-1 relative bg-card shadow-sm border border-border rounded-3xl overflow-hidden">
-                    {nodes.length > 0 ? (
-                      <KnowledgeTree
-                        subject={selectedStudent.subject}
-                        nodes={nodes}
-                        edges={edges}
-                        mode="view-only"
-                        studentNodeStatus={studentNodeStatus}
-                        nodeAccuracy={studentDetail?.nodeAccuracy}
-                        initialNodeId={studentDetail?.state?.initialLevelNodeId}
-                        currentNodeId={studentDetail?.state?.currentLevelNodeId}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Đang tải sơ đồ...
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <StudentMasteryMatrix
-                    nodes={nodes}
-                    studentDetail={studentDetail}
-                    subject={selectedStudent.subject}
-                  />
-                )}
-              </div>
-
-              {/* Student Logs */}
-              <div className="w-[380px] bg-card border border-border rounded-3xl p-5 flex flex-col overflow-hidden shadow-sm">
-                <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3.5">Log Chi Tiết Hoạt Động</h3>
-                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                  {studentDetail && studentDetail.logs && studentDetail.logs.length > 0 ? (
-                    studentDetail.logs.map((log) => {
-                      const isCorrect = log.action === "answer_correct";
-                      const isIncorrect = log.action === "answer_incorrect";
-                      const isCantDo = log.action === "click_cant_do";
-
-                      return (
-                        <div key={log.id} className="p-3 bg-muted border border-border rounded-2xl text-[11px] leading-relaxed space-y-1 shadow-sm">
-                          <div className="flex justify-between items-start">
-                            <span className="font-black text-foreground">{log.nodeName}</span>
-                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${isCorrect
-                                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                : isIncorrect || isCantDo
-                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
-                                  : "bg-blue-50 text-blue-600 border border-blue-200"
-                              }`}>
-                              {log.action}
-                            </span>
-                          </div>
-                          <p className="text-muted-foreground font-medium">{log.detail}</p>
-                          <div className="text-[9px] text-muted-foreground font-semibold">{new Date(log.createdAt).toLocaleString("vi-VN")}</div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-12 text-muted-foreground text-xs font-bold border border-dashed border-border rounded-2xl">
-                      Chưa ghi nhận hoạt động nào của học sinh.
-                    </div>
-                  )}
+            {studentViewMode === "tree" ? (
+              nodes.length > 0 ? (
+                <StudentMasteryProfile
+                  studentId={selectedStudent.studentId}
+                  subject={selectedStudent.subject}
+                  nodes={nodes}
+                  edges={edges}
+                  studentNodeStatus={studentNodeStatus}
+                  nodeAccuracy={studentDetail?.nodeAccuracy}
+                  initialNodeId={studentDetail?.state?.initialLevelNodeId}
+                  currentNodeId={studentDetail?.state?.currentLevelNodeId}
+                  activityContent={<StudentActivityFeed logs={studentDetail?.logs || []} />}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center rounded-3xl border border-border bg-card text-muted-foreground">
+                  Đang tải sơ đồ...
+                </div>
+              )
+            ) : (
+              <div className="flex-1 flex gap-5 overflow-hidden">
+                <StudentMasteryMatrix
+                  nodes={nodes}
+                  studentDetail={studentDetail}
+                  subject={selectedStudent.subject}
+                />
+                <div className="w-[380px] bg-card border border-border rounded-3xl p-5 overflow-hidden shadow-sm">
+                  <StudentActivityFeed logs={studentDetail?.logs || []} />
                 </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           // Tabs Content
@@ -1844,7 +1925,11 @@ export default function TeacherDashboard() {
                 )}
                 <div>
                   <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground uppercase tracking-tight">
-                    {activeTab === "students"
+                    {activeTab === "exam-builder"
+                      ? "Tạo đề kiểm tra"
+                      : activeTab === "exam-scoring"
+                        ? "Chấm bài kiểm tra"
+                        : activeTab === "students"
                       ? "Báo cáo tiến độ học tập"
                       : activeTab === "graph-designer"
                         ? "Thiết kế & Biên soạn sơ đồ cây"
@@ -1855,7 +1940,11 @@ export default function TeacherDashboard() {
                             : "Giám sát & Đánh giá lớp học"}
                   </h1>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {activeTab === "students"
+                    {activeTab === "exam-builder"
+                      ? "Biên soạn câu hỏi, cân đối điểm và chuẩn bị đề trong một workspace"
+                      : activeTab === "exam-scoring"
+                        ? "Chấm từng bài, lưu tự động, duyệt điểm và theo dõi lịch sử"
+                        : activeTab === "students"
                       ? "Theo dõi hành trình học tập và kết quả của từng học sinh"
                       : activeTab === "graph-designer"
                         ? "Biên soạn các nút lý thuyết, liên kết mối quan hệ tiên quyết"
@@ -1938,6 +2027,10 @@ export default function TeacherDashboard() {
             {/* Split logic between Teacher tabs */}
             {activeTab === "student-mgmt" ? (
               <StudentMgmtTab />
+            ) : activeTab === "exam-builder" ? (
+              <ExamBuilderTab subjects={subjects} />
+            ) : activeTab === "exam-scoring" ? (
+              <ExamScoringTab />
             ) : activeTab === "students" ? (
               <StudentsProgressTab
                 studentsProgress={studentsProgress}
@@ -2496,6 +2589,7 @@ export default function TeacherDashboard() {
                 handleMasterBankImport={handleMasterBankImport}
                 handleStartEditQuestion={handleStartEditQuestion}
                 handleDeleteQuestion={handleDeleteQuestion}
+                handleTagQuestion={(question) => setTaggingQuestionId(question.id)}
                 setEditingNode={setEditingNode}
                 formatDate={formatDate}
               />
@@ -2516,6 +2610,13 @@ export default function TeacherDashboard() {
           </div>
         )}
       </main>
+      <QuestionTaggingPanel
+        questionId={taggingQuestionId}
+        open={taggingQuestionId !== null}
+        onOpenChange={(open) => {
+          if (!open) setTaggingQuestionId(null);
+        }}
+      />
       {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-foreground/60 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
@@ -2590,6 +2691,35 @@ export default function TeacherDashboard() {
                 </select>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Loại câu hỏi
+                  </label>
+                  <select
+                    value={qQuestionType}
+                    onChange={(e) =>
+                      setQQuestionType(e.target.value as "multiple_choice" | "essay")
+                    }
+                    className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground"
+                  >
+                    <option value="multiple_choice">Trắc nghiệm</option>
+                    <option value="essay">Tự luận</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Khối lớp
+                  </label>
+                  <input
+                    value={qGradeLevel}
+                    onChange={(e) => setQGradeLevel(e.target.value)}
+                    placeholder="Ví dụ: Lớp 5"
+                    className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-semibold text-foreground"
+                  />
+                </div>
+              </div>
+
               {/* Content text-area */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
@@ -2640,6 +2770,7 @@ export default function TeacherDashboard() {
               </div>
 
               {/* Options A, B, C, D inputs */}
+              {qQuestionType === "multiple_choice" ? (
               <div className="space-y-2">
                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                   Các phương án trả lời
@@ -2695,6 +2826,88 @@ export default function TeacherDashboard() {
                   );
                 })}
               </div>
+              ) : (
+                <div className="space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-800">
+                        Barem câu tự luận
+                      </p>
+                      <p className="mt-1 text-[10px] font-semibold text-indigo-700/70">
+                        Mỗi ý có thể được gắn topic riêng sau khi lưu.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQRubrics((current) => [
+                          ...current,
+                          { content: "", points: "1.00" },
+                        ])
+                      }
+                      className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-[10px] font-black text-indigo-800 hover:bg-indigo-50"
+                    >
+                      Thêm ý
+                    </button>
+                  </div>
+                  {qRubrics.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-indigo-200 px-3 py-5 text-center text-[10px] font-semibold text-indigo-500">
+                      Chưa có ý barem.
+                    </p>
+                  ) : (
+                    qRubrics.map((rubric, index) => (
+                      <div
+                        key={rubric.id || `new-${index}`}
+                        className="grid grid-cols-[1fr_90px_auto] items-center gap-2"
+                      >
+                        <input
+                          value={rubric.content}
+                          onChange={(e) =>
+                            setQRubrics((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, content: e.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                          placeholder={`Nội dung ý ${index + 1}`}
+                          className="rounded-xl border border-indigo-100 bg-white px-3 py-2 text-xs font-semibold"
+                        />
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={rubric.points}
+                          onChange={(e) =>
+                            setQRubrics((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, points: e.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                          aria-label={`Điểm ý ${index + 1}`}
+                          className="rounded-xl border border-indigo-100 bg-white px-3 py-2 text-xs font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQRubrics((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                          }
+                          className="rounded-lg px-2 py-2 text-xs font-black text-rose-600 hover:bg-rose-50"
+                          aria-label={`Xóa ý ${index + 1}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end pt-3 border-t border-border mt-4">
                 <button
