@@ -10,25 +10,29 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 
 import {
   buildRoadmap,
   chatTheory,
+  getAdaptiveQuestions,
   getBadges,
   getLearningPath,
+  getLearningPathLive,
   getMastery,
-  getQuestions,
   getSubjects,
   getTree,
   mapQuestion,
   requestHint,
   submitAnswer,
   type GameSummary,
+  type HubEdge,
   type HubNode,
   type HubQuestion,
   type MasteryProfile,
   type RoadmapStep,
 } from "./api";
+import Character from "../components/Character";
+import { characterMeta, useCharacter } from "../components/character-context";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
-const COMPANION = { mascot: "🦊", name: "thầy Cáo" };
+// Nhân vật đồng hành lấy từ CharacterContext (mặc định Nấm); tên/emoji suy từ characterMeta().
 
 interface ChatMsg {
   sender: "ai" | "student";
@@ -73,6 +77,7 @@ export default function TutorHubPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [nodes, setNodes] = useState<HubNode[]>([]);
+  const [edges, setEdges] = useState<HubEdge[]>([]);
   const [mastery, setMastery] = useState<MasteryProfile>({ topics: {} });
   const [roadmap, setRoadmap] = useState<RoadmapStep[]>([]);
   const [summary, setSummary] = useState<GameSummary | null>(null);
@@ -99,6 +104,8 @@ export default function TutorHubPage() {
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [chatSending, setChatSending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const char = useCharacter();
+  const companion = characterMeta(char);
 
   // ---- load ----
   useEffect(() => {
@@ -146,11 +153,12 @@ export default function TutorHubPage() {
       setSubject(subj);
       const [tree, pathRes, summaryRes] = await Promise.all([
         getTree(subj),
-        getLearningPath().catch(() => ({ ordered_steps: [] })),
+        getLearningPathLive(subj).catch(() => ({ ordered_steps: [] })),
         getBadges().catch(() => null),
       ]);
       const rm = buildRoadmap(tree.nodes ?? [], tree.edges ?? [], pathRes.ordered_steps ?? [], masteryRes);
       setNodes(tree.nodes ?? []);
+      setEdges(tree.edges ?? []);
       setMastery(masteryRes);
       setRoadmap(rm);
       setSummary(summaryRes);
@@ -169,7 +177,7 @@ export default function TutorHubPage() {
   async function loadQuestions(nodeId: string) {
     setQLoading(true);
     try {
-      const raw = await getQuestions(nodeId);
+      const raw = await getAdaptiveQuestions(nodeId);
       setQuestions((raw ?? []).map(mapQuestion));
     } catch {
       setQuestions([]);
@@ -187,19 +195,21 @@ export default function TutorHubPage() {
   }
 
   async function refreshProgress() {
+    // Tính lại mastery + sao → dựng lại roadmap từ mastery TƯƠI (cá nhân hóa theo năng lực).
     const [m, s] = await Promise.all([
       getMastery(subject).catch(() => null),
       getBadges().catch(() => null),
     ]);
     if (m) setMastery(m);
     if (s) setSummary(s);
+    if (m) setRoadmap(buildRoadmap(nodes, edges, [], m));
   }
 
   function resetChat(lessonName: string) {
     setChat([
       {
         sender: "ai",
-        text: `Chào ${studentName}! Có gì chưa rõ ở bài "${lessonName || "này"}" cứ hỏi ${COMPANION.name} nhé — ${COMPANION.name} sẽ gợi mở để em tự nghĩ ra! ${COMPANION.mascot}`,
+        text: `Chào ${studentName}! Có gì chưa rõ ở bài "${lessonName || "này"}" cứ hỏi ${companion.name} nhé — ${companion.name} sẽ gợi mở để em tự nghĩ ra! ${companion.emoji}`,
       },
     ]);
   }
@@ -217,7 +227,7 @@ export default function TutorHubPage() {
   const stars = summary?.stars ?? 0;
   const streak = summary?.currentStreak ?? 0;
   const lessonBlurb =
-    firstSentence(currentNode?.theory ?? "") || `Cùng khám phá bài học này với ${COMPANION.name} nhé!`;
+    firstSentence(currentNode?.theory ?? "") || `Cùng khám phá bài học này với ${companion.name} nhé!`;
 
   function fire(durationMs: number) {
     setConfetti(makeConfetti());
@@ -702,11 +712,11 @@ export default function TutorHubPage() {
 
               <div style={{ width: 264, background: "linear-gradient(160deg,#faf7ff,#f2eefb)", border: "1px solid #ece5fb", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
-                  <div style={{ height: 44, width: 44, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", fontSize: 24 }}>
-                    {COMPANION.mascot}
+                  <div style={{ height: 44, width: 44, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                    <Character char={char} mood="cheerful" size={40} face="right" />
                   </div>
                   <div>
-                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{COMPANION.name}</div>
+                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{companion.name}</div>
                     <div style={{ fontSize: 11, color: "#7C46E8", fontWeight: 600 }}>● đang lắng nghe</div>
                   </div>
                 </div>
@@ -901,11 +911,11 @@ export default function TutorHubPage() {
               style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 760, display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
             >
               <div style={{ padding: "15px 20px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", gap: 11 }}>
-                <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", fontSize: 21 }}>
-                  {COMPANION.mascot}
+                <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                  <Character char={char} mood="cheerful" size={34} face="right" />
                 </div>
                 <div>
-                  <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{COMPANION.name}</div>
+                  <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{companion.name}</div>
                   <div style={{ fontSize: 11, color: "#0FB9A6", fontWeight: 600 }}>● gợi mở, không cho đáp án sẵn</div>
                 </div>
               </div>
@@ -928,7 +938,7 @@ export default function TutorHubPage() {
                 {chatSending && (
                   <div style={{ display: "flex", maxWidth: "82%" }}>
                     <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#9aa1b0" }}>
-                      {COMPANION.name} đang soạn… ✍️
+                      {companion.name} đang soạn… ✍️
                     </div>
                   </div>
                 )}
@@ -951,7 +961,7 @@ export default function TutorHubPage() {
                 <form onSubmit={onSubmitChat} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "7px 7px 7px 16px" }}>
                   <input
                     ref={inputRef}
-                    placeholder={`Nhắn cho ${COMPANION.name}...`}
+                    placeholder={`Nhắn cho ${companion.name}...`}
                     style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#16161F" }}
                   />
                   <button
@@ -987,9 +997,9 @@ export default function TutorHubPage() {
               Giỏi lắm, {studentName}! 🎉
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontSize: 13.5, color: "#5b6072", marginBottom: 22, lineHeight: 1.4 }}>
-              <span style={{ fontSize: 22 }}>{COMPANION.mascot}</span>
+              <Character char={char} mood="jump" size={44} face="right" />
               <span>
-                <b>{COMPANION.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
+                <b>{companion.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
               </span>
             </div>
             <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>

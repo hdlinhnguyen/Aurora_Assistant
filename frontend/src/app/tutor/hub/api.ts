@@ -83,11 +83,21 @@ export const getTree = (subject: string) =>
 export const getLearningPath = () =>
   apiFetch("/student/learning-path") as Promise<{ ordered_steps: OrderedStep[] }>;
 
+// Lộ trình LIVE: server tính lại theo mastery tươi của chính học sinh (không cần giáo viên duyệt).
+export const getLearningPathLive = (subject: string) =>
+  apiFetch(`/student/learning-path/live?subject=${encodeURIComponent(subject)}`) as Promise<{
+    ordered_steps: OrderedStep[];
+  }>;
+
 export const getMastery = (subject: string) =>
   apiFetch(`/student/mastery?subject=${encodeURIComponent(subject)}`) as Promise<MasteryProfile>;
 
 export const getQuestions = (nodeId: string) =>
   apiFetch(`/nodes/${nodeId}/questions`) as Promise<RawQuestion[]>;
+
+// Câu hỏi xếp thích ứng theo mastery của học sinh (dễ→khó tùy trình độ).
+export const getAdaptiveQuestions = (nodeId: string) =>
+  apiFetch(`/nodes/${nodeId}/questions/adaptive`) as Promise<RawQuestion[]>;
 
 export const submitAnswer = (nodeId: string, questionId: string, selectedOption: number) =>
   apiFetch(`/nodes/${nodeId}/answer`, {

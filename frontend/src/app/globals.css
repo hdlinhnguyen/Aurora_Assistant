@@ -303,3 +303,62 @@
   50% { transform: translateY(-6px); }
 }
 .ah-panel { animation: ah-fade 0.28s ease-out; }
+
+/* ===== Character sprite animation ===== */
+@keyframes spr-slide {
+  to { transform: translateX(var(--spr-end)); }
+}
+@keyframes spr-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ===== Fraction Lab ===== */
+@keyframes fl-bob {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-7px) rotate(1deg); }
+}
+@keyframes fl-squish {
+  0% { transform: scale(1, 1); }
+  28% { transform: scale(1.09, 0.92); }
+  60% { transform: scale(0.96, 1.05); }
+  100% { transform: scale(1, 1); }
+}
+@keyframes fl-slice-in {
+  0% { opacity: 0; transform: translateY(-36px) scale(0.55) rotate(-20deg); }
+  60% { opacity: 1; transform: translateY(4px) scale(1.05) rotate(4deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes fl-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes fl-fall {
+  0% { transform: translateY(-30px) rotate(0); opacity: 1; }
+  100% { transform: translateY(540px) rotate(400deg); opacity: 0; }
+}
+@keyframes ml-emote {
+  0% { opacity: 0; transform: scale(0.4) translateY(4px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.fl-chip { transition: transform 0.12s ease; cursor: grab; }
+.fl-chip:active { cursor: grabbing; transform: scale(1.06); }
+
+/* ===== Story Intro ===== */
+@keyframes si-in { 0% { opacity: 0; transform: translateY(16px) scale(0.97); } 100% { opacity: 1; transform: none; } }
+@keyframes si-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+/* ===== Chapter Cutscene ===== */
+@keyframes cs-in { 0% { opacity: 0; transform: translateY(14px) scale(0.92); } 100% { opacity: 1; transform: none; } }
+@keyframes cs-fadeout { 0% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05); } }
+@keyframes cs-travel { 0% { offset-distance: 0%; } 100% { offset-distance: 100%; } }
+@keyframes cs-draw { to { stroke-dashoffset: 0; } }
+@keyframes cs-pop { 0% { opacity: 0; transform: scale(0); } 60% { transform: scale(1.28); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes cs-flag { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+@keyframes cs-twinkle { 0%, 100% { opacity: 0.18; } 50% { opacity: 1; } }
+@keyframes cs-rise { 0% { opacity: 0; transform: translateY(46px) scale(0.95); } 100% { opacity: 1; transform: none; } }
+@keyframes cs-ring { 0% { opacity: 0; transform: scale(0.2) rotate(-45deg); } 70% { transform: scale(1.12) rotate(6deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes cs-glyph { 0% { opacity: 0; transform: scale(0); } 60% { transform: scale(1.32); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes cs-shine { 0% { transform: translateX(-130%) rotate(18deg); opacity: 0; } 25% { opacity: 0.85; } 100% { transform: translateX(130%) rotate(18deg); opacity: 0; } }
+@keyframes cs-fall { 0% { transform: translateY(-30px) rotate(0); opacity: 1; } 100% { transform: translateY(660px) rotate(440deg); opacity: 0; } }
+@keyframes cs-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
