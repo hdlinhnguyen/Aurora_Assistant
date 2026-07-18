@@ -206,3 +206,37 @@ class ClassLearningInsight(BaseModel):
     insufficient_evidence_students: list[str] = Field(default_factory=list)
     path_approval_summary: dict[str, int] = Field(default_factory=dict)
     changes_since_last_checkpoint: list[str] = Field(default_factory=list)
+
+
+class SuggestedTopic(BaseModel):
+    topic_id: str
+    suggestion_score: float = Field(ge=0)
+    confirmed_gap_rate: float = Field(ge=0, le=1)
+    gap_student_ids: list[str] = Field(default_factory=list)
+
+
+class SuggestedStudent(BaseModel):
+    student_id: str
+    help_priority: float = Field(ge=0)
+    root_cause_topic_id: str
+    reason: str
+    blocked_target_count: int = Field(ge=0)
+
+
+class LearningPathSuggestionRequest(BaseModel):
+    class_id: str
+    student_ids: list[str]
+    teacher_id: str
+    target_mastery_threshold: float = Field(default=0.80, ge=0, le=1)
+    minimum_confidence_threshold: float = Field(default=0.40, ge=0, le=1)
+    max_topics: int = Field(default=3, ge=1, le=3)
+    max_students: int = Field(default=5, ge=1, le=5)
+
+
+class LearningPathSuggestionResponse(BaseModel):
+    class_id: str
+    suggested_topics: list[SuggestedTopic] = Field(default_factory=list)
+    suggested_students: list[SuggestedStudent] = Field(default_factory=list)
+    insufficient_evidence_students: list[str] = Field(default_factory=list)
+    preview_paths: dict[str, PersonalizedLearningPath] = Field(default_factory=dict)
+    algorithm_version: str = "learning-path-suggestions-v1"
