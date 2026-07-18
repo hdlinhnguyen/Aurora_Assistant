@@ -24,6 +24,7 @@ function check(name: string, ok: boolean, detail = "") {
 }
 
 const file = path.resolve(process.cwd(), "data", "graph.json");
+const approvedFile = path.resolve(process.cwd(), "data", "edges-approved.json");
 if (!fs.existsSync(file)) {
   console.error("FAIL  data/graph.json not found — run: npx tsx scripts/build-graph.ts");
   process.exitCode = 1;
@@ -35,8 +36,32 @@ if (!fs.existsSync(file)) {
   if (parsed.success) {
     const nodes: KnowledgeNode[] = parsed.data.nodes;
     const byId = new Map(nodes.map((n) => [n.id, n]));
+    const approvedEdges: Array<{ tienQuyet: string; node: string }> = JSON.parse(
+      fs.readFileSync(approvedFile, "utf8"),
+    );
 
     check("ids: unique", new Set(nodes.map((n) => n.id)).size === nodes.length);
+
+    const approvedEdgeKeys = approvedEdges.map(
+      (edge) => `${edge.tienQuyet}->${edge.node}`,
+    );
+    check(
+      "approved edges: unique",
+      new Set(approvedEdgeKeys).size === approvedEdgeKeys.length,
+    );
+    check(
+      "approved edges: every endpoint exists",
+      approvedEdges.every(
+        (edge) => byId.has(edge.tienQuyet) && byId.has(edge.node),
+      ),
+    );
+    check(
+      "approved edges: proportional quantities prerequisites are approved",
+      approvedEdgeKeys.includes("l7-ti-le-thuc->l7-dai-luong-ti-le") &&
+        approvedEdgeKeys.includes(
+          "l7-phep-tinh-so-huu-ti->l7-dai-luong-ti-le",
+        ),
+    );
 
     const grade7NumberAlgebraIds = [
       "l7-so-huu-ti-khai-niem",

@@ -465,8 +465,8 @@
       "chuDe": "Số thực",
       "chuDeCon": "Giải toán về đại lượng tỉ lệ",
       "yccd": [
-        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ thuận.",
-        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ nghịch."
+        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ thuận (ví dụ: bài toán về tổng sản phẩm thu được và năng suất lao động,...).",
+        "Giải được một số bài toán đơn giản về đại lượng tỉ lệ nghịch (ví dụ: bài toán về thời gian hoàn thành kế hoạch và năng suất lao động,...)."
       ],
       "tienQuyet": [
         "l7-ti-le-thuc",
