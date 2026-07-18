@@ -110,12 +110,14 @@ def build_pipeline(
         sid: str = payload["student_id"]
         request: LearningPathRequest = payload["request"]
         states: dict[str, StudentTopicKnowledgeState] = payload["states"]
-        d = diagnose(curriculum, states, request.target_topic_ids)
+        targets = request.targets_for(sid)
+        student_request = request.model_copy(update={"target_topic_ids": targets})
+        d = diagnose(curriculum, states, targets)
         r = rank_root_causes(d, curriculum)
         path = None
         if d.error is None and r.candidates:
             path = plan_path(
-                request,
+                student_request,
                 d,
                 r,
                 curriculum,

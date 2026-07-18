@@ -59,6 +59,25 @@ def request(**overrides) -> LearningPathRequest:
     return LearningPathRequest(**(base | overrides))
 
 
+def test_request_uses_student_specific_targets():
+    req = LearningPathRequest(
+        class_id="7A",
+        student_ids=["minh", "lan"],
+        target_topic_ids=[],
+        target_topic_ids_by_student={"minh": ["a"], "lan": ["b"]},
+        teacher_id="co-lan",
+    )
+
+    assert req.targets_for("minh") == ["a"]
+    assert req.targets_for("lan") == ["b"]
+
+
+def test_request_keeps_legacy_shared_targets():
+    req = request(target_topic_ids=["a"])
+
+    assert req.targets_for("minh") == ["a"]
+
+
 CHAIN = graph(
     [topic("a"), topic("b"), topic("c"), topic("t")],
     [("a", "b"), ("b", "c"), ("c", "t")],

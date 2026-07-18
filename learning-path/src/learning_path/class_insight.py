@@ -66,6 +66,7 @@ def compute_class_insight(
 ) -> ClassLearningInsight:
     g = curriculum.to_networkx()
     min_conf = request.minimum_confidence_threshold
+    all_targets = request.all_targets()
 
     # ---- gap toàn lớp theo topic (mục 13.1) ----
     all_topics = sorted({t for states in states_by_student.values() for t in states})
@@ -92,7 +93,7 @@ def compute_class_insight(
             if gap_students
             else 0.0
         )
-        score = rate * severity * _target_relevance(g, tid, request.target_topic_ids) * avg_conf
+        score = rate * severity * _target_relevance(g, tid, all_targets) * avg_conf
         kind = _intervention(rate)
         intervention_by_topic[tid] = kind
         class_wide_gaps.append(
@@ -114,9 +115,9 @@ def compute_class_insight(
     groups: dict[str, InterventionGroup] = {}
     prioritized: list[PrioritizedStudent] = []
     insufficient: list[str] = []
-    primary_target = request.target_topic_ids[0] if request.target_topic_ids else ""
-
     for sid in request.student_ids:
+        student_targets = request.targets_for(sid)
+        primary_target = student_targets[0] if student_targets else ""
         ranking = rankings.get(sid)
         states = states_by_student.get(sid, {})
         if ranking is None or not ranking.candidates:
@@ -178,7 +179,7 @@ def compute_class_insight(
 
     return ClassLearningInsight(
         class_id=request.class_id,
-        target_topic_ids=request.target_topic_ids,
+        target_topic_ids=all_targets,
         class_mastery_distribution=dict(distribution),
         class_wide_gaps=class_wide_gaps,
         suggested_reteach_topics=suggested_reteach,

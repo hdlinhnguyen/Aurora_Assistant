@@ -110,7 +110,8 @@ class LearningPathRequest(BaseModel):
 
     class_id: str
     student_ids: list[str]
-    target_topic_ids: list[str]
+    target_topic_ids: list[str] = Field(default_factory=list)
+    target_topic_ids_by_student: dict[str, list[str]] = Field(default_factory=dict)
     teacher_id: str
     deadline: datetime | None = None
     estimated_minutes_per_student: int | None = None
@@ -119,6 +120,15 @@ class LearningPathRequest(BaseModel):
     target_mastery_threshold: float = Field(default=0.80, ge=0, le=1)
     minimum_confidence_threshold: float = Field(default=0.40, ge=0, le=1)
     review_checkpoint: datetime | None = None
+
+    def targets_for(self, student_id: str) -> list[str]:
+        return self.target_topic_ids_by_student.get(student_id, self.target_topic_ids)
+
+    def all_targets(self) -> list[str]:
+        targets = set(self.target_topic_ids)
+        for student_targets in self.target_topic_ids_by_student.values():
+            targets.update(student_targets)
+        return sorted(targets)
 
 
 PathStepStatus = Literal["pending", "in_progress", "done", "content_unavailable"]
