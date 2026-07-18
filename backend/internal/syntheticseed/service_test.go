@@ -19,7 +19,7 @@ func setupSeedDatabase(t *testing.T) *Service {
 	t.Helper()
 	db := testutil.OpenPostgres(t)
 	require.NoError(t, db.AutoMigrate(
-		&model.User{}, &model.ChatSession{}, &model.Message{}, &model.Topic{},
+		&model.User{}, &model.Classroom{}, &model.ChatSession{}, &model.Message{}, &model.Topic{},
 		&model.Node{}, &model.Edge{}, &model.Question{}, &model.QuestionRubricItem{},
 		&model.QuestionTopicMapping{}, &model.QuestionRubricItemTopicMapping{},
 		&model.QuestionTaggingState{}, &model.StudentState{}, &model.ActivityLog{},
