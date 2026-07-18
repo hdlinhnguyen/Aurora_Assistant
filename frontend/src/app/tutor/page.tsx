@@ -2013,19 +2013,51 @@ export default function TutorHubPage() {
                     alignItems: "stretch",
                   }}
                 >
-                  {/* Left: Progress bar */}
-                  <div style={{ width: 180, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 20, padding: 18, display: "flex", flexDirection: "column", flexShrink: 0, justifyContent: "center" }}>
+                  {/* Left: Question matrix (Ma trận câu đã làm) */}
+                  <div style={{ width: 220, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", flexShrink: 0 }}>
                     <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #ece5fb", paddingBottom: 10, marginBottom: 14, textAlign: "center" }}>
-                      Chẩn đoán thích ứng
+                      Tiến trình Chẩn đoán
                     </div>
-                    <div style={{ textAlign: "center", padding: "10px 0" }}>
-                      <div style={{ fontSize: 36, fontWeight: 850, color: "#16161F", ...POPPINS }}>
-                        {examQuestions.length} <span style={{ fontSize: 15, color: "#9aa1b0", fontWeight: 700 }}>/ 25</span>
+                    
+                    {/* Matrix Grid */}
+                    <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, maxHeight: 200, overflowY: "auto", padding: "4px 2px" }}>
+                      {Array.from({ length: 25 }).map((_, idx) => {
+                        const isCurrent = examQIndex === idx;
+                        const isAnswered = idx < examQuestions.length - 1; // All previous questions are answered
+                        
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              ...POPPINS,
+                              height: 30,
+                              borderRadius: 8,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 800,
+                              fontSize: 12,
+                              transition: "all .15s",
+                              ...(isCurrent
+                                ? { background: "#7C46E8", color: "#fff", boxShadow: "0 4px 8px rgba(124,70,232,.3)" }
+                                : isAnswered
+                                  ? { background: "#E2FDF8", border: "1px solid #14D9C0", color: "#0d7a6c" }
+                                  : { background: "#f1f3f7", color: "#9aa1b0" }),
+                            }}
+                          >
+                            {idx + 1}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ borderTop: "1px solid #ece5fb", paddingTop: 12, marginTop: 12, textAlign: "center" }}>
+                      <div style={{ fontSize: 11, color: "#5b6072", fontWeight: 700 }}>
+                        Đã hoàn thành: {examQuestions.length - 1} / 25
                       </div>
-                      <div style={{ fontSize: 11, color: "#5b6072", marginTop: 4, fontWeight: 600 }}>câu hỏi đã làm</div>
-                    </div>
-                    <div style={{ height: 6, background: "#eef1f4", borderRadius: 6, width: "100%", marginTop: 10 }}>
-                      <div style={{ height: 6, background: "#7C46E8", borderRadius: 6, width: `${Math.min(100, (examQuestions.length / 25) * 100)}%` }} />
+                      <div style={{ height: 5, background: "#eef1f4", borderRadius: 5, width: "100%", marginTop: 8 }}>
+                        <div style={{ height: 5, background: "#14D9C0", borderRadius: 5, width: `${Math.min(100, ((examQuestions.length - 1) / 25) * 100)}%` }} />
+                      </div>
                     </div>
                   </div>
 
@@ -2113,6 +2145,29 @@ export default function TutorHubPage() {
 
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, borderTop: "1px solid #f2f4f7", paddingTop: 16 }}>
                       <button
+                        onClick={() => {
+                          if (window.confirm("Bạn có chắc chắn muốn thoát bài thi không? Tiến trình bài thi chẩn đoán này sẽ bị hủy bỏ.")) {
+                            setActiveExam(null);
+                            setExamQuestions([]);
+                            setExamAnswers({});
+                          }
+                        }}
+                        style={{
+                          ...POPPINS,
+                          border: "1px solid #f8d3da",
+                          borderRadius: 12,
+                          padding: "11px 20px",
+                          background: "#fef3f5",
+                          color: "#c23a54",
+                          fontWeight: 850,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          transition: "all .15s",
+                        }}
+                      >
+                        🚪 Thoát / Hủy thi
+                      </button>
+                      <button
                         onClick={handleAdaptiveAnswer}
                         disabled={submittingExam}
                         style={{
@@ -2125,7 +2180,6 @@ export default function TutorHubPage() {
                           fontWeight: 800,
                           fontSize: 13,
                           cursor: "pointer",
-                          marginLeft: "auto",
                           boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
                         }}
                       >
