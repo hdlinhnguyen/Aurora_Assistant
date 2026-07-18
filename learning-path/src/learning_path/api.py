@@ -119,6 +119,10 @@ def create_app(
     app = FastAPI(title="learning-path", version="0.1.1")
     checkpointer_to_use = checkpointer or InMemorySaver()
 
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "service": "learning-path"}
+
     def get_curriculum() -> CurriculumGraph:
         if initial_curriculum is not None:
             return initial_curriculum
