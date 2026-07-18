@@ -22,7 +22,7 @@ def main() -> None:
 
         page.goto(f"{FRONTEND_URL}/login")
         page.wait_for_load_state("networkidle")
-        page.locator("button", has_text="teacher@aurora.edu.vn").click()
+        page.locator("button", has_text="synthetic.teacher@aurora.local").click()
         try:
             page.wait_for_url("**/teacher", timeout=10_000)
         except Exception as error:
