@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, MouseEvent } from "react";
 import { apiFetch } from "@/lib/api";
-import { TopicMastery, masteryPercent as toMasteryPercent } from "@/lib/mastery";
+import { BKT_INITIAL_MASTERY, TopicMastery, masteryPercent as toMasteryPercent } from "@/lib/mastery";
 import { toast } from "sonner";
 import { Plus, Trash, Trash2, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo, Redo, RefreshCw, Layers, LayoutGrid, CheckCircle2, AlertCircle, PlayCircle, Lock, Compass, X, Check, HelpCircle, AlertTriangle } from "lucide-react";
 
@@ -48,7 +48,6 @@ export default function KnowledgeTree({
   edges,
   mode,
   studentNodeStatus = {},
-  nodeAccuracy = {},
   masteryByTopic = {},
   initialNodeId,
   currentNodeId,
@@ -1078,14 +1077,10 @@ export default function KnowledgeTree({
 
                 // Mastery ring calculation
                 const bktState = masteryByTopic[node.id];
-                const nodeAcc = nodeAccuracy[node.id];
-                const accuracyPercent = nodeAcc && nodeAcc.total > 0
-                  ? Math.round((nodeAcc.correct / nodeAcc.total) * 100)
-                  : 0;
-                const displayedMasteryPercent = bktState
-                  ? toMasteryPercent(bktState.masteryProbability)
-                  : accuracyPercent;
-                const hasMasteryData = Boolean(bktState) || Boolean(nodeAcc && nodeAcc.total > 0);
+                const displayedMasteryPercent = toMasteryPercent(
+                  bktState?.masteryProbability ?? BKT_INITIAL_MASTERY,
+                );
+                const showMastery = mode !== "teacher";
                 const ringPad = 6;
                 const ringW = nodeWidth + ringPad * 2;
                 const ringH = nodeHeight + ringPad * 2;
@@ -1093,7 +1088,9 @@ export default function KnowledgeTree({
                 const ringPerimeter = 2 * (ringW - 2 * ringR) + 2 * (ringH - 2 * ringR) + 2 * Math.PI * ringR;
                 const ringFill = (displayedMasteryPercent / 100) * ringPerimeter;
                 const ringGap = ringPerimeter - ringFill;
-                const ringColor = bktState?.masteryStatus === "uncertain"
+                const ringColor = !bktState || bktState.masteryStatus === "unknown"
+                  ? "#64748b"
+                  : bktState.masteryStatus === "uncertain"
                   ? "#d97706"
                   : displayedMasteryPercent >= 80
                     ? "#10b981"
@@ -1108,7 +1105,7 @@ export default function KnowledgeTree({
                     style={{ opacity, transition: "opacity 0.2s" }}
                   >
                     {/* Mastery Progress Ring */}
-                    {hasMasteryData && mode !== "teacher" && (
+                    {showMastery && (
                       <rect
                         x={node.posX - ringPad}
                         y={node.posY - ringPad}
@@ -1129,7 +1126,7 @@ export default function KnowledgeTree({
                       />
                     )}
                     {/* Mastery ring background track */}
-                    {hasMasteryData && mode !== "teacher" && (
+                    {showMastery && (
                       <rect
                         x={node.posX - ringPad}
                         y={node.posY - ringPad}
@@ -1202,16 +1199,16 @@ export default function KnowledgeTree({
                               }[status]}
                             </span>
                           </div>
-                          {hasMasteryData && mode !== "teacher" && (
+                          {showMastery && (
                             <span
                               className="text-[8px] font-black px-1.5 py-0.5 rounded-full border tabular-nums leading-none shrink-0"
                               style={{
-                                backgroundColor: displayedMasteryPercent >= 80 ? "#ecfdf5" : displayedMasteryPercent >= 50 ? "#eff6ff" : "#fef2f2",
+                                backgroundColor: !bktState || bktState.masteryStatus === "unknown" ? "#f1f5f9" : displayedMasteryPercent >= 80 ? "#ecfdf5" : displayedMasteryPercent >= 50 ? "#eff6ff" : "#fef2f2",
                                 color: ringColor,
                                 borderColor: ringColor + "40",
                               }}
                             >
-                              {bktState ? "BKT " : ""}{displayedMasteryPercent}%
+                              BKT {displayedMasteryPercent}%
                             </span>
                           )}
                         </div>

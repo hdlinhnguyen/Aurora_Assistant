@@ -11,7 +11,17 @@ def read(relative: str) -> str:
 def test_knowledge_tree_accepts_bkt_mastery_map() -> None:
     source = read("frontend/src/app/components/KnowledgeTree.tsx")
     assert "masteryByTopic" in source
-    assert '"BKT "' in source
+    assert "BKT {displayedMasteryPercent}%" in source
+
+
+def test_personalized_tree_always_renders_bkt_prior() -> None:
+    tree = read("frontend/src/app/components/KnowledgeTree.tsx")
+    mastery = read("frontend/src/lib/mastery.ts")
+    assert "BKT_INITIAL_MASTERY" in mastery
+    assert 'const showMastery = mode !== "teacher"' in tree
+    assert "BKT {displayedMasteryPercent}%" in tree
+    assert 'bktState ? "BKT " : ""' not in tree
+    assert "accuracyPercent" not in tree
 
 
 def test_mastery_panel_exposes_history_ranges() -> None:
