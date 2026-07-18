@@ -6,12 +6,14 @@
  * Gamification (sao, streak, huy hiệu) lấy từ GET /student/badges (dẫn xuất từ hoạt động thật).
  */
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import {
   buildRoadmap,
   chatTheory,
   getBadges,
   getLearningPath,
+  getLearningPathLive,
   getMastery,
   getQuestions,
   getSubjects,
@@ -19,16 +21,20 @@ import {
   mapQuestion,
   requestHint,
   submitAnswer,
+  type DiffTag,
   type GameSummary,
+  type HubEdge,
   type HubNode,
   type HubQuestion,
   type MasteryProfile,
   type RoadmapStep,
 } from "./api";
+import Character, { type CharKind } from "../components/Character";
+import { characterMeta, useCharacter } from "../components/character-context";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
-const COMPANION = { mascot: "🦊", name: "thầy Cáo" };
+// Nhân vật đồng hành lấy từ CharacterContext (mặc định Nấm); tên/emoji suy từ characterMeta().
 
 interface ChatMsg {
   sender: "ai" | "student";
@@ -73,6 +79,7 @@ export default function TutorHubPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [nodes, setNodes] = useState<HubNode[]>([]);
+  const [edges, setEdges] = useState<HubEdge[]>([]);
   const [mastery, setMastery] = useState<MasteryProfile>({ topics: {} });
   const [roadmap, setRoadmap] = useState<RoadmapStep[]>([]);
   const [summary, setSummary] = useState<GameSummary | null>(null);
@@ -94,11 +101,15 @@ export default function TutorHubPage() {
   const [hintPress, setHintPress] = useState(0);
   const [hintLoading, setHintLoading] = useState(false);
   const [correctSession, setCorrectSession] = useState(0);
+  // Nhật ký trả lời phiên này theo cấp độ — nguồn cho "Kết quả theo cấp độ" ở Companion Rail.
+  const [answerLog, setAnswerLog] = useState<{ tag: DiffTag; ok: boolean }[]>([]);
   const [celebrate, setCelebrate] = useState(false);
   const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [chatSending, setChatSending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const char = useCharacter();
+  const companion = characterMeta(char);
 
   // ---- load ----
   useEffect(() => {
@@ -146,11 +157,12 @@ export default function TutorHubPage() {
       setSubject(subj);
       const [tree, pathRes, summaryRes] = await Promise.all([
         getTree(subj),
-        getLearningPath().catch(() => ({ ordered_steps: [] })),
+        getLearningPathLive(subj).catch(() => ({ ordered_steps: [] })),
         getBadges().catch(() => null),
       ]);
       const rm = buildRoadmap(tree.nodes ?? [], tree.edges ?? [], pathRes.ordered_steps ?? [], masteryRes);
       setNodes(tree.nodes ?? []);
+      setEdges(tree.edges ?? []);
       setMastery(masteryRes);
       setRoadmap(rm);
       setSummary(summaryRes);
@@ -183,23 +195,29 @@ export default function TutorHubPage() {
       setHintText("");
       setHintPress(0);
       setCorrectSession(0);
+      setAnswerLog([]);
     }
   }
 
   async function refreshProgress() {
-    const [m, s] = await Promise.all([
+    // Tính lại mastery + sao + LỘ TRÌNH LIVE → roadmap tự cập nhật theo tiến bộ.
+    const [m, s, pathRes] = await Promise.all([
       getMastery(subject).catch(() => null),
       getBadges().catch(() => null),
+      getLearningPathLive(subject).catch(() => null),
     ]);
     if (m) setMastery(m);
     if (s) setSummary(s);
+    if (m && pathRes) {
+      setRoadmap(buildRoadmap(nodes, edges, pathRes.ordered_steps ?? [], m));
+    }
   }
 
   function resetChat(lessonName: string) {
     setChat([
       {
         sender: "ai",
-        text: `Chào ${studentName}! Có gì chưa rõ ở bài "${lessonName || "này"}" cứ hỏi ${COMPANION.name} nhé — ${COMPANION.name} sẽ gợi mở để em tự nghĩ ra! ${COMPANION.mascot}`,
+        text: `Chào ${studentName}! Có gì chưa rõ ở bài "${lessonName || "này"}" cứ hỏi ${companion.name} nhé — ${companion.name} sẽ gợi mở để em tự nghĩ ra! ${companion.emoji}`,
       },
     ]);
   }
@@ -214,10 +232,21 @@ export default function TutorHubPage() {
   const lessonIndex = Math.max(0, roadmap.findIndex((s) => s.id === currentStepId));
   const chapterName = currentNode?.topicGroup || subject || "Kiến thức";
   const masteryPct = Math.round((mastery.topics?.[currentStepId]?.masteryProbability ?? 0) * 100);
+  const confidencePct = Math.round(
+    Math.min(1, Math.max(0, mastery.topics?.[currentStepId]?.confidenceScore ?? 0)) * 100,
+  );
+  // "bé Nấm/bé Cừu" — vai học trò của Tập Vở Feynman (khác companion.name "bạn Nấm" khi làm gia sư).
+  const buddy = char === "sheep" ? "bé Cừu" : "bé Nấm";
+  const feynmanHref = `/tutor/feynman?${new URLSearchParams({
+    node: currentStepId,
+    name: currentNode?.name ?? "",
+    subject,
+    group: currentNode?.topicGroup ?? "",
+  }).toString()}`;
   const stars = summary?.stars ?? 0;
   const streak = summary?.currentStreak ?? 0;
   const lessonBlurb =
-    firstSentence(currentNode?.theory ?? "") || `Cùng khám phá bài học này với ${COMPANION.name} nhé!`;
+    firstSentence(currentNode?.theory ?? "") || `Cùng khám phá bài học này với ${companion.name} nhé!`;
 
   function fire(durationMs: number) {
     setConfetti(makeConfetti());
@@ -245,6 +274,7 @@ export default function TutorHubPage() {
       const res = await submitAnswer(currentStepId, q.id, selected);
       setAnswered(true);
       setIsCorrect(res.isCorrect);
+      setAnswerLog((l) => [...l, { tag: q.tag, ok: res.isCorrect }]);
       if (res.isCorrect) {
         setCorrectSession((c) => c + 1);
         fire(2600);
@@ -255,6 +285,7 @@ export default function TutorHubPage() {
       const ok = selected === q.correct;
       setAnswered(true);
       setIsCorrect(ok);
+      setAnswerLog((l) => [...l, { tag: q.tag, ok }]);
       if (ok) {
         setCorrectSession((c) => c + 1);
         fire(2600);
@@ -291,6 +322,7 @@ export default function TutorHubPage() {
     setHintPress(0);
     setIsCorrect(false);
     setCorrectSession(0);
+    setAnswerLog([]);
   }
 
   async function doHint() {
@@ -702,11 +734,11 @@ export default function TutorHubPage() {
 
               <div style={{ width: 264, background: "linear-gradient(160deg,#faf7ff,#f2eefb)", border: "1px solid #ece5fb", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
-                  <div style={{ height: 44, width: 44, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", fontSize: 24 }}>
-                    {COMPANION.mascot}
+                  <div style={{ height: 44, width: 44, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                    <Character char={char} mood="cheerful" size={40} face="right" />
                   </div>
                   <div>
-                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{COMPANION.name}</div>
+                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{companion.name}</div>
                     <div style={{ fontSize: 11, color: "#7C46E8", fontWeight: 600 }}>● đang lắng nghe</div>
                   </div>
                 </div>
@@ -737,11 +769,11 @@ export default function TutorHubPage() {
             </div>
           )}
 
-          {/* ===== PRACTICE PANEL ===== */}
+          {/* ===== PRACTICE PANEL (+ companion rail) ===== */}
           {activeTab === "practice" && (
+            <div className="ah-panel" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
             <div
-              className="ah-panel"
-              style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: "24px 26px", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 820 }}
+              style={{ flex: 1, minWidth: 440, maxWidth: 820, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: "24px 26px", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}
             >
               {qLoading ? (
                 <div style={{ textAlign: "center", color: "#9aa1b0", padding: "40px 0", ...POPPINS, fontWeight: 700 }}>Đang tải câu hỏi…</div>
@@ -892,20 +924,29 @@ export default function TutorHubPage() {
                 </>
               )}
             </div>
+            <RailPractice
+              buddy={buddy}
+              masteryPct={masteryPct}
+              confidencePct={confidencePct}
+              answerLog={answerLog}
+              hintPress={hintPress}
+              feynmanHref={feynmanHref}
+            />
+            </div>
           )}
 
-          {/* ===== CHAT PANEL ===== */}
+          {/* ===== CHAT PANEL (+ companion rail) ===== */}
           {activeTab === "chat" && (
+            <div className="ah-panel" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
             <div
-              className="ah-panel"
-              style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 760, display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
+              style={{ flex: 1, minWidth: 440, maxWidth: 760, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
             >
               <div style={{ padding: "15px 20px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", gap: 11 }}>
-                <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", fontSize: 21 }}>
-                  {COMPANION.mascot}
+                <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                  <Character char={char} mood="cheerful" size={34} face="right" />
                 </div>
                 <div>
-                  <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{COMPANION.name}</div>
+                  <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{companion.name}</div>
                   <div style={{ fontSize: 11, color: "#0FB9A6", fontWeight: 600 }}>● gợi mở, không cho đáp án sẵn</div>
                 </div>
               </div>
@@ -928,7 +969,7 @@ export default function TutorHubPage() {
                 {chatSending && (
                   <div style={{ display: "flex", maxWidth: "82%" }}>
                     <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#9aa1b0" }}>
-                      {COMPANION.name} đang soạn… ✍️
+                      {companion.name} đang soạn… ✍️
                     </div>
                   </div>
                 )}
@@ -951,7 +992,7 @@ export default function TutorHubPage() {
                 <form onSubmit={onSubmitChat} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "7px 7px 7px 16px" }}>
                   <input
                     ref={inputRef}
-                    placeholder={`Nhắn cho ${COMPANION.name}...`}
+                    placeholder={`Nhắn cho ${companion.name}...`}
                     style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#16161F" }}
                   />
                   <button
@@ -963,6 +1004,15 @@ export default function TutorHubPage() {
                   </button>
                 </form>
               </div>
+            </div>
+            <RailChat
+              char={char}
+              buddy={buddy}
+              nodeName={currentNode?.name ?? ""}
+              theory={currentNode?.theory ?? ""}
+              onAsk={sendMessage}
+              feynmanHref={feynmanHref}
+            />
             </div>
           )}
         </main>
@@ -987,9 +1037,9 @@ export default function TutorHubPage() {
               Giỏi lắm, {studentName}! 🎉
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontSize: 13.5, color: "#5b6072", marginBottom: 22, lineHeight: 1.4 }}>
-              <span style={{ fontSize: 22 }}>{COMPANION.mascot}</span>
+              <Character char={char} mood="jump" size={44} face="right" />
               <span>
-                <b>{COMPANION.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
+                <b>{companion.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
               </span>
             </div>
             <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
@@ -1079,5 +1129,254 @@ export default function TutorHubPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ===== Companion Rail — lấp khoảng trống bên phải theo tab (port từ "Aurora Hub Rail.dc.html") =====
+
+const RAIL_RING_C = 195; // 2π·31
+
+/** Tách tối đa 3 gạch đầu dòng ngắn từ lý thuyết của bài. */
+function theoryBullets(theory: string): string[] {
+  const sentences = (theory || "")
+    .replace(/\s+/g, " ")
+    .split(/[.!?…]+\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 8);
+  return sentences.slice(0, 3).map((s) => (s.length > 90 ? s.slice(0, 90).trim() + "…" : s));
+}
+
+function RailCard({ children, shadow }: { children: React.ReactNode; shadow?: boolean }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #eef1f4",
+        borderRadius: 18,
+        padding: 16,
+        ...(shadow ? { boxShadow: "0 12px 30px -24px rgba(0,0,0,.25)" } : {}),
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FeynmanCta({ href, title, sub, mint }: { href: string; title: string; sub: string; mint?: boolean }) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: "block",
+        textDecoration: "none",
+        background: mint ? "linear-gradient(135deg,#14D9C0,#0FB9A6)" : "linear-gradient(135deg,#8B5CF6,#7C46E8)",
+        color: "#fff",
+        borderRadius: 18,
+        padding: 16,
+        cursor: "pointer",
+        boxShadow: mint ? "0 14px 26px -12px rgba(15,185,166,.5)" : "0 14px 26px -12px rgba(124,70,232,.5)",
+      }}
+    >
+      <div style={{ ...BALOO, fontWeight: 800, fontSize: 15 }}>{title}</div>
+      <div style={{ fontSize: 12, opacity: 0.92, marginTop: 2, lineHeight: 1.5 }}>{sub}</div>
+    </Link>
+  );
+}
+
+function RailChat({
+  char,
+  buddy,
+  nodeName,
+  theory,
+  onAsk,
+  feynmanHref,
+}: {
+  char: CharKind;
+  buddy: string;
+  nodeName: string;
+  theory: string;
+  onAsk: (text: string) => void;
+  feynmanHref: string;
+}) {
+  const bullets = theoryBullets(theory);
+  const questions = [
+    `Vì sao cách làm trong bài "${nodeName || "này"}" lại đúng ạ?`,
+    "Chỗ nào các bạn hay làm sai nhất ạ?",
+    "Cho em một ví dụ đời thường?",
+  ];
+  return (
+    <aside className="hr-in" style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* buddy */}
+      <div
+        style={{
+          background: "linear-gradient(160deg,#F3FBF9,#faf7ff)",
+          border: "1px solid #e2f3ef",
+          borderRadius: 20,
+          padding: 16,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <Character char={char} mood="cheerful" size={64} face="right" />
+        <div>
+          <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{buddy}</div>
+          <div style={{ fontSize: 11.5, color: "#0FB9A6", fontWeight: 600 }}>đang lắng nghe · gợi mở, không cho đáp án</div>
+        </div>
+      </div>
+      {/* quick theory */}
+      <RailCard shadow>
+        <div style={{ ...POPPINS, fontWeight: 800, fontSize: 12.5, marginBottom: 10 }}>📌 Tóm tắt nhanh</div>
+        <div
+          style={{
+            background: "#F3FBF9",
+            border: "1px solid #e2f3ef",
+            borderRadius: 12,
+            padding: "10px 12px",
+            textAlign: "center",
+            fontWeight: 700,
+            fontSize: 15,
+            marginBottom: 10,
+          }}
+        >
+          <span style={{ color: "#0FB9A6" }}>{nodeName || "Bài học"}</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: "#5b6072", lineHeight: 1.7 }}>
+          {bullets.length > 0 ? (
+            bullets.map((b) => <div key={b}>• {b}</div>)
+          ) : (
+            <>
+              <div>• Đọc kỹ lý thuyết ở tab 📖 trước nhé</div>
+              <div>• Chỗ nào chưa rõ cứ hỏi {buddy}</div>
+              <div>• Giảng lại được là hiểu thật!</div>
+            </>
+          )}
+        </div>
+      </RailCard>
+      {/* suggested questions */}
+      <RailCard>
+        <div style={{ ...POPPINS, fontWeight: 800, fontSize: 12.5, marginBottom: 10 }}>💡 Câu hỏi gợi ý</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {questions.map((qs) => (
+            <div
+              key={qs}
+              onClick={() => onAsk(qs)}
+              style={{
+                background: "#faf7ff",
+                border: "1px solid #ece5fb",
+                borderRadius: 11,
+                padding: "9px 12px",
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: "#5b2fc0",
+                cursor: "pointer",
+              }}
+            >
+              {qs}
+            </div>
+          ))}
+        </div>
+      </RailCard>
+      <FeynmanCta
+        href={feynmanHref}
+        title="Hiểu rồi chứ? 📓"
+        sub={`Thử giảng lại cho ${buddy} để kiểm tra mình hiểu thật — nhận điểm Clarity!`}
+      />
+    </aside>
+  );
+}
+
+function RailRing({ pct, color, label }: { pct: number; color: string; label: string }) {
+  return (
+    <div style={{ flex: 1, textAlign: "center" }}>
+      <div style={{ position: "relative", width: 78, height: 78, margin: "0 auto" }}>
+        <svg width="78" height="78" viewBox="0 0 78 78">
+          <circle cx="39" cy="39" r="31" fill="none" stroke="#eef1f4" strokeWidth="9" />
+          <circle
+            cx="39"
+            cy="39"
+            r="31"
+            fill="none"
+            stroke={color}
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={RAIL_RING_C}
+            strokeDashoffset={Math.round(RAIL_RING_C * (1 - pct / 100))}
+            transform="rotate(-90 39 39)"
+          />
+        </svg>
+        <div style={{ ...BALOO, position: "absolute", inset: 0, display: "grid", placeItems: "center", fontWeight: 800, fontSize: 17 }}>
+          {pct}%
+        </div>
+      </div>
+      <div style={{ fontSize: 10.5, color: "#7c8194", fontWeight: 700, marginTop: 4 }}>{label}</div>
+    </div>
+  );
+}
+
+function RailPractice({
+  buddy,
+  masteryPct,
+  confidencePct,
+  answerLog,
+  hintPress,
+  feynmanHref,
+}: {
+  buddy: string;
+  masteryPct: number;
+  confidencePct: number;
+  answerLog: { tag: DiffTag; ok: boolean }[];
+  hintPress: number;
+  feynmanHref: string;
+}) {
+  const levels: DiffTag[] = ["Nhận biết", "Thông hiểu", "Vận dụng"];
+  const hintLevel = Math.min(hintPress, 3);
+  return (
+    <aside className="hr-in" style={{ width: 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* gauges */}
+      <RailCard shadow>
+        <div style={{ ...POPPINS, fontWeight: 800, fontSize: 12.5, marginBottom: 12 }}>📊 Năng lực bài này</div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <RailRing pct={masteryPct} color="#14D9C0" label="Độ hiểu" />
+          <RailRing pct={confidencePct} color="#7C46E8" label="Độ tự tin" />
+        </div>
+      </RailCard>
+      {/* by level */}
+      <RailCard>
+        <div style={{ ...POPPINS, fontWeight: 800, fontSize: 12.5, marginBottom: 10 }}>Kết quả theo cấp độ</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {levels.map((lv) => {
+            const marks = answerLog.filter((a) => a.tag === lv).slice(-5);
+            return (
+              <div key={lv} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
+                <span style={{ fontWeight: 600, color: marks.length === 0 ? "#a2a8b4" : "#16161F" }}>{lv}</span>
+                {marks.length === 0 ? (
+                  <span style={{ color: "#c2c8d2", fontWeight: 700 }}>chưa làm</span>
+                ) : (
+                  <span style={{ fontWeight: 800, display: "flex", gap: 4 }}>
+                    {marks.map((m, i) => (
+                      <span key={i} style={{ color: m.ok ? "#0FB9A6" : "#e05a7a" }}>{m.ok ? "✓" : "✗"}</span>
+                    ))}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </RailCard>
+      {/* hint ladder */}
+      <RailCard>
+        <div style={{ ...POPPINS, fontWeight: 800, fontSize: 12.5, marginBottom: 10 }}>✨ Nấc gợi ý đã dùng</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{ flex: 1, height: 7, borderRadius: 6, background: i < hintLevel ? "#14D9C0" : "#eef1f4" }} />
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: "#7c8194", marginTop: 7 }}>
+          Bậc {hintLevel}/3 — càng ít gợi ý, điểm càng cao.
+        </div>
+      </RailCard>
+      <FeynmanCta href={feynmanHref} title="Làm đúng rồi? 📓" sub={`Giảng lại cho ${buddy} để chốt hiểu bản chất nhé!`} mint />
+    </aside>
   );
 }

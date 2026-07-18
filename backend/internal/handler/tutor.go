@@ -1388,6 +1388,123 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+// GetStudentLearningPathLive sinh lộ trình cá nhân hóa LIVE cho chính học sinh,
+// không cần giáo viên duyệt. Tính lại BKT từ activity_logs tươi mỗi lần gọi.
+func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
+	studentIDStr, _ := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(studentIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user id"})
+	}
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "thiếu subject"})
+	}
+
+	// Mục tiêu = mọi nút của môn (uuid) — planner sẽ tự lọc theo mastery của học sinh.
+	var nodeIDs []string
+	if err := config.DB.Model(&model.Node{}).Where("subject = ?", subject).Pluck("id", &nodeIDs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	if len(nodeIDs) == 0 {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+
+	// Evidence từ activity của chính học sinh (nhị phân ở P0; P1 thêm độ khó/hints/attempt).
+	var logs []model.ActivityLog
+	if err := config.DB.Where("student_id = ? AND subject = ?", studentID, subject).Find(&logs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	rawQuiz := buildRawQuizFromLogs(logs)
+
+	fastAPIBody := CreatePathFastAPIBody{
+		Request: CreatePathBodyRequest{
+			ClassID:                    "live-" + studentIDStr,
+			StudentIDs:                 []string{studentIDStr},
+			TargetTopicIDs:             nodeIDs,
+			TeacherID:                  studentIDStr,
+			TargetMasteryThreshold:     0.80,
+			MinimumConfidenceThreshold: 0.40,
+		},
+		RawQuiz:  rawQuiz,
+		RawPaper: []interface{}{},
+		AsOf:     time.Now().Format(time.RFC3339),
+	}
+	jsonBytes, err := json.Marshal(fastAPIBody)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post("http://127.0.0.1:8000/learning-path/live", "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		// Không nối được service → trả rỗng, FE tự fallback thứ tự cây.
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	if c.Query("debug") == "1" {
+		pathKeys := []string{}
+		if paths, ok := result["paths"].(map[string]interface{}); ok {
+			for k := range paths {
+				pathKeys = append(pathKeys, k)
+			}
+		}
+		return c.JSON(fiber.Map{
+			"nodeCount":     len(nodeIDs),
+			"evidenceCount": len(rawQuiz),
+			"studentId":     studentIDStr,
+			"pythonStatus":  result["status"],
+			"pathKeys":      pathKeys,
+			"raw":           result,
+		})
+	}
+	if paths, ok := result["paths"].(map[string]interface{}); ok {
+		if p, ok := paths[studentIDStr].(map[string]interface{}); ok {
+			if steps, ok := p["ordered_steps"]; ok {
+				return c.JSON(fiber.Map{"ordered_steps": steps})
+			}
+		}
+	}
+	return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+}
+
+// buildRawQuizFromLogs chuyển ActivityLog answer_correct/incorrect thành RawQuizEvidence.
+func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
+	rawQuiz := []RawQuizEvidence{}
+	for _, lg := range logs {
+		score := 0.0
+		switch lg.Action {
+		case "answer_correct":
+			score = 1.0
+		case "answer_incorrect":
+			score = 0.0
+		default:
+			continue
+		}
+		rawQuiz = append(rawQuiz, RawQuizEvidence{
+			EvidenceID:    lg.ID.String(),
+			StudentID:     lg.StudentID.String(),
+			SessionID:     "live-session",
+			QuestionID:    "live-question",
+			TopicID:       lg.NodeID.String(),
+			Score:         score,
+			AttemptNumber: 1,
+			HintsUsed:     0,
+			GradingMethod: "auto",
+			OccurredAt:    lg.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return rawQuiz
+}
+
 func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 	threadID := c.Params("threadId")
 	if threadID == "" {
