@@ -245,6 +245,7 @@ func main() {
 	adminGroup.Put("/teachers/:id", adminHandler.UpdateTeacher)
 	adminGroup.Delete("/teachers/:id", adminHandler.DeleteTeacher)
 	adminGroup.Get("/classrooms", adminHandler.GetClassrooms)
+	adminGroup.Get("/classrooms/:classId/students", studentMgmtHandler.GetClassroomStudents)
 	adminGroup.Post("/classrooms", adminHandler.CreateClassroom)
 	adminGroup.Put("/classrooms/:id", adminHandler.UpdateClassroom)
 	adminGroup.Delete("/classrooms/:id", adminHandler.DeleteClassroom)

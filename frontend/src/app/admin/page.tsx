@@ -25,7 +25,7 @@ export default function AdminDashboard() {
         let studentCount = 0;
         for (const cls of classrooms) {
           try {
-            const students = await apiFetch(`/teacher/classrooms/${cls.id}/students`);
+            const students = await apiFetch(`/admin/classrooms/${cls.id}/students`);
             studentCount += students.length;
           } catch (e) {
             console.error("Failed to load students for class", cls.id, e);
