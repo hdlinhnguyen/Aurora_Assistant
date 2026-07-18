@@ -13,12 +13,14 @@ import (
 )
 
 type Result struct {
-	Teacher       model.User
-	Students      []model.User
-	Subject       string
-	NodeIDs       []uuid.UUID
-	QuestionCount int
-	ActivityCount int
+	Teacher                 model.User
+	Students                []model.User
+	Subject                 string
+	NodeIDs                 []uuid.UUID
+	QuestionCount           int
+	ActivityCount           int
+	ExamCount               int
+	ApprovedSubmissionCount int
 }
 
 type Service struct {
@@ -54,6 +56,9 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 	userIDs := make([]uuid.UUID, 0, len(users))
 	for _, user := range users {
 		userIDs = append(userIDs, user.ID)
+	}
+	if err := resetHistoricalExamData(tx, userIDs); err != nil {
+		return err
 	}
 
 	var nodes []model.Node
@@ -244,7 +249,17 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 	for _, node := range nodes {
 		nodeIDs = append(nodeIDs, node.ID)
 	}
-	return Result{Teacher: teacher, Students: students, Subject: config.Subject, NodeIDs: nodeIDs, QuestionCount: questionCount, ActivityCount: activityCount}, nil
+	exams, approvedCount, err := createHistoricalExamData(
+		tx, config, teacher, students, nodeIDs[1:], time.Now().UTC().Truncate(time.Minute),
+	)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{
+		Teacher: teacher, Students: students, Subject: config.Subject, NodeIDs: nodeIDs,
+		QuestionCount: questionCount, ActivityCount: activityCount,
+		ExamCount: len(exams), ApprovedSubmissionCount: approvedCount,
+	}, nil
 }
 
 func createAccount(tx *gorm.DB, account Account) (model.User, error) {

@@ -3,6 +3,7 @@ package syntheticseed
 import (
 	"context"
 	"testing"
+	"time"
 
 	"backend/internal/model"
 	"backend/internal/testutil"
@@ -20,9 +21,46 @@ func setupSeedDatabase(t *testing.T) *Service {
 		&model.QuestionTopicMapping{}, &model.QuestionRubricItemTopicMapping{},
 		&model.QuestionTaggingState{}, &model.StudentState{}, &model.ActivityLog{},
 		&model.StudentTopicMastery{}, &model.StudentTopicMasteryHistory{},
-		&model.GuardrailEvent{}, &model.LearningPath{},
+		&model.GuardrailEvent{}, &model.LearningPath{}, &model.Exam{},
+		&model.ExamQuestion{}, &model.ExamRubricItem{}, &model.ExamSnapshot{},
+		&model.ExamGradingProgress{}, &model.ExamInternalEvent{}, &model.ExamAuditLog{},
+		&model.GradingBatch{}, &model.ScoringSubmission{}, &model.ScoringQuestionResult{},
+		&model.ScoringRubricResult{}, &model.ScoringApprovalSnapshot{}, &model.ScoringAuditLog{},
+		&model.ScoringInternalEvent{},
 	))
 	return New(db, DefaultConfig())
+}
+
+func TestResetAndSeedCreatesApprovedHistoricalResultsForEveryStudent(t *testing.T) {
+	service := setupSeedDatabase(t)
+	result, err := service.ResetAndSeed(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 2, result.ExamCount)
+	require.Equal(t, 6, result.ApprovedSubmissionCount)
+
+	var exams []model.Exam
+	require.NoError(t, service.db.Where("created_by = ?", result.Teacher.ID).Order("created_at").Find(&exams).Error)
+	require.Len(t, exams, 2)
+	require.Equal(t, model.ExamStatusPreparingExam, exams[0].Status)
+	require.NotNil(t, exams[0].LockedSnapshotID)
+	require.True(t, exams[0].CreatedAt.Before(time.Now().UTC().Add(-24*time.Hour)))
+
+	for _, student := range result.Students {
+		var submissions []model.ScoringSubmission
+		require.NoError(t, service.db.
+			Joins("JOIN grading_batches ON grading_batches.id = scoring_submissions.grading_batch_id").
+			Where("scoring_submissions.student_id = ? AND grading_batches.created_by = ?", student.ID, result.Teacher.ID).
+			Find(&submissions).Error)
+		require.Len(t, submissions, 2)
+		for _, submission := range submissions {
+			require.Equal(t, model.ScoringSubmissionStatusApproved, submission.Status)
+			require.Equal(t, 1, submission.EffectiveApprovalVersion)
+			var approvals int64
+			require.NoError(t, service.db.Model(&model.ScoringApprovalSnapshot{}).
+				Where("submission_id = ?", submission.ID).Count(&approvals).Error)
+			require.EqualValues(t, 1, approvals)
+		}
+	}
 }
 
 func TestResetAndSeedPreservesRealData(t *testing.T) {
