@@ -17,11 +17,19 @@ import (
 	"backend/internal/config"
 	"backend/internal/exam"
 	"backend/internal/handler"
+	masteryprofile "backend/internal/mastery"
 	"backend/internal/middleware"
 	"backend/internal/model"
 	"backend/internal/scoring"
 	"backend/internal/service"
 )
+
+func envOrDefault(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
+}
 
 func main() {
 	// Load .env file
@@ -66,6 +74,9 @@ func main() {
 		exam.NewDOCXExporter(),
 		config.ExamExportDir(),
 	)
+	masteryRepo := masteryprofile.NewRepository(config.DB)
+	masteryClient := masteryprofile.NewClient(envOrDefault("LEARNING_PATH_URL", "http://127.0.0.1:8000"), nil)
+	masterySvc := masteryprofile.NewService(config.DB, masteryRepo, masteryClient)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
@@ -73,6 +84,7 @@ func main() {
 	taggingHandler := handler.NewTaggingHandler(taggingSvc)
 	questionBankHandler := handler.NewQuestionBankHandler(questionBankSvc)
 	examHandler := handler.NewExamHandler(examSvc, os.Getenv("EXAM_INTERNAL_TOKEN"))
+	masteryHandler := handler.NewMasteryHandler(masterySvc)
 	scoringSvc := scoring.NewService(scoring.NewRepository(config.DB), func(db *gorm.DB) exam.ScoringGateway {
 		return exam.NewScoringGateway(db)
 	})
@@ -210,6 +222,7 @@ func main() {
 	// Protected Routes
 	api := app.Group("/api", middleware.Protected(config.DB))
 	teacherExams := api.Group("/teacher", middleware.RequireRole("teacher"))
+	studentMastery := api.Group("/student", middleware.RequireRole("student"))
 	teacherExams.Post("/exams", examHandler.Create)
 	teacherExams.Get("/exams", examHandler.List)
 	teacherExams.Get("/exams/:examId", examHandler.Get)
@@ -245,6 +258,11 @@ func main() {
 	teacherExams.Post("/scoring-submissions/:submissionId/revisions", scoringHandler.StartRevision)
 	teacherExams.Get("/scoring-submissions/:submissionId/history", scoringHandler.History)
 	teacherExams.Get("/scoring-submissions/:submissionId/audit", scoringHandler.Audit)
+	teacherExams.Get("/students/:studentId/mastery", masteryHandler.GetTeacherProfile)
+	teacherExams.Get("/students/:studentId/mastery/:topicId/history", masteryHandler.GetTeacherHistory)
+	teacherExams.Post("/students/:studentId/mastery/recalculate", masteryHandler.RecalculateTeacherProfile)
+	studentMastery.Get("/mastery", masteryHandler.GetStudentProfile)
+	studentMastery.Get("/mastery/:topicId/history", masteryHandler.GetStudentHistory)
 
 	app.Post("/internal/exams/:examId/first-submission", examHandler.FirstSubmission)
 	app.Post("/internal/exams/:examId/grading-completed", examHandler.GradingCompleted)
@@ -322,7 +340,6 @@ func main() {
 	api.Get("/teacher/monitoring/:subject", tutorHandler.GetMonitoringData)
 	api.Post("/teacher/students/:studentId/re-diagnostic", tutorHandler.RequestReDiagnostic)
 	api.Get("/teacher/classes/intervention-groups/:subject", tutorHandler.GetClassInterventionGroups)
-
 
 	port := os.Getenv("PORT")
 	if port == "" {

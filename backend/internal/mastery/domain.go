@@ -22,25 +22,25 @@ const (
 var ErrForbidden = errors.New("mastery profile access forbidden")
 
 type TopicState struct {
-	StudentID          uuid.UUID
-	TopicID            uuid.UUID
-	MasteryProbability float64
-	ConfidenceScore    float64
-	Consistency        float64
-	EvidenceCount      int
-	EffectiveEvidence  float64
-	Status             string
-	EvidenceSummary    map[string]float64
-	SourceBreakdown    map[string]int
-	Version            int
-	LastEvidenceAt     *time.Time
-	CalculatedAt       time.Time
+	StudentID          uuid.UUID          `json:"studentId"`
+	TopicID            uuid.UUID          `json:"topicId"`
+	MasteryProbability float64            `json:"masteryProbability"`
+	ConfidenceScore    float64            `json:"confidenceScore"`
+	Consistency        float64            `json:"consistency"`
+	EvidenceCount      int                `json:"evidenceCount"`
+	EffectiveEvidence  float64            `json:"effectiveEvidence"`
+	Status             string             `json:"masteryStatus"`
+	EvidenceSummary    map[string]float64 `json:"evidenceSummary"`
+	SourceBreakdown    map[string]int     `json:"sourceBreakdown"`
+	Version            int                `json:"version"`
+	LastEvidenceAt     *time.Time         `json:"lastEvidenceAt"`
+	CalculatedAt       time.Time          `json:"calculatedAt"`
 }
 
 type HistoryPoint struct {
 	TopicState
-	RecordedAt        time.Time
-	TriggerEvidenceID string
+	RecordedAt        time.Time `json:"recordedAt"`
+	TriggerEvidenceID string    `json:"triggerEvidenceId"`
 }
 
 type Profile struct {

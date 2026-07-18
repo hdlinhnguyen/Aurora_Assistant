@@ -43,6 +43,20 @@ func (s *Service) GetHistory(ctx context.Context, studentID, topicID uuid.UUID, 
 	return s.store.GetHistory(ctx, studentID, topicID, historyRange)
 }
 
+func (s *Service) CanTeacherView(ctx context.Context, teacherID, studentID uuid.UUID) error {
+	var teacherCount, studentCount int64
+	if err := s.db.WithContext(ctx).Model(&model.User{}).Where("id = ? AND role = ?", teacherID, "teacher").Count(&teacherCount).Error; err != nil {
+		return err
+	}
+	if err := s.db.WithContext(ctx).Model(&model.User{}).Where("id = ? AND role = ?", studentID, "student").Count(&studentCount).Error; err != nil {
+		return err
+	}
+	if teacherCount != 1 || studentCount != 1 {
+		return ErrForbidden
+	}
+	return nil
+}
+
 func (s *Service) RecalculateStudent(ctx context.Context, studentID uuid.UUID, subject string) (Profile, error) {
 	topicIDs, err := s.subjectTopics(ctx, studentID, subject)
 	if err != nil {
