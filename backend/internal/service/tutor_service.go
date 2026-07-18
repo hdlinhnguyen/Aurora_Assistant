@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -958,37 +959,57 @@ func (s *tutorService) GetSubjects() ([]string, error) {
 	}
 
 	if len(cleanedSubjects) == 0 {
-		cleanedSubjects = []string{"Toán Lớp 5"}
+		cleanedSubjects = []string{}
 	}
 	return cleanedSubjects, nil
 }
 
 func (s *tutorService) DeleteSubject(subject string) error {
+	log.Printf("[DEBUG DeleteSubject] Starting delete for subject=%q", subject)
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var existingNodeIDs []uuid.UUID
 		tx.Model(&model.Node{}).Where("subject = ?", subject).Pluck("id", &existingNodeIDs)
+		log.Printf("[DEBUG DeleteSubject] Found %d nodes for subject=%q", len(existingNodeIDs), subject)
 		if len(existingNodeIDs) > 0 {
 			// Delete questions
-			if err := tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.Question{}).Error; err != nil {
-				return err
+			res := tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.Question{})
+			if res.Error != nil {
+				log.Printf("[DEBUG DeleteSubject] ERROR deleting questions: %v", res.Error)
+				return res.Error
 			}
+			log.Printf("[DEBUG DeleteSubject] Deleted %d questions", res.RowsAffected)
+
 			// Delete student states
-			if err := tx.Where("initial_level_node_id IN ? OR current_level_node_id IN ?", existingNodeIDs, existingNodeIDs).Delete(&model.StudentState{}).Error; err != nil {
-				return err
+			res = tx.Where("initial_level_node_id IN ? OR current_level_node_id IN ?", existingNodeIDs, existingNodeIDs).Delete(&model.StudentState{})
+			if res.Error != nil {
+				log.Printf("[DEBUG DeleteSubject] ERROR deleting student states: %v", res.Error)
+				return res.Error
 			}
+			log.Printf("[DEBUG DeleteSubject] Deleted %d student states", res.RowsAffected)
+
 			// Delete activity logs
-			if err := tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.ActivityLog{}).Error; err != nil {
-				return err
+			res = tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.ActivityLog{})
+			if res.Error != nil {
+				log.Printf("[DEBUG DeleteSubject] ERROR deleting activity logs: %v", res.Error)
+				return res.Error
 			}
+			log.Printf("[DEBUG DeleteSubject] Deleted %d activity logs", res.RowsAffected)
 		}
 		// Delete edges
-		if err := tx.Where("subject = ?", subject).Delete(&model.Edge{}).Error; err != nil {
-			return err
+		res := tx.Where("subject = ?", subject).Delete(&model.Edge{})
+		if res.Error != nil {
+			log.Printf("[DEBUG DeleteSubject] ERROR deleting edges: %v", res.Error)
+			return res.Error
 		}
+		log.Printf("[DEBUG DeleteSubject] Deleted %d edges", res.RowsAffected)
+
 		// Delete nodes
-		if err := tx.Where("subject = ?", subject).Delete(&model.Node{}).Error; err != nil {
-			return err
+		res = tx.Where("subject = ?", subject).Delete(&model.Node{})
+		if res.Error != nil {
+			log.Printf("[DEBUG DeleteSubject] ERROR deleting nodes: %v", res.Error)
+			return res.Error
 		}
+		log.Printf("[DEBUG DeleteSubject] Deleted %d nodes. SUCCESS!", res.RowsAffected)
 		return nil
 	})
 }

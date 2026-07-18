@@ -3,6 +3,15 @@
 Write-Host "=== BAT DAU KHOI CHAY HE THONG AURORA SOCRATIC TUTOR ===" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Gray
 
+# Giai phong cac cong bi chiem neu co de tranh xung dot
+Write-Host "Dang kiem tra va giai phong cac cong 8082, 3000, 8000..." -ForegroundColor Yellow
+Get-NetTCPConnection -LocalPort 8082,3000,8000 -ErrorAction SilentlyContinue | ForEach-Object {
+    try {
+        Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
+    } catch {}
+}
+Start-Sleep -Seconds 1
+
 # 1. Start Docker Database
 Write-Host "1. Dang bat Co so du lieu PostgreSQL..." -ForegroundColor Yellow
 docker compose -f backend/docker/docker-compose.yml -p aurora up -d

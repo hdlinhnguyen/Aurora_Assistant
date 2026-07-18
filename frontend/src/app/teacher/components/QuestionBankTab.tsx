@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Upload, Pencil, Trash } from "lucide-react";
+import { Upload, FileJson, Pencil, Trash } from "lucide-react";
 
 import { NodeItem, Question } from "../page";
 
@@ -18,6 +18,7 @@ interface QuestionBankTabProps {
   handleStartAddQuestion: () => void;
   handleDownloadTemplate: () => void;
   handleExcelImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleMasterBankImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleStartEditQuestion: (q: Question) => void;
   handleDeleteQuestion: (qId: string) => void;
   setEditingNode: (node: NodeItem | null) => void;
@@ -37,6 +38,7 @@ export default function QuestionBankTab({
   handleStartAddQuestion,
   handleDownloadTemplate,
   handleExcelImport,
+  handleMasterBankImport,
   handleStartEditQuestion,
   handleDeleteQuestion,
   setEditingNode,
@@ -147,6 +149,16 @@ export default function QuestionBankTab({
               type="file"
               accept=".xlsx,.xls"
               onChange={handleExcelImport}
+              className="hidden"
+            />
+          </label>
+
+          <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center gap-1.5 cursor-pointer">
+            <FileJson size={14} /> Import Master Bank
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleMasterBankImport}
               className="hidden"
             />
           </label>

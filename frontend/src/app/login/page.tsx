@@ -27,7 +27,9 @@ function LoginForm() {
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
-        if (user.role === "teacher") {
+        if (user.role === "admin") {
+          router.push("/admin");
+        } else if (user.role === "teacher") {
           router.push("/teacher");
         } else {
           router.push("/tutor");
@@ -56,7 +58,9 @@ function LoginForm() {
       localStorage.setItem("aurora_token", data.token);
       localStorage.setItem("aurora_user", JSON.stringify(data.user));
       
-      if (data.user.role === "teacher") {
+      if (data.user.role === "admin") {
+        router.push("/admin");
+      } else if (data.user.role === "teacher") {
         router.push("/teacher");
       } else {
         router.push("/tutor");
@@ -84,7 +88,9 @@ function LoginForm() {
         localStorage.setItem("aurora_token", data.token);
         localStorage.setItem("aurora_user", JSON.stringify(data.user));
         
-        if (data.user.role === "teacher") {
+        if (data.user.role === "admin") {
+          router.push("/admin");
+        } else if (data.user.role === "teacher") {
           router.push("/teacher");
         } else {
           router.push("/tutor");
@@ -119,30 +125,42 @@ function LoginForm() {
 
       {/* Demo quick accounts */}
       {isLogin && (
-        <div className="mb-6 grid grid-cols-2 gap-3">
+        <div className="mb-6 grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => handleDemoLogin("student@aurora.edu.vn", "student")}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl border border-border bg-muted hover:bg-accent transition-all text-center text-foreground shadow-sm"
+            className="flex flex-col items-center justify-center p-2 rounded-xl border border-border bg-muted hover:bg-accent transition-all text-center text-foreground shadow-sm"
           >
             {/* Custom Student SVG Icon */}
-            <svg className="h-5 w-5 text-[var(--mint)] mb-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 text-[var(--mint)] mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
             </svg>
-            <span className="text-xs font-bold">Học sinh Demo</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">student@aurora.edu.vn</span>
+            <span className="text-[10px] font-bold">Học sinh</span>
+            <span className="text-[8px] text-muted-foreground mt-0.5 truncate w-full">student@...</span>
           </button>
           <button
             type="button"
             onClick={() => handleDemoLogin("teacher@aurora.edu.vn", "teacher")}
-            className="flex flex-col items-center justify-center p-3 rounded-2xl border border-border bg-muted hover:bg-accent transition-all text-center text-foreground shadow-sm"
+            className="flex flex-col items-center justify-center p-2 rounded-xl border border-border bg-muted hover:bg-accent transition-all text-center text-foreground shadow-sm"
           >
             {/* Custom Teacher SVG Icon */}
-            <svg className="h-5 w-5 text-[var(--purple)] mb-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-4 w-4 text-[var(--purple)] mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2zm12-5a2 2 0 11-4 0 2 2 0 014 0zM9 20h12" />
             </svg>
-            <span className="text-xs font-bold">Giáo viên Demo</span>
-            <span className="text-[9px] text-muted-foreground mt-0.5">teacher@aurora.edu.vn</span>
+            <span className="text-[10px] font-bold">Giáo viên</span>
+            <span className="text-[8px] text-muted-foreground mt-0.5 truncate w-full">teacher@...</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDemoLogin("admin@aurora.edu.vn", "admin")}
+            className="flex flex-col items-center justify-center p-2 rounded-xl border border-border bg-muted hover:bg-accent transition-all text-center text-foreground shadow-sm"
+          >
+            {/* Custom Admin SVG Icon */}
+            <svg className="h-4 w-4 text-blue-500 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="text-[10px] font-bold">Admin</span>
+            <span className="text-[8px] text-muted-foreground mt-0.5 truncate w-full">admin@...</span>
           </button>
         </div>
       )}

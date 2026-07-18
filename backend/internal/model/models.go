@@ -8,14 +8,25 @@ import (
 )
 
 type User struct {
-	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
-	Email     string         `gorm:"uniqueIndex;not null" json:"email"`
-	Password  string         `gorm:"not null" json:"-"`
-	Name      string         `json:"name"`
-	Role      string         `gorm:"type:varchar(20);default:'student'" json:"role"` // "student" or "teacher"
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	Email       string         `gorm:"uniqueIndex;not null" json:"email"`
+	Password    string         `gorm:"not null" json:"-"`
+	Name        string         `json:"name"`
+	Role        string         `gorm:"type:varchar(20);default:'student'" json:"role"` // "student", "teacher", "admin"
+	ClassroomID *uuid.UUID     `gorm:"type:uuid;index" json:"classroomId"`
+	Status      string         `gorm:"type:varchar(20);default:'active'" json:"status"` // "active", "pending", "inactive"
+	CreatedAt   time.Time      `json:"createdAt"`
+	UpdatedAt   time.Time      `json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+type Classroom struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
+	TeacherID uuid.UUID `gorm:"type:uuid;index;not null" json:"teacherId"`
+	Teacher   User      `gorm:"foreignKey:TeacherID" json:"-"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type ChatSession struct {
@@ -96,6 +107,7 @@ type Question struct {
 	CorrectOption      int            `gorm:"type:integer;not null" json:"correctOption"`
 	Difficulty         string         `gorm:"type:varchar(20);default:'medium'" json:"difficulty"` // "easy", "medium", "hard"
 	DistractorMappings string         `gorm:"type:text" json:"distractorMappings"` // JSON map, e.g. {"option_b": "node-uuid"}
+	Sig                string         `gorm:"type:varchar(255);index" json:"sig"` // Signature for dedup (from master_bank)
 	CreatedAt          time.Time      `json:"createdAt"`
 	UpdatedAt          time.Time      `json:"updatedAt"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
