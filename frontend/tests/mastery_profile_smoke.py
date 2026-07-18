@@ -27,3 +27,17 @@ def test_mastery_types_keep_confidence_separate() -> None:
     assert "masteryProbability" in source
     assert "confidenceScore" in source
     assert "masteryStatus" in source
+
+
+def test_teacher_profile_uses_teacher_scoped_mastery_api() -> None:
+    source = read("frontend/src/app/teacher/components/StudentMasteryProfile.tsx")
+    assert "/teacher/students/" in source
+    assert "/mastery/recalculate" in source
+    assert "MasteryTopicPanel" in source
+    assert "masteryByTopic" in source
+
+
+def test_teacher_page_mounts_student_mastery_profile() -> None:
+    source = read("frontend/src/app/teacher/page.tsx")
+    assert 'import StudentMasteryProfile from "./components/StudentMasteryProfile"' in source
+    assert "<StudentMasteryProfile" in source
