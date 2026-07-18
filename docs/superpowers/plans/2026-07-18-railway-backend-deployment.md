@@ -291,4 +291,3 @@ Expected: no hard-coded Python service call remains outside an explicitly tested
 - [ ] **Step 5: Review only the intended diff**
 
 Run: `git status --short` and `git diff --stat`. Confirm unrelated pre-existing deletions and edits remain untouched. Record test commands and results in the handoff.
-
