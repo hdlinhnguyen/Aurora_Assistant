@@ -95,6 +95,16 @@ export default function QuestionBankTab({
 
     const renderMathExpr = (expr: string) => {
       let m = expr;
+      // Strip left/right modifiers
+      m = m.replace(/\\left/g, "").replace(/\\right/g, "");
+      
+      // Replace latex spaces with normal space
+      m = m.replace(/\\,/g, " ")
+           .replace(/\\ /g, " ")
+           .replace(/\\;/g, " ")
+           .replace(/\\:/g, " ")
+           .replace(/\\!/g, "");
+
       m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
         return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[12px] leading-tight font-sans">
           <span class="border-b border-violet-700 px-1 text-center pb-0.5">${num}</span>
@@ -109,7 +119,7 @@ export default function QuestionBankTab({
       m = m.replace(/\\times/g, "×");
       m = m.replace(/\\div/g, "÷");
 
-      return `<span class="font-mono bg-violet-50/70 text-violet-900 px-1.5 py-0.5 rounded text-[11px] font-bold border border-violet-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
+      return `<span class="font-serif italic text-slate-800 mx-0.5 inline-block">${m}</span>`;
     };
 
     html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
