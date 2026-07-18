@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 
 	"backend/internal/config"
+	"backend/internal/learningpath"
 	"backend/internal/model"
 	"backend/internal/service"
 	"backend/internal/telemetry"
@@ -30,6 +31,11 @@ import (
 type TutorHandler struct {
 	svc       service.TutorService
 	telemetry telemetry.ActorPublisher
+	progress  LearningPathProgressUpdater
+}
+
+type LearningPathProgressUpdater interface {
+	ApplyEvidence(context.Context, learningpath.ApplyEvidenceInput) (learningpath.ProgressStepView, error)
 }
 
 type TutorHandlerOption func(*TutorHandler)
@@ -37,6 +43,12 @@ type TutorHandlerOption func(*TutorHandler)
 func WithTutorTelemetry(publisher telemetry.ActorPublisher) TutorHandlerOption {
 	return func(handler *TutorHandler) {
 		handler.telemetry = publisher
+	}
+}
+
+func WithLearningPathProgress(updater LearningPathProgressUpdater) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.progress = updater
 	}
 }
 
@@ -676,6 +688,7 @@ func (h *TutorHandler) SubmitAnswer(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	h.recordLearningPathEvidence(userID, nodeID, learningpath.EvidenceAnswer, isCorrect)
 
 	return c.JSON(fiber.Map{
 		"isCorrect": isCorrect,
@@ -699,6 +712,7 @@ func (h *TutorHandler) SubmitCantDo(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	h.recordLearningPathEvidence(userID, nodeID, learningpath.EvidenceCantDo, false)
 	return c.JSON(res)
 }
 
@@ -1716,6 +1730,7 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 		}
 		config.DB.Create(&newLog)
 		h.publishHintTelemetry(studentID, topicUUID, req.PressCount, string(bodyBytes))
+		h.recordLearningPathEvidence(studentID, topicUUID, learningpath.EvidenceHint, false)
 	}
 
 	return c.JSON(hintResult)
@@ -1736,6 +1751,17 @@ func (h *TutorHandler) publishHintTelemetry(studentID, topicID uuid.UUID, level 
 		if _, err := h.telemetry.PublishActor(context.Background(), studentID, "student", event); err != nil {
 			log.Printf("telemetry hint event failed: %v", err)
 		}
+	}
+}
+
+func (h *TutorHandler) recordLearningPathEvidence(studentID, topicID uuid.UUID, kind string, correct bool) {
+	if h.progress == nil {
+		return
+	}
+	if _, err := h.progress.ApplyEvidence(context.Background(), learningpath.ApplyEvidenceInput{
+		StudentID: studentID, TopicID: topicID, Kind: kind, Correct: correct,
+	}); err != nil {
+		log.Printf("learning path progress update failed: %v", err)
 	}
 }
 
@@ -1801,6 +1827,7 @@ func (h *TutorHandler) AdaptiveDowngrade(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	h.recordLearningPathEvidence(studentID, nodeID, learningpath.EvidenceAdaptiveDowngrade, false)
 	return c.JSON(res)
 }
 

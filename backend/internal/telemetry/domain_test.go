@@ -115,3 +115,27 @@ func TestValidateEventAcceptsFrontendLifecycleEvents(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateEventAcceptsLearningPathStepLifecycleEvents(t *testing.T) {
+	properties := map[string]any{
+		"learning_path_id": "path-1", "topic_id": "topic-1", "step_order": 1,
+		"status_before": "in_progress", "status_after": "completed",
+		"attempt_count": 3, "correct_count": 2, "hint_count": 1,
+	}
+	for _, name := range []string{
+		"learning_path_step_started", "learning_path_step_progressed", "learning_path_step_completed",
+	} {
+		event := validEvent()
+		event.Name = name
+		event.Properties = properties
+		if err := ValidateEvent(event); err != nil {
+			t.Fatalf("ValidateEvent(%s) error = %v", name, err)
+		}
+	}
+	event := validEvent()
+	event.Name = "learning_path_step_blocked"
+	event.Properties = properties
+	if err := ValidateEvent(event); err == nil {
+		t.Fatal("expected blocked event without blocked_reason to fail")
+	}
+}

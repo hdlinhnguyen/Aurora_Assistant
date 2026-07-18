@@ -125,6 +125,15 @@ func (s *Service) ApplyEvidence(ctx context.Context, input ApplyEvidenceInput) (
 		case EvidenceAdaptiveDowngrade:
 			input.Reason = BlockedReasonAdaptiveDowngrade
 		}
+		if (input.Mastery == nil || input.Confidence == nil) && s.mastery != nil {
+			mastery, confidence, found, masteryErr := s.mastery.TopicMastery(ctx, input.StudentID, input.TopicID)
+			if masteryErr != nil {
+				log.Printf("learning path mastery lookup failed: %v", masteryErr)
+			} else if found {
+				input.Mastery = &mastery
+				input.Confidence = &confidence
+			}
+		}
 		if input.Mastery != nil {
 			result.MasteryAfter = input.Mastery
 		}

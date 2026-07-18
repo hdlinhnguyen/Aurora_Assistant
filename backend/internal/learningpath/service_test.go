@@ -197,6 +197,23 @@ func TestApplyEvidencePublishesCompletionWithoutLearningContent(t *testing.T) {
 	require.NotContains(t, publisher.events[0].Properties, "hint_text")
 }
 
+func TestApplyEvidenceLoadsLatestMasteryWhenSnapshotsAreOmitted(t *testing.T) {
+	db := setupLearningPathDB(t)
+	studentID, path, topics := seedApprovedPath(t, db, 1)
+	states := map[uuid.UUID][2]float64{}
+	svc := NewService(db, nil, fakeMasteryReader{states: states})
+	require.NoError(t, svc.Initialize(context.Background(), &path))
+	states[topics[0]] = [2]float64{.80, .60}
+
+	got, err := svc.ApplyEvidence(context.Background(), ApplyEvidenceInput{
+		StudentID: studentID, TopicID: topics[0], Kind: EvidenceAnswer, Correct: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, StatusCompleted, got.Status)
+	require.NotNil(t, got.MasteryAfter)
+	require.NotNil(t, got.ConfidenceAfter)
+}
+
 func setupLearningPathDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := testutil.OpenPostgres(t)
