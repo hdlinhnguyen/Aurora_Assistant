@@ -1,6 +1,7 @@
 package model_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"backend/internal/model"
@@ -86,5 +87,14 @@ func TestScorePersistenceRejectsInvalidDirectConstruction(t *testing.T) {
 	quietDB := db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)})
 	if err := quietDB.Create(&record).Error; err == nil {
 		t.Fatal("persistence accepted a directly constructed score with excessive scale")
+	}
+}
+
+func TestScoreMarshalJSONRejectsInvalidDirectConstruction(t *testing.T) {
+	for _, raw := range []string{"1.239", "100000.00", "-100000.00"} {
+		score := model.Score{Decimal: decimal.RequireFromString(raw)}
+		if _, err := json.Marshal(score); err == nil {
+			t.Errorf("json.Marshal accepted invalid direct score %s", raw)
+		}
 	}
 }

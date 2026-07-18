@@ -54,6 +54,9 @@ func (s Score) String() string {
 }
 
 func (s Score) MarshalJSON() ([]byte, error) {
+	if err := validateScore(s.Decimal); err != nil {
+		return nil, err
+	}
 	return json.Marshal(s.String())
 }
 
