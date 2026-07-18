@@ -12,6 +12,8 @@ func validEvent() Event {
 		Name:           "question_presented",
 		SchemaVersion:  1,
 		OccurredAt:     time.Date(2026, 7, 18, 3, 0, 0, 0, time.UTC),
+		ActorID:        "v1_01234567890123456789012345678901",
+		ActorRole:      "student",
 		SessionID:      "4baf78d5-c66f-4072-b124-622d0edbeb21",
 		AttemptID:      "b5367a39-1c86-45fe-8242-4012f35e2680",
 		TopicID:        "topic-fractions",

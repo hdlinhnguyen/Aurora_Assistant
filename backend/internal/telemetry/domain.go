@@ -67,6 +67,9 @@ func ValidateEvent(event Event) error {
 	if event.SchemaVersion != CurrentSchemaVersion || event.OccurredAt.IsZero() || event.OccurredAt.Location() != time.UTC {
 		return ErrInvalidEvent
 	}
+	if event.ActorID == "" || !allowedValue(event.ActorRole, "student", "teacher", "admin", "system") {
+		return ErrInvalidEvent
+	}
 	if _, err := uuid.Parse(event.EventID); err != nil {
 		return ErrInvalidEvent
 	}

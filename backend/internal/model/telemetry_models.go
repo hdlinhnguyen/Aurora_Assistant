@@ -15,12 +15,12 @@ type TelemetryEvent struct {
 	ReceivedAt     time.Time `gorm:"not null" json:"-"`
 	ActorID        string    `gorm:"type:varchar(128);not null;index:idx_telemetry_actor_time,priority:1" json:"-"`
 	ActorRole      string    `gorm:"type:varchar(20);not null" json:"-"`
-	SessionID      string    `gorm:"type:uuid;index" json:"-"`
-	AttemptID      string    `gorm:"type:uuid;index" json:"-"`
+	SessionID      *string   `gorm:"type:uuid;index" json:"-"`
+	AttemptID      *string   `gorm:"type:uuid;index" json:"-"`
 	ClassID        string    `gorm:"type:varchar(128);index" json:"-"`
 	TopicID        string    `gorm:"type:varchar(128);index" json:"-"`
 	Source         string    `gorm:"type:varchar(30);not null" json:"-"`
-	CorrelationID  string    `gorm:"type:uuid;index" json:"-"`
+	CorrelationID  *string   `gorm:"type:uuid;index" json:"-"`
 	AppVersion     string    `gorm:"type:varchar(100)" json:"-"`
 	ConsentState   string    `gorm:"type:varchar(30);not null" json:"-"`
 	RetentionClass string    `gorm:"type:varchar(30);not null;index" json:"-"`

@@ -98,12 +98,21 @@ func main() {
 		telemetryKey = "development-only-telemetry-key"
 		log.Println("TELEMETRY_HMAC_KEY is not set; using development telemetry key")
 	}
+	telemetryPublisher := telemetry.NewPublisher(config.DB, telemetry.SystemClock{})
 	telemetryCollector := telemetry.NewCollector(
-		telemetry.NoopPublisher{},
+		telemetryPublisher,
 		[]byte(telemetryKey),
 		"v1",
 		telemetry.SystemClock{},
 	)
+	telemetryWorker := telemetry.NewWorker(config.DB, telemetry.SystemClock{})
+	workerContext, stopTelemetryWorker := context.WithCancel(context.Background())
+	defer stopTelemetryWorker()
+	go func() {
+		if err := telemetryWorker.Run(workerContext); err != nil && err != context.Canceled {
+			log.Printf("telemetry worker stopped: %v", err)
+		}
+	}()
 
 	// Ensure at least one admin exists.
 	var adminCount int64
