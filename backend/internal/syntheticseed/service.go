@@ -209,7 +209,8 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 
 	questionsByNode := make(map[uuid.UUID][]model.Question)
 	questionCount := 0
-	for nodeIndex, node := range curriculum.Targets {
+	// Tạo câu hỏi cho MỌI nút (không chỉ target) để học sinh luyện tập ở đúng trình độ mình.
+	for nodeIndex, node := range curriculum.Topics {
 		questions := make([]model.Question, 0, 3)
 		for questionIndex := 0; questionIndex < 3; questionIndex++ {
 			question := model.Question{
@@ -243,9 +244,13 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 			return Result{}, err
 		}
 
-		for topicIndex, node := range curriculum.Targets[:3] {
+		totalTopics := len(curriculum.Topics)
+		for nodePos, node := range curriculum.Topics {
 			questions := questionsByNode[node.ID]
-			for _, attempt := range GenerateAttempts(config.Seed, studentIndex, topicIndex, len(questions)) {
+			if len(questions) == 0 {
+				continue
+			}
+			for _, attempt := range GenerateFrontierAttempts(config.Seed, studentIndex, nodePos, totalTopics, len(questions)) {
 				action := "answer_incorrect"
 				if attempt.Correct {
 					action = "answer_correct"

@@ -98,7 +98,7 @@ func main() {
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
-	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher))
+	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher), handler.WithMasteryRecalc(masterySvc))
 	adminHandler := handler.NewAdminHandler(config.DB)
 	adminMetricsHandler := handler.NewAdminMetricsHandler(adminmetrics.NewService(config.DB))
 	studentMgmtHandler := handler.NewStudentMgmtHandler(config.DB)
@@ -217,6 +217,7 @@ func main() {
 	api.Get("/subjects/:subject/tree", tutorHandler.GetTree)
 	api.Get("/subjects/:subject/questions", tutorHandler.GetSubjectQuestions)
 	api.Get("/nodes/:nodeId/questions", tutorHandler.GetQuestions)
+	api.Get("/nodes/:nodeId/questions/adaptive", tutorHandler.GetAdaptiveQuestions)
 	api.Post("/nodes/:nodeId/questions", tutorHandler.CreateQuestion)
 	api.Post("/nodes/:nodeId/questions/bulk", tutorHandler.CreateQuestionsBulk)
 	api.Put("/questions/:id", tutorHandler.UpdateQuestion)
@@ -245,6 +246,7 @@ func main() {
 	api.Post("/nodes/:nodeId/cant-do", tutorHandler.SubmitCantDo)
 	api.Post("/nodes/:nodeId/adaptive-downgrade", tutorHandler.AdaptiveDowngrade)
 	api.Get("/student/learning-path", tutorHandler.GetStudentLearningPath)
+	api.Get("/student/learning-path/live", tutorHandler.GetStudentLearningPathLive)
 	api.Post("/student/hints", tutorHandler.RequestHint)
 	api.Post("/nodes/:nodeId/chat-theory", tutorHandler.ChatNodeTheory)
 

@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -22,14 +23,21 @@ import (
 	"github.com/google/uuid"
 
 	"backend/internal/config"
+	masteryprofile "backend/internal/mastery"
 	"backend/internal/model"
 	"backend/internal/service"
 	"backend/internal/telemetry"
 )
 
 type TutorHandler struct {
-	svc       service.TutorService
-	telemetry telemetry.ActorPublisher
+	svc           service.TutorService
+	telemetry     telemetry.ActorPublisher
+	masteryRecalc masteryRecalculator
+}
+
+// masteryRecalculator tính lại BKT mastery cho 1 học sinh/môn (cập nhật ngay khi trả lời).
+type masteryRecalculator interface {
+	RecalculateStudent(context.Context, uuid.UUID, string) (masteryprofile.Profile, error)
 }
 
 type TutorHandlerOption func(*TutorHandler)
@@ -37,6 +45,12 @@ type TutorHandlerOption func(*TutorHandler)
 func WithTutorTelemetry(publisher telemetry.ActorPublisher) TutorHandlerOption {
 	return func(handler *TutorHandler) {
 		handler.telemetry = publisher
+	}
+}
+
+func WithMasteryRecalc(m masteryRecalculator) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.masteryRecalc = m
 	}
 }
 
@@ -487,6 +501,65 @@ func (h *TutorHandler) GetQuestions(c fiber.Ctx) error {
 	return c.JSON(questions)
 }
 
+// GetAdaptiveQuestions trả câu hỏi của nút, XẾP theo mastery của học sinh:
+// mastery thấp → câu dễ (NB) trước; mastery cao → câu khó (VD) trước, rồi tăng dần.
+func (h *TutorHandler) GetAdaptiveQuestions(c fiber.Ctx) error {
+	studentIDStr, _ := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(studentIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user id"})
+	}
+	nodeIdStr := c.Params("nodeId")
+	nodeID, err := uuid.Parse(nodeIdStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
+	}
+	questions, err := h.svc.GetQuestions(nodeID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Mastery nút này → tầng độ khó mục tiêu (0=NB, 1=TH, 2=VD).
+	prob := 0.30
+	var stm model.StudentTopicMastery
+	if config.DB.Where("student_id = ? AND topic_id = ?", studentID, nodeID).First(&stm).Error == nil {
+		prob = stm.MasteryProbability
+	}
+	target := 0
+	if prob >= 0.70 {
+		target = 2
+	} else if prob >= 0.40 {
+		target = 1
+	}
+
+	rank := func(d string) int {
+		switch strings.ToLower(strings.TrimSpace(d)) {
+		case "hard", "vd", "vdc", "vận dụng", "vận dụng cao":
+			return 2
+		case "medium", "th", "thông hiểu":
+			return 1
+		default:
+			return 0 // easy / nb / nhận biết
+		}
+	}
+	sort.SliceStable(questions, func(i, j int) bool {
+		ri, rj := rank(questions[i].Difficulty), rank(questions[j].Difficulty)
+		di := ri - target
+		if di < 0 {
+			di = -di
+		}
+		dj := rj - target
+		if dj < 0 {
+			dj = -dj
+		}
+		if di != dj {
+			return di < dj // gần tầng mục tiêu nhất trước
+		}
+		return ri < rj // rồi tăng dần độ khó
+	})
+	return c.JSON(questions)
+}
+
 func (h *TutorHandler) GetSubjectQuestions(c fiber.Ctx) error {
 	subjectRaw := c.Params("subject")
 	subject, err := url.PathUnescape(subjectRaw)
@@ -675,6 +748,18 @@ func (h *TutorHandler) SubmitAnswer(c fiber.Ctx) error {
 	isCorrect, question, err := h.svc.SubmitAnswer(userID, nodeID, qID, req.SelectedOption)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Cập nhật mastery ngay (async) → lộ trình + hero tươi theo tiến bộ, không cần giáo viên.
+	if h.masteryRecalc != nil {
+		var node model.Node
+		if config.DB.Where("id = ?", nodeID).First(&node).Error == nil {
+			subject := node.Subject
+			sid := userID
+			go func() {
+				_, _ = h.masteryRecalc.RecalculateStudent(context.Background(), sid, subject)
+			}()
+		}
 	}
 
 	return c.JSON(fiber.Map{
@@ -1386,6 +1471,107 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 		h.publishLearningPathGenerated(teacherID, threadID, pathCount)
 	}
 	return c.JSON(result)
+}
+
+// GetStudentLearningPathLive sinh lộ trình cá nhân hóa LIVE cho chính học sinh,
+// không cần giáo viên duyệt. Tính lại BKT từ activity_logs tươi mỗi lần gọi.
+func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
+	studentIDStr, _ := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(studentIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user id"})
+	}
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "thiếu subject"})
+	}
+
+	// Mục tiêu = mọi nút của môn (uuid) — planner sẽ tự lọc theo mastery của học sinh.
+	var nodeIDs []string
+	if err := config.DB.Model(&model.Node{}).Where("subject = ?", subject).Pluck("id", &nodeIDs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	if len(nodeIDs) == 0 {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+
+	// Evidence từ activity của chính học sinh (nhị phân ở P0; P1 thêm độ khó/hints/attempt).
+	var logs []model.ActivityLog
+	if err := config.DB.Where("student_id = ? AND subject = ?", studentID, subject).Find(&logs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	rawQuiz := buildRawQuizFromLogs(logs)
+
+	fastAPIBody := CreatePathFastAPIBody{
+		Request: CreatePathBodyRequest{
+			ClassID:                    "live-" + studentIDStr,
+			StudentIDs:                 []string{studentIDStr},
+			TargetTopicIDs:             nodeIDs,
+			TeacherID:                  studentIDStr,
+			TargetMasteryThreshold:     0.80,
+			MinimumConfidenceThreshold: 0.40,
+		},
+		RawQuiz:  rawQuiz,
+		RawPaper: []interface{}{},
+		AsOf:     time.Now().Format(time.RFC3339),
+	}
+	jsonBytes, err := json.Marshal(fastAPIBody)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post("http://127.0.0.1:8000/learning-path/live", "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		// Không nối được service → trả rỗng, FE tự fallback thứ tự cây.
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	if paths, ok := result["paths"].(map[string]interface{}); ok {
+		if p, ok := paths[studentIDStr].(map[string]interface{}); ok {
+			if steps, ok := p["ordered_steps"]; ok {
+				return c.JSON(fiber.Map{"ordered_steps": steps})
+			}
+		}
+	}
+	return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+}
+
+// buildRawQuizFromLogs chuyển ActivityLog answer_correct/incorrect thành RawQuizEvidence.
+func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
+	rawQuiz := []RawQuizEvidence{}
+	for _, lg := range logs {
+		score := 0.0
+		switch lg.Action {
+		case "answer_correct":
+			score = 1.0
+		case "answer_incorrect":
+			score = 0.0
+		default:
+			continue
+		}
+		rawQuiz = append(rawQuiz, RawQuizEvidence{
+			EvidenceID:    lg.ID.String(),
+			StudentID:     lg.StudentID.String(),
+			SessionID:     "live-session",
+			QuestionID:    "live-question",
+			TopicID:       lg.NodeID.String(),
+			Score:         score,
+			AttemptNumber: 1,
+			HintsUsed:     0,
+			GradingMethod: "auto",
+			OccurredAt:    lg.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return rawQuiz
 }
 
 func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {

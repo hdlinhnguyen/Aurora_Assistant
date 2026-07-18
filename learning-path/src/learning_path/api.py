@@ -164,6 +164,39 @@ def create_app(
         )
         return _respond(thread_id, result, round((perf_counter() - started) * 1000))
 
+    @app.post("/learning-path/live")
+    def create_learning_path_live(body: CreatePathBody) -> dict:
+        """Chế độ tự phục vụ cho học sinh: chạy pipeline rồi auto-duyệt qua interrupt
+        của giáo viên → trả path đã finalize ngay (không cần giáo viên can thiệp).
+        Dùng cho lộ trình LIVE: học sinh tự sinh path từ mastery tươi của chính mình."""
+        thread_id = uuid.uuid4().hex
+        started = perf_counter()
+        curr = get_curriculum()
+        pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
+        result = pipeline.invoke(
+            {
+                "request": body.request,
+                "raw_quiz": body.raw_quiz or [],
+                "raw_paper": body.raw_paper or [],
+                "as_of": body.as_of,
+                "path_version": 1,
+            },
+            _config(thread_id),
+        )
+        # auto-resume qua interrupt duyệt của giáo viên
+        if result.get("__interrupt__"):
+            result = pipeline.invoke(
+                Command(resume={"approve": True, "note": "self-serve"}), _config(thread_id)
+            )
+        return {
+            "thread_id": thread_id,
+            "status": "finalized",
+            "decision_metadata": learning_path_metadata(
+                result.get("paths", {}), round((perf_counter() - started) * 1000)
+            ),
+            **_serialize(result),
+        }
+
     @app.post("/learning-path/{thread_id}/approve")
     def approve_learning_path(thread_id: str, body: ApproveBody) -> dict:
         curr = get_curriculum()
