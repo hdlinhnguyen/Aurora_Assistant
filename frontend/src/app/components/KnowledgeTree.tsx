@@ -276,15 +276,17 @@ export default function KnowledgeTree({
     setPan({ x: 0, y: 0 });
     setScale(1);
 
-    // Save all positions to backend
-    for (const n of updatedNodes) {
-      try {
-        await apiFetch(`/subjects/nodes/${n.id}`, {
-          method: "PUT",
-          body: JSON.stringify({ posX: n.posX, posY: n.posY }),
-        });
-      } catch (err) {
-        console.error("Failed to save auto-layout position:", err);
+    // Save all positions to backend if mode is teacher
+    if (mode === "teacher") {
+      for (const n of updatedNodes) {
+        try {
+          await apiFetch(`/subjects/nodes/${n.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ posX: n.posX, posY: n.posY }),
+          });
+        } catch (err) {
+          console.error("Failed to save auto-layout position:", err);
+        }
       }
     }
     if (onRefresh) onRefresh();
@@ -865,7 +867,7 @@ export default function KnowledgeTree({
             </div>
           )}
 
-          {mode === "teacher" && !isFocusedView && (
+          {!isFocusedView && (
             <div className="flex items-center gap-1.5 ml-2">
               <button
                 onClick={handleAutoLayout}
