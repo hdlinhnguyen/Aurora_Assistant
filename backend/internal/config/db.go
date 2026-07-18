@@ -73,6 +73,7 @@ func ConnectDB() {
 
 	err = db.AutoMigrate(
 		&model.User{},
+		&model.Classroom{},
 		&model.ChatSession{},
 		&model.Message{},
 		&model.Topic{},
@@ -129,6 +130,13 @@ func ConnectDB() {
 	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_grading_batches_exam_snapshot_id ON grading_batches (exam_snapshot_id)`).Error; err != nil {
 		log.Fatal("Failed to create grading snapshot index:", err)
 	}
+
+	// Drop the unique index on questions.sig if it was previously created
+	// (empty-sig rows from legacy questions violate uniqueness)
+	db.Exec(`DROP INDEX IF EXISTS idx_questions_sig`)
+	db.Exec(`DROP INDEX IF EXISTS "idx_questions_sig"`)
+	// Create a regular (non-unique) index instead
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_questions_sig_lookup ON questions(sig) WHERE sig IS NOT NULL AND sig != ''`)
 
 	sqlDB, err := db.DB()
 	if err == nil {

@@ -71,3 +71,29 @@ func Protected(db *gorm.DB) fiber.Handler {
 		return c.Next()
 	}
 }
+
+// RequireRole restricts access to users having one of the specified roles
+func RequireRole(allowedRoles ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		token, ok := c.Locals("user").(*jwt.Token)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized: Missing token"})
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized: Invalid claims"})
+		}
+		userRole, exists := claims["role"].(string)
+		if !exists {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Forbidden: Role not specified in token"})
+		}
+		for _, role := range allowedRoles {
+			if userRole == role {
+				return c.Next()
+			}
+		}
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "Bạn không có quyền truy cập chức năng này",
+		})
+	}
+}

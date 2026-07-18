@@ -322,7 +322,7 @@ export default function StudentsProgressTab({ studentsProgress, selectedSubject,
           </div>
 
           {/* ── Table ─────────────────────────────────────────────────────── */}
-          <div className="flex-1 bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col">
+          <div data-tour="inspect-drawer" className="flex-1 bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col">
             <div className="overflow-auto flex-1">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0] shadow-border">

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -81,10 +82,26 @@ export default function LandingPage() {
               </svg>
             </button>
             <button
-              onClick={() => router.push("/login?role=teacher")}
-              className="bg-card border border-border hover:bg-muted text-foreground px-8 py-4 rounded-full font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] backdrop-blur"
+              onClick={async () => {
+                try {
+                  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: "student@aurora.edu.vn", password: "demo123" }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem("aurora_token", data.token);
+                    localStorage.setItem("aurora_user", JSON.stringify(data.user));
+                  }
+                } catch (e) {}
+                localStorage.setItem("aurora_tour_active", "true");
+                localStorage.setItem("aurora_tour_step", "0");
+                router.push("/tutor");
+              }}
+              className="bg-gradient-to-r from-[var(--purple)] to-indigo-600 hover:brightness-110 text-white px-8 py-4 rounded-full font-bold shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
             >
-              Bảng điểm Lớp học
+              <span>🚀 Tour Hướng Dẫn (2 phút)</span>
             </button>
           </div>
         </div>

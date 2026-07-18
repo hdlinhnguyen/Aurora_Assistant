@@ -73,5 +73,9 @@ Học sinh chỉ đọc được hồ sơ của chính mình tại dashboard cá
 
 3. Mở trình duyệt truy cập: **[http://localhost:3000](http://localhost:3000)**.
 4. Đăng nhập cực nhanh bằng thẻ One-Click Login có sẵn ở giao diện:
-   * **Tài khoản Học sinh Demo**: `student@aurora.edu.vn` / Mật khẩu: `demo123`
-   * **Tài khoản Giáo viên Demo**: `teacher@aurora.edu.vn` / Mật khẩu: `demo123`
+   * **Giáo viên synthetic**: `synthetic.teacher@aurora.local` / Mật khẩu: `demo123`
+   * **Học sinh synthetic A**: `synthetic.student.a@aurora.local` / Mật khẩu: `demo123`
+   * **Học sinh synthetic B**: `synthetic.student.b@aurora.local` / Mật khẩu: `demo123`
+   * **Học sinh synthetic C**: `synthetic.student.c@aurora.local` / Mật khẩu: `demo123`
+
+Synthetic data được reset về trạng thái mẫu mỗi lần backend khởi động. Backend tạo answer events rồi gọi BKT service để tính mastery; frontend không chứa phần trăm mastery hardcode. Đặt `ENABLE_SYNTHETIC_DATA=false` để giữ nguyên database và bỏ qua bước reset/seed này.
