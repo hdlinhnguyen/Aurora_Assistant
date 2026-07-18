@@ -1356,17 +1356,6 @@ export default function TutorHubPage() {
                           </div>
                         )}
 
-                        {/* Compact Theory Summary Box */}
-                        <div style={{ background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, ...POPPINS, fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 4 }}>
-                            <BookOpen size={14} style={{ color: "#7C46E8" }} />
-                            <span>Tóm tắt lý thuyết bài học:</span>
-                          </div>
-                          <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.5, color: "#64748b" }}>
-                            {currentNode?.theory?.trim() || "Nội dung lý thuyết cho bài này đang được cập nhật."}
-                          </p>
-                        </div>
-
                         <div style={{ ...BALOO, fontWeight: 800, fontSize: 16, color: "#16161F", lineHeight: 1.5, marginBottom: 16 }}>
                           <SafeHtml text={q.q} />
                         </div>
