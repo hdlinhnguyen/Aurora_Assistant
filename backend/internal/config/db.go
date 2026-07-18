@@ -39,6 +39,7 @@ func migrationModels() []any {
 		&model.GuardrailEvent{},
 		&model.TelemetryEvent{},
 		&model.TelemetryOutbox{},
+		&model.QuestionAttemptFact{},
 		&model.Exam{},
 		&model.ExamQuestion{},
 		&model.ExamRubricItem{},
