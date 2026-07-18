@@ -90,3 +90,21 @@ func TestRepositoryRejectsOutOfRangeState(t *testing.T) {
 
 	require.ErrorContains(t, err, "mastery_probability")
 }
+
+func TestRepositoryOlderVersionDoesNotOverwriteCurrentState(t *testing.T) {
+	repo, student, topic := setupRepository(t)
+	newer := sampleState(student.ID, topic.ID)
+	newer.Version = 2
+	newer.MasteryProbability = 0.9
+	older := sampleState(student.ID, topic.ID)
+	older.Version = 1
+	older.MasteryProbability = 0.2
+
+	require.NoError(t, repo.UpsertStates(context.Background(), []mastery.TopicState{newer}))
+	require.NoError(t, repo.UpsertStates(context.Background(), []mastery.TopicState{older}))
+
+	profile, err := repo.GetProfile(context.Background(), student.ID, topic.Subject)
+	require.NoError(t, err)
+	require.Equal(t, 2, profile.Topics[topic.ID.String()].Version)
+	require.InDelta(t, 0.9, profile.Topics[topic.ID.String()].MasteryProbability, 0.0001)
+}

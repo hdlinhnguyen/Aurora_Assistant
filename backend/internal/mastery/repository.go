@@ -3,6 +3,7 @@ package mastery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"backend/internal/model"
@@ -21,6 +22,16 @@ func (r *Repository) UpsertStates(ctx context.Context, states []TopicState) erro
 		for _, state := range states {
 			if err := ValidateState(state); err != nil {
 				return err
+			}
+			var existing model.StudentTopicMastery
+			query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("student_id = ? AND topic_id = ?", state.StudentID, state.TopicID).
+				Limit(1).Find(&existing)
+			if query.Error != nil && !errors.Is(query.Error, gorm.ErrRecordNotFound) {
+				return query.Error
+			}
+			if query.RowsAffected > 0 && existing.Version > state.Version {
+				continue
 			}
 			current, err := currentModel(state)
 			if err != nil {
