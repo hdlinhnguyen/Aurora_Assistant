@@ -7,6 +7,7 @@
 Khoảng cách năng lực trong các lớp học đông học sinh ở Việt Nam:
 - **Giáo viên và học sinh ở vùng khó khăn/lớp học đông:** Một giáo viên phải quản lý lớp ~40 học sinh với nền tảng kiến thức rất khác nhau.
 - **Hệ quả:** Học sinh yếu bị bỏ lại phía sau, trong khi học sinh giỏi bị kìm hãm sự phát triển.
+- **Không đủ nguồn lực cho gia sư 1-1:** Giáo viên không có đủ thời gian để kèm riêng từng em theo đúng lỗ hổng kiến thức cá nhân; gia sư 1-1 truyền thống lại quá tốn kém, không phải gia đình nào cũng tiếp cận được.
 - **Hạn chế của giải pháp hiện tại:** Các ứng dụng học tập hiện tại chỉ đẩy bài giảng theo thứ tự cố định, thiếu tính thích ứng cho từng cá nhân học sinh và bỏ qua vai trò quan trọng của giáo viên trên lớp.
 
 ## Giải pháp (Solution)
@@ -16,6 +17,7 @@ Hệ thống gia sư thích ứng (Adaptive Tutoring System) kiên quyết nói 
 - **Kỹ thuật Feynman (Feynman Technique):** Bắt học sinh đóng vai người dạy giảng lại kiến thức cho bạn nhỏ AI bằng ngôn ngữ đơn giản nhất để kiểm tra mức độ thấu hiểu bản chất.
 - **Tư duy từ Nguyên lý gốc (First Principles Thinking):** Bóc tách bài toán phức tạp về các chân lý toán học/tự nhiên cơ sở nhất (Axioms) và lập luận logic đi lên.
 - **Teacher Dashboard (Bắt buộc):** Tự động phân nhóm học sinh theo nhu cầu, gợi ý giáo viên ai cần giúp đỡ trước, và phát hiện các lỗ hổng kiến thức chung của cả lớp để giáo viên giảng lại.
+- **RAG (Retrieval-Augmented Generation) hỗ trợ như gia sư 1-1:** Hệ thống truy xuất đúng kiến thức nền/bài giảng bám sát Chương trình GDPT 2018 từ knowledge base để cá nhân hóa lộ trình học cho từng em — bù đắp phần giáo viên không đủ thời gian kèm riêng, không thay thế mà hỗ trợ vai trò của giáo viên.
 - **Tính năng đặc thù:** Hoạt động offline hoặc ở điều kiện băng thông thấp, nội dung bám sát Chương trình Giáo dục phổ thông theo Văn bản của Bộ Giáo dục công bố năm 2018.
 
 ## Target User

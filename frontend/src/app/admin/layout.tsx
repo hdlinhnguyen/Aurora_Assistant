@@ -6,13 +6,15 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
-import { 
-  Users, 
-  Home, 
-  BookOpen, 
-  LogOut, 
+import {
+  Users,
+  Home,
+  BookOpen,
+  LogOut,
   GraduationCap,
-  Sparkles
+  Sparkles,
+  Gauge,
+  UserCog
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -89,6 +91,8 @@ export default function AdminLayout({
     { label: "Tổng quan", href: "/admin", icon: Home },
     { label: "Quản lý Giáo viên", href: "/admin/teachers", icon: GraduationCap },
     { label: "Quản lý Lớp học", href: "/admin/classrooms", icon: BookOpen },
+    { label: "Người dùng & Chẩn đoán", href: "/admin/users", icon: UserCog },
+    { label: "Giám sát Hệ thống", href: "/admin/monitoring", icon: Gauge },
   ];
 
   return (
