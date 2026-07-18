@@ -26,6 +26,8 @@ import MonitoringTab from "./components/MonitoringTab";
 import LearningPathTab from "./components/LearningPathTab";
 import StudentsProgressTab from "./components/StudentsProgressTab";
 import StudentMasteryMatrix from "./components/StudentMasteryMatrix";
+import ExamBuilderTab from "./components/ExamBuilderTab";
+import ExamScoringTab from "./components/ExamScoringTab";
 import {
   Users,
   GitBranch,
@@ -53,7 +55,9 @@ import {
   RefreshCw,
   Database,
   TrendingUp,
-  BarChart2
+  BarChart2,
+  FilePenLine,
+  ClipboardCheck
 } from "lucide-react";
 
 export interface NodeItem {
@@ -135,7 +139,7 @@ interface RubricDraft {
   points: string;
 }
 
-type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring";
+type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "exam-builder" | "exam-scoring";
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -1236,6 +1240,24 @@ export default function TeacherDashboard() {
 
         {/* Tab Selection */}
         <div className="p-4 space-y-1.5 flex-1 overflow-y-auto">
+          <button
+            onClick={() => setActiveTab("exam-builder")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "exam-builder"
+                ? "bg-foreground border-foreground text-background shadow-md"
+                : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <FilePenLine size={16} /> Tạo đề kiểm tra
+          </button>
+          <button
+            onClick={() => setActiveTab("exam-scoring")}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black transition-all border ${activeTab === "exam-scoring"
+                ? "bg-foreground border-foreground text-background shadow-md"
+                : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`}
+          >
+            <ClipboardCheck size={16} /> Chấm bài kiểm tra
+          </button>
           {selectedSubject ? (
             <>
               <button
@@ -1328,7 +1350,7 @@ export default function TeacherDashboard() {
 
       {/* Main Panel Workspace */}
       <main className="flex-1 flex flex-col p-6 overflow-hidden bg-background relative">
-        {!selectedSubject ? (
+        {!selectedSubject && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
           // Subject Selection Screen Dashboard
           <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">
             {isSidebarCollapsed && (
@@ -1617,7 +1639,11 @@ export default function TeacherDashboard() {
             </div>
 
             {/* Split logic between Teacher tabs */}
-            {activeTab === "students" ? (
+            {activeTab === "exam-builder" ? (
+              <ExamBuilderTab subjects={subjects} />
+            ) : activeTab === "exam-scoring" ? (
+              <ExamScoringTab />
+            ) : activeTab === "students" ? (
               <StudentsProgressTab
                 studentsProgress={studentsProgress}
                 selectedSubject={selectedSubject}
