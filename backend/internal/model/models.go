@@ -90,9 +90,51 @@ type Question struct {
 	OptionsJSON   string         `gorm:"type:text;not null" json:"optionsJson"` // JSON array, e.g. ["A", "B"]
 	CorrectOption int            `gorm:"type:integer;not null" json:"correctOption"`
 	Difficulty    string         `gorm:"type:varchar(20);default:'medium'" json:"difficulty"` // "easy", "medium", "hard"
+	QuestionType  string         `gorm:"type:varchar(20);not null;default:'multiple_choice'" json:"questionType"`
+	GradeLevel    string         `gorm:"type:varchar(50)" json:"gradeLevel"`
 	CreatedAt     time.Time      `json:"createdAt"`
 	UpdatedAt     time.Time      `json:"updatedAt"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+type QuestionRubricItem struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	QuestionID uuid.UUID `gorm:"type:uuid;not null;index;uniqueIndex:idx_question_rubric_position,priority:1" json:"questionId"`
+	Question   Question  `gorm:"foreignKey:QuestionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	Content    string    `gorm:"type:text;not null" json:"content"`
+	Points     Score     `gorm:"not null" json:"points"`
+	Position   int       `gorm:"not null;uniqueIndex:idx_question_rubric_position,priority:2" json:"position"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+}
+
+type QuestionTopicMapping struct {
+	QuestionID uuid.UUID `gorm:"type:uuid;primaryKey" json:"questionId"`
+	Question   Question  `gorm:"foreignKey:QuestionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	NodeID     uuid.UUID `gorm:"type:uuid;primaryKey" json:"nodeId"`
+	Node       Node      `gorm:"foreignKey:NodeID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
+	CreatedBy  uuid.UUID `gorm:"type:uuid;not null;index" json:"createdBy"`
+	Creator    User      `gorm:"foreignKey:CreatedBy;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type QuestionRubricItemTopicMapping struct {
+	RubricItemID uuid.UUID          `gorm:"type:uuid;primaryKey" json:"rubricItemId"`
+	RubricItem   QuestionRubricItem `gorm:"foreignKey:RubricItemID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	NodeID       uuid.UUID          `gorm:"type:uuid;primaryKey" json:"nodeId"`
+	Node         Node               `gorm:"foreignKey:NodeID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
+	CreatedBy    uuid.UUID          `gorm:"type:uuid;not null;index" json:"createdBy"`
+	Creator      User               `gorm:"foreignKey:CreatedBy;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
+	CreatedAt    time.Time          `json:"createdAt"`
+}
+
+type QuestionTaggingState struct {
+	QuestionID uuid.UUID  `gorm:"type:uuid;primaryKey" json:"questionId"`
+	Question   Question   `gorm:"foreignKey:QuestionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"-"`
+	Version    int        `gorm:"not null;default:1;check:question_tagging_version_positive,version >= 1" json:"version"`
+	UpdatedBy  *uuid.UUID `gorm:"type:uuid;index" json:"updatedBy"`
+	Updater    *User      `gorm:"foreignKey:UpdatedBy;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"-"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
 type StudentState struct {
@@ -150,5 +192,4 @@ type LearningPath struct {
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
-
 
