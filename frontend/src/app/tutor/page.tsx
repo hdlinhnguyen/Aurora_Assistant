@@ -249,6 +249,61 @@ export default function TutorHubPage() {
     }
   }
 
+  function makeFallbackQuestions(nodeId: string, nodeName: string): any[] {
+    const questionsList = [
+      {
+        q: `Chọn khẳng định đúng nhất khi tìm hiểu về khái niệm và bản chất của: **"${nodeName}"**?`,
+        opts: [
+          `Cần nắm vững định nghĩa cốt lõi và các tính chất nền tảng của "${nodeName}".`,
+          `Có thể áp dụng máy móc các công thức tính toán mà không cần hiểu bản chất.`,
+          `Có thể bỏ qua các bước biến đổi logic cơ bản khi làm bài tập tự luyện.`,
+          `Định nghĩa lý thuyết hoàn toàn không có mối liên hệ thực tế nào cả.`,
+        ],
+        correct: 0,
+        tag: "Nhận biết"
+      },
+      {
+        q: `Khi giải các bài toán thuộc chuyên đề **"${nodeName}"**, hành vi nào dưới đây là chuẩn xác nhất?`,
+        opts: [
+          `Phân tích kỹ đề bài, đối chiếu với lý thuyết trước khi đặt bút biến đổi.`,
+          `Thực hiện biến đổi ngẫu nhiên bỏ qua các điều kiện xác định.`,
+          `Sử dụng máy tính cầm tay để ra kết quả luôn mà không cần hiểu các bước trung gian.`,
+          `Không cần kiểm tra lại tính hợp lý của kết quả sau khi làm xong.`,
+        ],
+        correct: 0,
+        tag: "Thông hiểu"
+      },
+      {
+        q: `Mối quan hệ giữa chuyên đề **"${nodeName}"** và các kiến thức toán học khác được mô tả như thế nào?`,
+        opts: [
+          `Kiến thức này được thừa kế và liên kết chặt chẽ với các khái niệm nền tảng trước đó.`,
+          `Đây là một chuyên đề hoàn toàn biệt lập, không có mối liên hệ với các bài học khác.`,
+          `Học sinh không cần học các phép tính cơ bản vẫn có thể hiểu sâu sắc phần này.`,
+          `Chỉ cần học thuộc lòng lý thuyết mà không cần thực hành giải toán là đủ.`,
+        ],
+        correct: 0,
+        tag: "Vận dụng"
+      }
+    ];
+
+    return questionsList.map((item, idx) => {
+      const indexed = item.opts.map((opt, i) => ({ opt, isCorrect: i === item.correct }));
+      const seed = nodeId.charCodeAt(0) + idx;
+      const shuffled = [...indexed].sort((a, b) => {
+        const valA = (a.opt.length + seed) % 7;
+        const valB = (b.opt.length + seed) % 7;
+        return valA - valB;
+      });
+      return {
+        id: `demo-${nodeId}-${idx}`,
+        q: item.q,
+        opts: shuffled.map(o => o.opt),
+        correct: shuffled.findIndex(o => o.isCorrect),
+        tag: item.tag,
+      };
+    });
+  }
+
   async function loadQuestions(nodeId: string) {
     setQLoading(true);
     try {
@@ -257,40 +312,14 @@ export default function TutorHubPage() {
       if (mapped.length === 0) {
         const targetNode = nodes.find((n) => n.id === nodeId);
         const nodeName = targetNode?.name || "Khái niệm Phân số";
-        setQuestions([
-          {
-            id: `demo-${nodeId}`,
-            q: `[Luyện tập & Thử nghiệm Socratic AI] Chọn khẳng định đúng khi tìm hiểu về: "${nodeName}"?`,
-            opts: [
-              `Nắm vững bản chất định nghĩa và nguyên lý nền tảng của ${nodeName}`,
-              "Thực hiện biến đổi ngẫu nhiên không qua các bước cơ bản",
-              "Bỏ qua quy đồng hoặc rút gọn khi làm bài",
-              "Không áp dụng được cho bài toán thực tế",
-            ],
-            correct: 0,
-            tag: "Thông hiểu",
-          },
-        ]);
+        setQuestions(makeFallbackQuestions(nodeId, nodeName));
       } else {
         setQuestions(mapped);
       }
     } catch {
       const targetNode = nodes.find((n) => n.id === nodeId);
       const nodeName = targetNode?.name || "Khái niệm Phân số";
-      setQuestions([
-        {
-          id: `demo-${nodeId}`,
-          q: `[Luyện tập & Thử nghiệm Socratic AI] Chọn khẳng định đúng khi tìm hiểu về: "${nodeName}"?`,
-          opts: [
-            `Nắm vững bản chất định nghĩa và nguyên lý nền tảng của ${nodeName}`,
-            "Thực hiện biến đổi ngẫu nhiên không qua các bước cơ bản",
-            "Bỏ qua quy đồng hoặc rút gọn khi làm bài",
-            "Không áp dụng được cho bài toán thực tế",
-          ],
-          correct: 0,
-          tag: "Thông hiểu",
-        },
-      ]);
+      setQuestions(makeFallbackQuestions(nodeId, nodeName));
     } finally {
       setQLoading(false);
       setQIndex(0);

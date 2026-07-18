@@ -293,14 +293,11 @@ export default function KnowledgeTree({
     if (!containerRef.current || localNodes.length === 0) return;
 
     const timer = setTimeout(() => {
-      if (isFocusedView && activeSelectedNodeId) {
-        // Center the selected node in the viewport
-        const container = containerRef.current;
-        if (!container) return;
+      const container = containerRef.current;
+      if (!container) return;
 
+      if (isFocusedView && activeSelectedNodeId) {
         // Find the selected node from displayNodes (which has focused-view coords)
-        // Since displayNodes is recalculated during render, we need to find position
-        // from the focused layout. The node's position in focused view is deterministic.
         const selectedNode = displayNodes.find(n => n.id === activeSelectedNodeId);
         if (!selectedNode) {
           handleResetZoom();
@@ -321,6 +318,24 @@ export default function KnowledgeTree({
 
         setScale(targetScale);
         setPan({ x: Math.round(panX), y: Math.round(panY) });
+      } else if (activeSelectedNodeId) {
+        // Center the selected node in overview mode without changing current scale
+        const selectedNode = localNodes.find(n => n.id === activeSelectedNodeId);
+        if (selectedNode) {
+          const nodeWidth = 230;
+          const nodeHeight = 85;
+          const nodeCenterX = selectedNode.posX + nodeWidth / 2;
+          const nodeCenterY = selectedNode.posY + nodeHeight / 2;
+
+          const containerWidth = container.clientWidth || 800;
+          const containerHeight = container.clientHeight || 500;
+
+          const targetScale = scale || 1.0;
+          const panX = containerWidth / 2 - nodeCenterX * targetScale;
+          const panY = containerHeight / 2 - nodeCenterY * targetScale;
+
+          setPan({ x: Math.round(panX), y: Math.round(panY) });
+        }
       } else {
         handleResetZoom();
       }
