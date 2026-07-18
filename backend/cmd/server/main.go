@@ -14,6 +14,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 
+	"backend/internal/adminmetrics"
 	"backend/internal/config"
 	"backend/internal/exam"
 	"backend/internal/handler"
@@ -96,6 +97,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authSvc)
 	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher))
 	adminHandler := handler.NewAdminHandler(config.DB)
+	adminMetricsHandler := handler.NewAdminMetricsHandler(adminmetrics.NewService(config.DB))
 	studentMgmtHandler := handler.NewStudentMgmtHandler(config.DB)
 	taggingHandler := handler.NewTaggingHandler(taggingSvc)
 	questionBankHandler := handler.NewQuestionBankHandler(questionBankSvc)
@@ -246,6 +248,7 @@ func main() {
 	adminGroup.Post("/classrooms", adminHandler.CreateClassroom)
 	adminGroup.Put("/classrooms/:id", adminHandler.UpdateClassroom)
 	adminGroup.Delete("/classrooms/:id", adminHandler.DeleteClassroom)
+	adminGroup.Get("/telemetry-dashboard", adminMetricsHandler.GetTelemetryDashboard)
 
 	// Teacher Routes (Teacher & Admin only)
 	teacherGroup := api.Group("/teacher", middleware.RequireRole("teacher", "admin"))
