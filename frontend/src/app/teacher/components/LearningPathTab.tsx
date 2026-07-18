@@ -1,318 +1,207 @@
 "use client";
 
-import React from "react";
-import { ListTodo, GitFork, AlertCircle, ArrowUp, ArrowDown, Trash, ShieldAlert, Target, AlertTriangle, Users, Flame, FileText } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Check, FilePlus2, Flame, Loader2, RefreshCw, ShieldAlert, Sparkles, UserRound, X } from "lucide-react";
+import { toast } from "sonner";
 
-import { NodeItem, StudentProgress } from "../page";
+import type { NodeItem, StudentProgress } from "../page";
+import {
+  approveLearningPathDrafts,
+  createManualLearningPathDraft,
+  type AutomaticDraftResponse,
+  loadAutomaticLearningPathDrafts,
+  skipLearningPathDrafts,
+} from "./learningPathWorkspaceApi";
 
-interface LearningPathTabProps {
+interface Props {
+  selectedSubject: string;
   nodes: NodeItem[];
-  selectedTargetTopics: string[];
-  setSelectedTargetTopics: React.Dispatch<React.SetStateAction<string[]>>;
-  handleGenerateLearningPath: () => void;
-  generatingPath: boolean;
-  pathErrorDetail: string | null;
-  insights: any;
-  draftPaths: any;
   studentsProgress: StudentProgress[];
-  handleApproveLearningPath: () => void;
-  approvingPath: boolean;
-  handleMoveStep: (sid: string, idx: number, dir: "up" | "down") => void;
-  handleDeleteStep: (sid: string, idx: number) => void;
 }
 
-export default function LearningPathTab({
-  nodes,
-  selectedTargetTopics,
-  setSelectedTargetTopics,
-  handleGenerateLearningPath,
-  generatingPath,
-  pathErrorDetail,
-  insights,
-  draftPaths,
-  studentsProgress,
-  handleApproveLearningPath,
-  approvingPath,
-  handleMoveStep,
-  handleDeleteStep,
-}: LearningPathTabProps) {
+type ManualQueue = { threadId: string; drafts: AutomaticDraftResponse["drafts"] } | null;
+
+const pct = (value?: number) => `${Math.round((value ?? 0) * 100)}%`;
+
+export default function LearningPathTab({ selectedSubject, nodes, studentsProgress }: Props) {
+  const [workspace, setWorkspace] = useState<AutomaticDraftResponse | null>(null);
+  const [manualQueue, setManualQueue] = useState<ManualQueue>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualStudents, setManualStudents] = useState<string[]>([]);
+  const [manualTopics, setManualTopics] = useState<string[]>([]);
+  const [manualSearch, setManualSearch] = useState("");
+  const [workingStudent, setWorkingStudent] = useState<string | null>(null);
+
+  const topicById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const studentById = useMemo(() => new Map(studentsProgress.map((student) => [student.studentId, student])), [studentsProgress]);
+  const topicNodes = useMemo(() => nodes.filter((node) => !node.isRoot), [nodes]);
+
+  const reload = async (refresh = false) => {
+    if (!selectedSubject) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setWorkspace(await loadAutomaticLearningPathDrafts(selectedSubject, refresh));
+    } catch (err: any) {
+      setError(err?.message || "Không thể phân tích lộ trình hiện tại");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setWorkspace(null);
+    setManualQueue(null);
+    void reload();
+    // Reload intentionally follows the selected subject identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubject]);
+
+  const automaticDrafts = workspace ? Object.entries(workspace.drafts) : [];
+  const manualDrafts = manualQueue ? Object.entries(manualQueue.drafts) : [];
+  const allDrafts = [...automaticDrafts, ...manualDrafts];
+
+  const updateAfterReview = (studentIds: string[]) => {
+    setWorkspace((current) => {
+      if (!current) return current;
+      const drafts = { ...current.drafts };
+      studentIds.forEach((id) => delete drafts[id]);
+      return { ...current, drafts, summary: { ...current.summary, draftCount: Object.keys(drafts).length } };
+    });
+  };
+
+  const approve = async (threadId: string, studentIds: string[], paths: AutomaticDraftResponse["drafts"]) => {
+    setWorkingStudent(studentIds.length === 1 ? studentIds[0] : "all");
+    try {
+      await approveLearningPathDrafts(threadId, studentIds, paths);
+      updateAfterReview(studentIds);
+      if (manualQueue?.threadId === threadId) setManualQueue((queue) => queue ? { ...queue, drafts: Object.fromEntries(Object.entries(queue.drafts).filter(([id]) => !studentIds.includes(id))) } : queue);
+      toast.success(studentIds.length > 1 ? "Đã duyệt các lộ trình được chọn" : "Đã duyệt lộ trình cho học sinh");
+    } catch (err: any) {
+      toast.error(`Không thể duyệt lộ trình: ${err?.message || "lỗi không xác định"}`);
+    } finally {
+      setWorkingStudent(null);
+    }
+  };
+
+  const skip = async (threadId: string, studentId: string) => {
+    setWorkingStudent(studentId);
+    try {
+      await skipLearningPathDrafts(threadId, [studentId]);
+      updateAfterReview([studentId]);
+      if (manualQueue?.threadId === threadId) setManualQueue((queue) => queue ? { ...queue, drafts: Object.fromEntries(Object.entries(queue.drafts).filter(([id]) => id !== studentId)) } : queue);
+      toast.success("Đã bỏ qua bản đề xuất");
+    } catch (err: any) {
+      toast.error(`Không thể bỏ qua: ${err?.message || "lỗi không xác định"}`);
+    } finally {
+      setWorkingStudent(null);
+    }
+  };
+
+  const createManual = async () => {
+    if (!manualStudents.length || !manualTopics.length) {
+      toast.warning("Chọn ít nhất một học sinh và một topic cần cải thiện");
+      return;
+    }
+    try {
+      const result: any = await createManualLearningPathDraft(selectedSubject, manualStudents, manualTopics);
+      const paths = result.paths || {};
+      setManualQueue({ threadId: result.thread_id || result.threadId, drafts: paths });
+      setManualOpen(false);
+      toast.success("Đã tạo bản nháp thủ công");
+    } catch (err: any) {
+      toast.error(`Không thể tạo bản nháp: ${err?.message || "lỗi không xác định"}`);
+    }
+  };
+
+  const renderDraft = (studentId: string, draft: AutomaticDraftResponse["drafts"][string], source: "automatic" | "manual", threadId: string) => {
+    const student = studentById.get(studentId);
+    const weakTopics = workspace?.recommendationsByStudent?.[studentId] || [];
+    const firstWeak = weakTopics[0];
+    const isWorking = workingStudent === studentId || workingStudent === "all";
+    return (
+      <article key={`${source}-${studentId}`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-white"><UserRound size={17} /></span>
+            <div>
+              <h4 className="font-black text-slate-900">{student?.studentName || studentId}</h4>
+              <p className="text-[11px] text-slate-500">{student?.studentEmail || "Học sinh trong lớp hiện tại"}</p>
+            </div>
+          </div>
+          <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${source === "automatic" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-800"}`}>
+            {source === "automatic" ? "Hệ thống đề xuất" : "Giáo viên tạo"}
+          </span>
+        </div>
+        {firstWeak && (
+          <div className="mt-4 rounded-2xl border border-rose-100 bg-rose-50/70 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-black text-rose-950">{topicById.get(firstWeak.topicId)?.name || firstWeak.topicId}</span>
+              <span className="text-[10px] font-black text-rose-700">Mastery {pct(firstWeak.mastery)} · Confidence {pct(firstWeak.confidence)}</span>
+            </div>
+            <p className="mt-1 text-[10px] font-semibold text-rose-800">Mức mastery dưới 40% và đã đủ bằng chứng tin cậy để phụ đạo.</p>
+          </div>
+        )}
+        <div className="mt-4 space-y-2">
+          {(draft.ordered_steps || []).map((step) => (
+            <div key={`${studentId}-${step.order}-${step.topic_id}`} className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <span className="text-[10px] font-black text-slate-400">{step.order}</span>
+              <span className="min-w-0 flex-1 truncate text-xs font-bold text-slate-700">{topicById.get(step.topic_id)?.name || step.topic_id}</span>
+              <span className="text-[10px] font-black text-slate-400">{pct(step.current_mastery)} → {pct(step.target_mastery)}</span>
+            </div>
+          ))}
+          {!draft.ordered_steps?.length && <p className="text-xs font-semibold text-slate-500">Không có bước khả dụng trong bản nháp.</p>}
+        </div>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button onClick={() => void approve(threadId, [studentId], { [studentId]: draft })} disabled={Boolean(workingStudent)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50"><Check size={14} /> Duyệt</button>
+          <button onClick={() => void skip(threadId, studentId)} disabled={Boolean(workingStudent)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-black text-slate-600 disabled:opacity-50">Bỏ qua</button>
+        </div>
+        {isWorking && <p className="mt-2 text-center text-[10px] font-bold text-slate-400">Đang cập nhật…</p>}
+      </article>
+    );
+  };
+
+  if (!selectedSubject) return <div className="flex-1 rounded-3xl border border-dashed border-slate-300 p-12 text-center text-sm font-bold text-slate-500">Hãy chọn môn học ở thanh bên để bắt đầu.</div>;
+
   return (
-    <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6 animate-[fadeIn_0.3s_ease-out]">
-      {/* Step 1: Select Target Topics */}
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-        <div>
-          <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-            <Target size={16} className="text-[var(--mint)] animate-pulse" />
-            <span>Bước 1: Chọn bài học mục tiêu chẩn đoán</span>
-          </h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5 font-semibold">Chọn các bài học bạn muốn chẩn đoán và lập lộ trình học phụ đạo cho lớp</p>
+    <div className="flex-1 space-y-5 overflow-y-auto pr-1 pb-8">
+      <header className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-600">Teacher intervention queue</p>
+            <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">Lập lộ trình cá nhân hóa</h2>
+            <p className="mt-1 text-xs font-semibold text-slate-500">Môn hiện tại: <span className="text-slate-900">{selectedSubject}</span></p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => void reload(true)} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-50"><RefreshCw size={14} className={loading ? "animate-spin" : ""} /> Phân tích lại</button>
+            <button onClick={() => setManualOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-950"><FilePlus2 size={14} /> Tự tạo lộ trình</button>
+          </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[160px] overflow-y-auto p-1">
-          {nodes.map((node) => {
-            const isChecked = selectedTargetTopics.includes(node.id);
-            return (
-              <button
-                key={node.id}
-                onClick={() => {
-                  if (isChecked) {
-                    setSelectedTargetTopics(prev => prev.filter(id => id !== node.id));
-                  } else {
-                    setSelectedTargetTopics(prev => [...prev, node.id]);
-                  }
-                }}
-                className={`flex items-center gap-3 p-3 rounded-2xl border text-left text-xs font-bold transition-all shadow-sm cursor-pointer ${isChecked
-                    ? "bg-foreground border-foreground text-background"
-                    : "bg-white border-border text-foreground hover:bg-muted"
-                  }`}
-              >
-                <span className={`h-4 w-4 rounded-md border flex items-center justify-center font-bold text-[9px] ${isChecked ? "bg-background border-background text-foreground" : "border-border bg-white"
-                  }`}>
-                  {isChecked && "✓"}
-                </span>
-                <span className="truncate">{node.name}</span>
-              </button>
-            );
-          })}
-        </div>
-        
-        <div className="flex pt-2 justify-end">
-          <button
-            onClick={handleGenerateLearningPath}
-            disabled={generatingPath || selectedTargetTopics.length === 0}
-            className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer uppercase tracking-wider"
-          >
-            {generatingPath ? "Đang tính toán..." : "Lập lộ trình & Phân tích lớp học"}
-          </button>
-        </div>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          ["Học sinh cần hỗ trợ", workspace?.summary.reliableStudentCount || 0, "text-rose-600"],
+          ["Bản nháp chờ duyệt", allDrafts.length, "text-amber-600"],
+          ["Cần thêm dữ liệu", workspace?.summary.insufficientEvidenceCount || 0, "text-sky-600"],
+          ["Topic trong môn", topicNodes.length, "text-emerald-600"],
+        ].map(([label, value, color]) => <div key={String(label)} className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p><p className={`mt-1 text-2xl font-black ${color}`}>{value}</p></div>)}
       </div>
 
-      {/* API detailed error display (Monospace styled box) */}
-      {pathErrorDetail && (
-        <div className="bg-rose-50 border border-rose-200 p-5 rounded-3xl space-y-3">
-          <div className="flex items-center gap-2 text-rose-800">
-            <ShieldAlert size={18} />
-            <span className="font-extrabold text-xs uppercase tracking-wider">LỖI THIẾT LẬP LỘ TRÌNH</span>
-          </div>
-          <p className="text-[11px] text-rose-700 font-semibold leading-relaxed">
-            Không thể kết nối đến máy chủ tính toán lộ trình hoặc dữ liệu học sinh không hợp lệ. Vui lòng kiểm tra lại cấu trúc cây kiến thức hoặc dữ liệu nộp bài của học sinh.
-          </p>
-          <div className="p-3 bg-rose-900 text-rose-50 text-[10px] font-mono rounded-xl max-h-[150px] overflow-y-auto whitespace-pre-wrap leading-normal border border-rose-950">
-            {pathErrorDetail}
-          </div>
-        </div>
-      )}
+      {error && <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800"><ShieldAlert size={17} /><div><p className="font-black">Không thể tạo đề xuất</p><p className="mt-1">{error}</p><button onClick={() => void reload()} className="mt-2 font-black underline">Thử lại</button></div></div>}
 
-      {/* Step 2: Display Results if available */}
-      {insights && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-[fadeIn_0.3s_ease-out]">
-          
-          {/* Left: Class Insights (Gaps, Intervention Groups, Priority List) */}
-          <div className="xl:col-span-2 space-y-6">
-            
-            {/* Class-wide Gaps */}
-            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                <AlertTriangle size={15} className="text-amber-500" />
-                <span>Lỗ hổng kiến thức chung toàn lớp</span>
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {insights.class_wide_gaps && insights.class_wide_gaps.map((gap: any) => {
-                  const gapNode = nodes.find(n => n.id === gap.topic_id);
-                  return (
-                    <div key={gap.topic_id} className="p-4 bg-amber-50/20 border border-amber-100 rounded-2xl space-y-1.5 shadow-sm">
-                      <span className="font-black text-amber-900 text-xs block truncate" title={gapNode ? gapNode.name : gap.topic_id}>
-                        {gapNode ? gapNode.name : gap.topic_id}
-                      </span>
-                      <div className="flex justify-between text-[10px] font-bold text-amber-700">
-                        <span>Tỷ lệ hổng:</span>
-                        <span className="font-black text-amber-900">{(gap.gap_ratio * 100).toFixed(0)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-                {(!insights.class_wide_gaps || insights.class_wide_gaps.length === 0) && (
-                  <p className="text-xs text-muted-foreground font-semibold col-span-2 py-4 text-center">Không phát hiện lỗ hổng kiến thức nghiêm trọng nào chung.</p>
-                )}
-              </div>
-            </div>
+      <section className="rounded-[2rem] border border-slate-200 bg-slate-50/70 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><Sparkles size={16} className="text-amber-500" /><h3 className="text-sm font-black text-slate-950">Đề xuất cần giáo viên duyệt</h3></div><p className="mt-1 text-[11px] font-semibold text-slate-500">Tự động lọc mastery dưới 40% và confidence trên 60% trong môn hiện tại.</p></div>{automaticDrafts.length > 1 && workspace?.threadId && <button onClick={() => void approve(workspace.threadId, automaticDrafts.map(([id]) => id), Object.fromEntries(automaticDrafts))} disabled={Boolean(workingStudent)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white disabled:opacity-50">Duyệt tất cả</button>}</div>
+        {loading && !workspace ? <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-xs font-bold text-slate-500"><Loader2 size={16} className="animate-spin" /> Đang phân tích dữ liệu lớp…</div> : automaticDrafts.length ? <div className="grid gap-4 xl:grid-cols-2">{automaticDrafts.map(([id, draft]) => renderDraft(id, draft, "automatic", workspace!.threadId))}</div> : <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center"><Flame size={22} className="mx-auto text-slate-300" /><p className="mt-2 text-sm font-black text-slate-700">Chưa có bản nháp tự động</p><p className="mt-1 text-xs font-semibold text-slate-500">Không có học sinh nào đủ điều kiện hoặc giáo viên có thể tự tạo lộ trình.</p></div>}
+      </section>
 
-            {/* Intervention Groups */}
-            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                <Users size={15} className="text-indigo-500" />
-                <span>Nhóm can thiệp phụ đạo ({insights.intervention_groups?.length || 0})</span>
-              </h3>
-              
-              <div className="space-y-3">
-                {insights.intervention_groups && insights.intervention_groups.map((group: any, idx: number) => {
-                  const rootNode = nodes.find(n => n.id === group.root_cause_topic_id);
-                  
-                  const names = group.student_ids.map((sid: string) => {
-                    const p = studentsProgress.find(sp => sp.studentId === sid);
-                    return p ? p.studentName : sid;
-                  });
+      {workspace?.insufficientEvidence?.length ? <section className="rounded-[2rem] border border-sky-200 bg-sky-50/60 p-5"><div className="flex items-center gap-2"><AlertTriangle size={16} className="text-sky-600" /><h3 className="text-sm font-black text-sky-950">Cần thêm dữ liệu trước khi đề xuất</h3></div><p className="mt-1 text-xs font-semibold text-sky-800">Các trường hợp này chưa đủ confidence, hệ thống không gắn nhãn yếu và không tự tạo lộ trình.</p><div className="mt-3 flex flex-wrap gap-2">{workspace.insufficientEvidence.map((item) => <span key={`${item.studentId}-${item.topicId}`} className="rounded-full border border-sky-200 bg-white px-3 py-1.5 text-[10px] font-black text-sky-800">{studentById.get(item.studentId)?.studentName || item.studentId} · {topicById.get(item.topicId)?.name || item.topicId} · {pct(item.confidence)} confidence</span>)}</div></section> : null}
 
-                  return (
-                    <div key={idx} className="p-4 bg-muted/40 border border-border rounded-2xl space-y-2.5 shadow-sm">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                          <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded uppercase tracking-wider">
-                            Nguyên nhân gốc rễ (Root Cause)
-                          </span>
-                          <h4 className="font-black text-slate-800 text-xs mt-1" title={rootNode ? rootNode.name : group.root_cause_topic_id}>
-                            {rootNode ? rootNode.name : group.root_cause_topic_id}
-                          </h4>
-                        </div>
-                        <span className="px-2.5 py-1 bg-slate-900 text-white rounded-xl text-[10px] font-black shrink-0">
-                          {group.student_ids.length} Học sinh
-                        </span>
-                      </div>
+      {manualDrafts.length ? <section className="rounded-[2rem] border border-sky-200 bg-white p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-sm font-black text-slate-950">Bản nháp giáo viên vừa tạo</h3><p className="mt-1 text-xs font-semibold text-slate-500">Kiểm tra lại trước khi kích hoạt cho học sinh.</p></div></div><div className="grid gap-4 xl:grid-cols-2">{manualDrafts.map(([id, draft]) => renderDraft(id, draft, "manual", manualQueue!.threadId))}</div></section> : null}
 
-                      <div className="text-[10px] text-slate-600 leading-relaxed font-semibold bg-white p-3 rounded-xl border border-slate-100">
-                        <span className="font-black text-slate-500 block mb-1">Học sinh thuộc nhóm:</span>
-                        {names.join(", ")}
-                      </div>
-                    </div>
-                  );
-                })}
-                {(!insights.intervention_groups || insights.intervention_groups.length === 0) && (
-                  <p className="text-xs text-muted-foreground font-semibold py-4 text-center">Không có nhóm can thiệp cần phân loại.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Support Priority List */}
-            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
-              <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                <Flame size={15} className="text-rose-500 animate-bounce" />
-                <span>Ưu tiên hỗ trợ học sinh ({insights.prioritized_students?.length || 0})</span>
-              </h3>
-              
-              <div className="space-y-2.5">
-                {insights.prioritized_students && insights.prioritized_students.map((student: any) => {
-                  const p = studentsProgress.find(sp => sp.studentId === student.student_id);
-                  const name = p ? p.studentName : student.student_id;
-                  const email = p ? p.studentEmail : "";
-                  
-                  return (
-                    <div key={student.student_id} className="p-3.5 bg-rose-50/20 border border-rose-100 rounded-2xl flex items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <span className="text-xs font-black text-slate-800">{name}</span>
-                        <span className="block text-[10px] text-muted-foreground font-semibold">{email}</span>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <div className="text-right">
-                          <span className="text-[10px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 uppercase tracking-wider block">
-                            Độ khẩn cấp: {student.urgency_score.toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {(!insights.prioritized_students || insights.prioritized_students.length === 0) && (
-                  <p className="text-xs text-muted-foreground font-semibold py-4 text-center">Tất cả học sinh đều đang có tiến độ tốt.</p>
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Right: Draft Paths & Approval */}
-          <div className="space-y-6">
-            <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4 flex flex-col max-h-[700px]">
-              <div>
-                <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide flex items-center gap-2">
-                  <FileText size={15} className="text-emerald-500" />
-                  <span>Lộ trình dự thảo của lớp ({draftPaths ? Object.keys(draftPaths).length : 0})</span>
-                </h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">Nhấn duyệt để áp dụng chính thức các lộ trình này xuống tài khoản học sinh</p>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleApproveLearningPath}
-                  disabled={approvingPath || !draftPaths || Object.keys(draftPaths).length === 0}
-                  className="w-full py-3 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground font-black text-xs rounded-xl shadow-[var(--shadow-card)] transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer text-center uppercase tracking-wider"
-                >
-                  {approvingPath ? "Đang duyệt..." : "Duyệt lộ trình cả lớp"}
-                </button>
-              </div>
-              
-              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
-                {draftPaths && Object.keys(draftPaths).map((sid) => {
-                  const studentPath = draftPaths[sid];
-                  const p = studentsProgress.find(sp => sp.studentId === sid);
-                  const name = p ? p.studentName : sid;
-                  
-                  return (
-                    <div key={sid} className="p-4 bg-muted/20 border border-border rounded-2xl space-y-3">
-                      <div className="flex justify-between items-center border-b border-border/40 pb-2">
-                        <span className="text-xs font-black text-slate-800">{name}</span>
-                        <span className="text-[8px] bg-slate-900 text-white font-black px-1.5 py-0.5 rounded uppercase tracking-wider">
-                          Dự thảo (Draft)
-                        </span>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        {studentPath.ordered_steps && studentPath.ordered_steps.map((step: any, idx: number) => {
-                          const stepNode = nodes.find(n => n.id === step.topic_id);
-                          return (
-                            <div key={idx} className="flex items-center justify-between gap-3 p-2 bg-white border border-slate-100 rounded-xl shadow-sm">
-                              <div className="flex items-center gap-2 truncate">
-                                <span className="text-[10px] font-black text-slate-400 font-mono w-4 shrink-0">
-                                  #{idx + 1}
-                                </span>
-                                <span className="text-[10px] font-bold text-slate-700 truncate" title={stepNode ? stepNode.name : step.topic_id}>
-                                  {stepNode ? stepNode.name : step.topic_id}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  onClick={() => handleMoveStep(sid, idx, "up")}
-                                  disabled={idx === 0}
-                                  className="p-1 hover:bg-slate-100 text-slate-500 rounded disabled:opacity-30 cursor-pointer"
-                                >
-                                  <ArrowUp size={11} />
-                                </button>
-                                <button
-                                  onClick={() => handleMoveStep(sid, idx, "down")}
-                                  disabled={idx === studentPath.ordered_steps.length - 1}
-                                  className="p-1 hover:bg-slate-100 text-slate-500 rounded disabled:opacity-30 cursor-pointer"
-                                >
-                                  <ArrowDown size={11} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteStep(sid, idx)}
-                                  className="p-1 hover:bg-rose-50 text-rose-500 rounded cursor-pointer"
-                                >
-                                  <Trash size={11} />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {(!studentPath.ordered_steps || studentPath.ordered_steps.length === 0) && (
-                          <p className="text-[10px] text-muted-foreground font-semibold text-center py-2">Đã học hết hoặc không cần phụ đạo.</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!insights && (
-        <div className="bg-card border border-border rounded-3xl p-12 text-center text-muted-foreground text-xs font-bold border-dashed flex flex-col items-center justify-center gap-2">
-          <ListTodo size={28} className="text-muted-foreground/30 animate-pulse mb-1" />
-          Chưa có kết quả phân tích. Hãy chọn chủ đề mục tiêu ở trên và bấm "Lập lộ trình & Phân tích lớp học".
-        </div>
-      )}
+      {manualOpen && <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30" onClick={() => setManualOpen(false)}><aside className="h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-600">Manual path builder</p><h3 className="mt-1 text-lg font-black text-slate-950">Tự tạo lộ trình</h3><p className="mt-1 text-xs font-semibold text-slate-500">{selectedSubject}</p></div><button onClick={() => setManualOpen(false)} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"><X size={17} /></button></div><label className="mt-6 block text-xs font-black text-slate-700">Tìm học sinh<input value={manualSearch} onChange={(event) => setManualSearch(event.target.value)} placeholder="Tên hoặc email" className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-sky-400" /></label><div className="mt-3 space-y-2">{studentsProgress.filter((student) => `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(manualSearch.toLowerCase())).map((student) => <button key={student.studentId} onClick={() => setManualStudents((current) => current.includes(student.studentId) ? current.filter((id) => id !== student.studentId) : [...current, student.studentId])} className={`flex w-full items-center justify-between rounded-xl border p-3 text-left ${manualStudents.includes(student.studentId) ? "border-sky-400 bg-sky-50" : "border-slate-200"}`}><span><span className="block text-xs font-black">{student.studentName}</span><span className="block text-[10px] text-slate-500">{student.studentEmail}</span></span>{manualStudents.includes(student.studentId) && <Check size={15} className="text-sky-600" />}</button>)}</div><div className="mt-6 flex items-center justify-between"><span className="text-xs font-black text-slate-700">Topic cần cải thiện</span><span className="text-[10px] font-bold text-slate-400">{manualTopics.length} đã chọn</span></div><div className="mt-3 max-h-64 space-y-2 overflow-y-auto">{topicNodes.map((node) => <button key={node.id} onClick={() => setManualTopics((current) => current.includes(node.id) ? current.filter((id) => id !== node.id) : [...current, node.id])} className={`flex w-full items-center justify-between rounded-xl border p-3 text-left ${manualTopics.includes(node.id) ? "border-amber-400 bg-amber-50" : "border-slate-200"}`}><span className="truncate text-xs font-black">{node.name}</span>{manualTopics.includes(node.id) && <Check size={15} className="text-amber-600" />}</button>)}</div><button onClick={() => void createManual()} className="mt-6 w-full rounded-xl bg-slate-900 px-4 py-3 text-xs font-black text-white">Tạo bản nháp</button></aside></div>}
     </div>
   );
 }

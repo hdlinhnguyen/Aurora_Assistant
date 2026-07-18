@@ -2938,19 +2938,9 @@ export default function TeacherDashboard() {
               </div>
             ) : activeTab === "learning-path" ? (
               <LearningPathTab
+                selectedSubject={selectedSubject}
                 nodes={nodes}
-                selectedTargetTopics={selectedTargetTopics}
-                setSelectedTargetTopics={setSelectedTargetTopics}
-                handleGenerateLearningPath={handleGenerateLearningPath}
-                generatingPath={generatingPath}
-                pathErrorDetail={pathErrorDetail}
-                insights={insights}
-                draftPaths={draftPaths}
                 studentsProgress={studentsProgress}
-                handleApproveLearningPath={handleApproveLearningPath}
-                approvingPath={approvingPath}
-                handleMoveStep={handleMoveStep}
-                handleDeleteStep={handleDeleteStep}
               />
             ) : activeTab === "question-bank" ? (
               <QuestionBankTab
