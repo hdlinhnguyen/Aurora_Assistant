@@ -1,4 +1,5 @@
 "use client";
+import { SafeHtml } from "@/components/ui/safe-html";
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
@@ -7,82 +8,7 @@ import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileDown, Fi
 type Exam = { id: string; title: string; subject: string; gradeLevel: string; durationMinutes: number; totalPoints: string; status: string; version: number; questions?: any[] };
 const statusCopy: Record<string, string> = { drafting: "Bản nháp", preparing_exam: "Sẵn sàng chấm", done: "Hoàn tất" };
 
-const formatMarkdown = (text: string): string => {
-  if (!text) return "";
-  let html = text;
-
-  html = html
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
-  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-  const cleanMathSymbols = (str: string) => {
-    let m = str;
-    
-    // Strip left/right modifiers
-    m = m.replace(/\\left/g, "").replace(/\\right/g, "");
-    
-    // Replace latex spaces with normal space
-    m = m.replace(/\\,/g, " ")
-         .replace(/\\ /g, " ")
-         .replace(/\\;/g, " ")
-         .replace(/\\:/g, " ")
-         .replace(/\\!/g, "");
-
-    // Replace fractions using inline-styles to avoid spacing/line-height gaps
-    m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
-      return `<span style="display: inline-flex; flex-direction: column; align-items: center; line-height: 1 !important; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; margin: 0 4px; vertical-align: middle;">
-        <span style="display: block; width: 100%; text-align: center; border-bottom: 1px solid #7c3aed; padding-bottom: 2px; line-height: 1 !important;">${num}</span>
-        <span style="display: block; width: 100%; text-align: center; padding-top: 2px; line-height: 1 !important;">${den}</span>
-      </span>`;
-    });
-
-    m = m.replace(/\\cdot/g, "·");
-    m = m.replace(/\\neq/g, "≠");
-    m = m.replace(/\\Rightarrow|\\implies/g, "⇒");
-    m = m.replace(/\\le|\\leq/g, "≤");
-    m = m.replace(/\\ge|\\geq/g, "≥");
-    m = m.replace(/\\times/g, "×");
-    m = m.replace(/\\div/g, "÷");
-    m = m.replace(/\\in/g, "∈");
-    m = m.replace(/\\pm/g, "±");
-
-    // Blackboard bold sets
-    m = m.replace(/\\mathbb\{Z\}/g, "ℤ");
-    m = m.replace(/\\mathbb\{R\}/g, "ℝ");
-    m = m.replace(/\\mathbb\{N\}/g, "ℕ");
-    m = m.replace(/\\mathbb\{Q\}/g, "ℚ");
-    m = m.replace(/\\mathbb\{C\}/g, "ℂ");
-
-    // Replace exponents (superscripts)
-    m = m.replace(/\^\{(.*?)\}/g, "<sup>$1</sup>");
-    m = m.replace(/\^([a-zA-Z0-9\-+])/g, "<sup>$1</sup>");
-
-    // Replace subscripts
-    m = m.replace(/_\{(.*?)\}/g, "<sub>$1</sub>");
-    m = m.replace(/_([a-zA-Z0-9\-+])/g, "<sub>$1</sub>");
-
-    return m;
-  };
-
-  // 1. First: Replace LaTeX formulas wrapped in $...$ and style them as inline-flex math
-  html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
-    const cleaned = cleanMathSymbols(p1);
-    return `<span class="font-serif italic text-slate-800 mx-0.5 inline-flex items-center align-middle">${cleaned}</span>`;
-  });
-
-  // 2. Second: Clean up any raw LaTeX commands outside of $...$ (e.g. raw \in, \neq, \mathbb{Z})
-  html = cleanMathSymbols(html);
-
-  html = html.replace(/\n/g, "<br />");
-  return html;
-};
-
-export default function ExamBuilderTab({ subjects }: { subjects: string[] }) {
+export default function ExamBuilderTab({ subjects, selectedSubject }: { subjects: string[]; selectedSubject: string }) {
   const [exams, setExams] = useState<Exam[]>([]);
   const [detail, setDetail] = useState<Exam | null>(null);
   const [bank, setBank] = useState<any[]>([]);
@@ -393,9 +319,10 @@ export default function ExamBuilderTab({ subjects }: { subjects: string[] }) {
                         <span className="text-[9px] font-black text-muted-foreground uppercase">
                           Câu {index + 1} · {q.questionType === "essay" ? "Tự luận" : "Trắc nghiệm"}
                         </span>
-                        <p
+                        <SafeHtml
+                          as="p"
+                          text={q.content}
                           className="mt-1 text-sm font-bold leading-relaxed text-slate-800"
-                          dangerouslySetInnerHTML={{ __html: formatMarkdown(q.content) }}
                         />
                       </div>
                       <span className="text-sm font-black shrink-0">{q.points}đ</span>
@@ -432,7 +359,7 @@ export default function ExamBuilderTab({ subjects }: { subjects: string[] }) {
     </main>
 
     <aside className="min-h-0 rounded-3xl border border-border bg-card shadow-sm overflow-auto p-4 space-y-5">
-      {detail ? <><div><div className="flex items-center gap-2"><Library size={16} className="text-[var(--purple)]"/><h3 className="text-sm font-black">Ngân hàng câu hỏi</h3></div><div className="mt-3 relative"><Search size={14} className="absolute left-3 top-3 text-muted-foreground"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Tìm câu hỏi..." className="w-full rounded-xl border bg-background pl-9 pr-3 py-2.5 text-xs"/></div><div className="mt-3 max-h-64 overflow-auto space-y-2">{filteredBank.slice(0,12).map(q=><button key={q.id} onClick={()=>addBank(q.id)} disabled={detail.status !== "drafting"} className="w-full rounded-xl border border-border p-3 text-left hover:border-violet-300 hover:bg-violet-50/30 disabled:opacity-50 cursor-pointer transition-all"><p className="text-xs font-bold line-clamp-2 text-slate-800" dangerouslySetInnerHTML={{ __html: formatMarkdown(q.content) }} /><span className="mt-2 inline-flex text-[9px] font-black text-violet-700 items-center gap-1"><Plus size={11}/> Thêm vào đề</span></button>)}</div></div>
+      {detail ? <><div><div className="flex items-center gap-2"><Library size={16} className="text-[var(--purple)]"/><h3 className="text-sm font-black">Ngân hàng câu hỏi</h3></div><div className="mt-3 relative"><Search size={14} className="absolute left-3 top-3 text-muted-foreground"/><input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Tìm câu hỏi..." className="w-full rounded-xl border bg-background pl-9 pr-3 py-2.5 text-xs"/></div><div className="mt-3 max-h-64 overflow-auto space-y-2">{filteredBank.slice(0,12).map(q=><button key={q.id} onClick={()=>addBank(q.id)} disabled={detail.status !== "drafting"} className="w-full rounded-xl border border-border p-3 text-left hover:border-violet-300 hover:bg-violet-50/30 disabled:opacity-50 cursor-pointer transition-all"><SafeHtml as="p" text={q.content} className="text-xs font-bold line-clamp-2 text-slate-800" /><span className="mt-2 inline-flex text-[9px] font-black text-violet-700 items-center gap-1"><Plus size={11}/> Thêm vào đề</span></button>)}</div></div>
         <div className="border-t pt-4"><h3 className="text-sm font-black">Soạn câu hỏi nhanh</h3><div className="mt-3 space-y-2"><select value={manual.type} onChange={e=>setManual({...manual,type:e.target.value})} className="w-full rounded-xl border bg-background p-2.5 text-xs"><option value="single_choice">Trắc nghiệm</option><option value="essay">Tự luận</option></select><textarea value={manual.content} onChange={e=>setManual({...manual,content:e.target.value})} placeholder="Nội dung câu hỏi" className="w-full rounded-xl border bg-background p-3 text-xs min-h-20"/><input value={manual.points} onChange={e=>setManual({...manual,points:e.target.value})} placeholder="Điểm" className="w-full rounded-xl border bg-background p-2.5 text-xs"/>{manual.type === "single_choice" && manual.choices.map((c,i)=><input key={i} value={c} onChange={e=>{const choices=[...manual.choices];choices[i]=e.target.value;setManual({...manual,choices})}} placeholder={`Phương án ${String.fromCharCode(65+i)}`} className="w-full rounded-xl border bg-background p-2.5 text-xs"/>)}<button onClick={addManual} disabled={!manual.content || detail.status !== "drafting"} className="w-full rounded-xl bg-foreground text-background py-2.5 text-xs font-black cursor-pointer hover:opacity-90 active:scale-95 transition-all">Thêm câu hỏi</button></div></div>
         {selectedQuestion?.questionType === "essay" && <div className="border-t pt-4"><h3 className="text-sm font-black">Barem câu tự luận</h3><div className="mt-2 space-y-2">{selectedQuestion.rubricItems?.map((r:any)=><div key={r.id} className="rounded-xl bg-violet-50/60 p-3 text-xs border border-violet-100/60 text-slate-800"><b>{r.content || r.description}</b><span className="float-right font-black text-violet-700">{r.points}đ</span></div>)}<textarea value={rubric.description} onChange={e=>setRubric({...rubric,description:e.target.value})} placeholder="Mô tả ý chấm" className="w-full rounded-xl border border-border p-2.5 text-xs bg-background"/><input value={rubric.points} onChange={e=>setRubric({...rubric,points:e.target.value})} className="w-full rounded-xl border border-border p-2.5 text-xs bg-background"/><button onClick={addRubric} className="w-full rounded-xl bg-violet-600 text-white py-2.5 text-xs font-black cursor-pointer hover:bg-violet-750 active:scale-95 transition-all">Thêm ý barem</button></div></div>}
       </> : <div className="h-full grid place-items-center text-center py-16"><div><Clock3 className="mx-auto text-muted-foreground"/><p className="mt-3 text-sm font-black">Chọn một đề</p><p className="text-xs text-muted-foreground">Công cụ biên soạn sẽ xuất hiện tại đây.</p></div></div>}

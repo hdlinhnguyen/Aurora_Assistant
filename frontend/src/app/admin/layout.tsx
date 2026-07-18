@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 import { 
   Users, 
   Home, 
@@ -22,6 +25,16 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [adminName, setAdminName] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Lottie Book animation state
+  const [bookAnimation, setBookAnimation] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/book.json")
+      .then((res) => res.json())
+      .then((data) => setBookAnimation(data))
+      .catch((err) => console.error("Error loading book animation:", err));
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem("aurora_token");
@@ -55,8 +68,17 @@ export default function AdminLayout({
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--purple)] border-t-transparent mx-auto"></div>
+        <div className="text-center flex flex-col items-center justify-center">
+          {bookAnimation ? (
+            <Lottie
+              animationData={bookAnimation}
+              loop={true}
+              autoplay={true}
+              className="h-24 w-24 mx-auto"
+            />
+          ) : (
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--purple)] border-t-transparent mx-auto"></div>
+          )}
           <p className="mt-2 text-sm text-muted-foreground">Đang xác thực quyền Admin...</p>
         </div>
       </div>

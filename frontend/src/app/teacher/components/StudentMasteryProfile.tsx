@@ -105,10 +105,10 @@ export default function StudentMasteryProfile({
           type="button"
           onClick={recalculate}
           disabled={recalculating}
-          className="absolute right-4 top-4 z-30 flex items-center gap-2 rounded-xl border border-border bg-white/95 px-3 py-2 text-[10px] font-black shadow-sm backdrop-blur hover:bg-white disabled:opacity-60"
+          className="absolute right-4 top-4 z-30 flex items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50/90 hover:bg-indigo-100/90 text-indigo-700 px-3.5 py-2 text-xs font-black shadow-sm backdrop-blur transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
         >
-          <RefreshCw size={13} className={recalculating ? "animate-spin" : ""} />
-          {recalculating ? "Đang tính BKT" : "Cập nhật BKT"}
+          <RefreshCw size={13} className={recalculating ? "animate-spin text-indigo-600" : "text-indigo-600"} />
+          <span>{recalculating ? "Đang tính toán..." : "Cập nhật BKT"}</span>
         </button>
         <KnowledgeTree
           subject={subject}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { toast } from "sonner";
 import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle, Key, Lock, X, Zap, Target, Clock, RefreshCw } from "lucide-react";
 import KnowledgeTree from "../components/KnowledgeTree";
@@ -64,57 +65,7 @@ export default function StudentTutorPage() {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [selectedSubject, setSelectedSubject] = useState("");
 
-  const formatMarkdown = (text: string): string => {
-    if (!text) return "";
-    let html = text;
-
-    // Escape HTML tags to prevent basic XSS
-    html = html
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    // Format bold-italic (***text***)
-    html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
-    // Format bold (**text**)
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    // Format italic (*text*)
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-    // Convert LaTeX fractions \dfrac{num}{den} or \frac{num}{den} & Math Symbols
-    const renderMathExpr = (expr: string) => {
-      let m = expr;
-      // Convert \dfrac{a}{b} or \frac{a}{b} into vertical fraction HTML
-      m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
-        return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[13px] leading-tight font-sans">
-          <span class="border-b border-indigo-700 px-1 text-center pb-0.5">${num}</span>
-          <span class="px-1 text-center pt-0.5">${den}</span>
-        </span>`;
-      });
-      // Math symbols
-      m = m.replace(/\\cdot/g, "·");
-      m = m.replace(/\\neq/g, "≠");
-      m = m.replace(/\\Rightarrow|\\implies/g, "⇒");
-      m = m.replace(/\\le|\\leq/g, "≤");
-      m = m.replace(/\\ge|\\geq/g, "≥");
-      m = m.replace(/\\times/g, "×");
-      m = m.replace(/\\div/g, "÷");
-
-      return `<span class="font-mono bg-indigo-50/70 text-indigo-900 px-1.5 py-0.5 rounded text-[12px] font-bold border border-indigo-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
-    };
-
-    // Format inline math ($...$)
-    html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
-      return renderMathExpr(p1);
-    });
-
-    // Replace newlines with <br />
-    html = html.replace(/\n/g, "<br />");
-
-    return html;
-  };
-  
-  // Tree Data
+    // Tree Data
   const [nodes, setNodes] = useState<NodeItem[]>([]);
   const [edges, setEdges] = useState<EdgeItem[]>([]);
   const [studentState, setStudentState] = useState<StudentState | null>(null);
@@ -1544,9 +1495,9 @@ export default function StudentTutorPage() {
 
                     {currentQuestion ? (
                       <div className="flex-1 flex flex-col overflow-y-auto space-y-5 pr-1">
-                        <div
+                        <SafeHtml
+                          text={currentQuestion.content}
                           className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm text-slate-800 leading-relaxed font-semibold shadow-inner"
-                          dangerouslySetInnerHTML={{ __html: formatMarkdown(currentQuestion.content) }}
                         />
 
                         <div className="grid grid-cols-1 gap-2.5">
@@ -1578,7 +1529,7 @@ export default function StudentTutorPage() {
                                 }`}>
                                   {letters[idx] || (idx + 1)}
                                 </span>
-                                <span className="flex-1 font-extrabold" dangerouslySetInnerHTML={{ __html: formatMarkdown(opt) }} />
+                                <SafeHtml as="span" text={opt} className="flex-1 font-extrabold" />
                               </button>
                             );
                           })}
@@ -1946,13 +1897,14 @@ export default function StudentTutorPage() {
                   <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl p-4 bg-slate-50/30 space-y-3 mb-4 text-sm font-medium">
                     {theoryChat.map((msg, idx) => (
                       <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                        <div 
+                        <SafeHtml
+                          text={msg.content}
+                          variant="tutor"
                           className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border transition-all text-xs md:text-sm leading-relaxed ${
                             msg.sender === "student"
                               ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
                               : "bg-white border-slate-200 text-slate-800 rounded-bl-none font-bold"
                           }`}
-                          dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
                         />
                       </div>
                     ))}
@@ -2168,9 +2120,9 @@ export default function StudentTutorPage() {
                         </div>
 
                         {/* Question Box */}
-                        <div 
+                        <SafeHtml
+                          text={currentQ.content}
                           className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 text-sm text-slate-800 leading-relaxed shadow-inner font-extrabold"
-                          dangerouslySetInnerHTML={{ __html: formatMarkdown(currentQ.content) }}
                         />
 
                         {/* Options Buttons */}
@@ -2195,7 +2147,7 @@ export default function StudentTutorPage() {
                                 }`}>
                                   {letters[idx] || (idx + 1)}
                                 </span>
-                                <span className="flex-1 font-extrabold" dangerouslySetInnerHTML={{ __html: formatMarkdown(opt) }} />
+                                <SafeHtml as="span" text={opt} className="flex-1 font-extrabold" />
                               </button>
                             );
                           })}
@@ -2221,9 +2173,11 @@ export default function StudentTutorPage() {
                               </span>
                               <span className="text-[9px] text-slate-400 font-semibold font-mono">(Trọng số BKT đã giảm)</span>
                             </div>
-                            <p 
+                            <SafeHtml 
+                              as="p"
+                              text={activeHint}
+                              variant="tutor"
                               className="text-xs text-slate-750 leading-relaxed font-extrabold"
-                              dangerouslySetInnerHTML={{ __html: formatMarkdown(activeHint) }}
                             />
                           </div>
                         )}
@@ -2351,13 +2305,14 @@ export default function StudentTutorPage() {
                               ) : (
                                 qChat.map((msg, idx) => (
                                   <div key={idx} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
-                                    <div 
+                                    <SafeHtml
+                                      text={msg.content}
+                                      variant="tutor"
                                       className={`max-w-[90%] rounded-2xl px-3 py-2 border shadow-sm transition-all text-[11px] leading-relaxed ${
                                         msg.sender === "student"
                                           ? "bg-slate-900 border-slate-950 text-white rounded-br-none"
                                           : "bg-indigo-50/70 border-indigo-100 text-indigo-950 rounded-bl-none font-bold"
                                       }`}
-                                      dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
                                     />
                                   </div>
                                 ))

@@ -1,4 +1,5 @@
 "use client";
+import { SafeHtml } from "@/components/ui/safe-html";
 
 import React from "react";
 import {
@@ -79,81 +80,6 @@ export default function QuestionBankTab({
       : true;
     return matchSearch && matchNode && matchDiff && matchType;
   });
-
-  const formatMarkdown = (text: string): string => {
-    if (!text) return "";
-    let html = text;
-
-    html = html
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-    const cleanMathSymbols = (str: string) => {
-      let m = str;
-      
-      // Strip left/right modifiers
-      m = m.replace(/\\left/g, "").replace(/\\right/g, "");
-      
-      // Replace latex spaces with normal space
-      m = m.replace(/\\,/g, " ")
-           .replace(/\\ /g, " ")
-           .replace(/\\;/g, " ")
-           .replace(/\\:/g, " ")
-           .replace(/\\!/g, "");
-
-      // Replace fractions using inline-styles to avoid spacing/line-height gaps
-      m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
-        return `<span style="display: inline-flex; flex-direction: column; align-items: center; line-height: 1 !important; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; margin: 0 4px; vertical-align: middle;">
-          <span style="display: block; width: 100%; text-align: center; border-bottom: 1px solid #7c3aed; padding-bottom: 2px; line-height: 1 !important;">${num}</span>
-          <span style="display: block; width: 100%; text-align: center; padding-top: 2px; line-height: 1 !important;">${den}</span>
-        </span>`;
-      });
-
-      m = m.replace(/\\cdot/g, "·");
-      m = m.replace(/\\neq/g, "≠");
-      m = m.replace(/\\Rightarrow|\\implies/g, "⇒");
-      m = m.replace(/\\le|\\leq/g, "≤");
-      m = m.replace(/\\ge|\\geq/g, "≥");
-      m = m.replace(/\\times/g, "×");
-      m = m.replace(/\\div/g, "÷");
-      m = m.replace(/\\in/g, "∈");
-      m = m.replace(/\\pm/g, "±");
-
-      // Blackboard bold sets
-      m = m.replace(/\\mathbb\{Z\}/g, "ℤ");
-      m = m.replace(/\\mathbb\{R\}/g, "ℝ");
-      m = m.replace(/\\mathbb\{N\}/g, "ℕ");
-      m = m.replace(/\\mathbb\{Q\}/g, "ℚ");
-      m = m.replace(/\\mathbb\{C\}/g, "ℂ");
-
-      // Replace exponents (superscripts)
-      m = m.replace(/\^\{(.*?)\}/g, "<sup>$1</sup>");
-      m = m.replace(/\^([a-zA-Z0-9\-+])/g, "<sup>$1</sup>");
-
-      // Replace subscripts
-      m = m.replace(/_\{(.*?)\}/g, "<sub>$1</sub>");
-      m = m.replace(/_([a-zA-Z0-9\-+])/g, "<sub>$1</sub>");
-
-      return m;
-    };
-
-    // 1. First: Replace LaTeX formulas wrapped in $...$ and style them as inline-flex math
-    html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
-      const cleaned = cleanMathSymbols(p1);
-      return `<span class="font-serif italic text-slate-800 mx-0.5 inline-flex items-center align-middle">${cleaned}</span>`;
-    });
-
-    // 2. Second: Clean up any raw LaTeX commands outside of $...$ (e.g. raw \in, \neq, \mathbb{Z})
-    html = cleanMathSymbols(html);
-
-    html = html.replace(/\n/g, "<br />");
-    return html;
-  };
 
   return (
     <div className="flex-1 flex flex-col gap-5 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
@@ -348,10 +274,10 @@ export default function QuestionBankTab({
                     </div>
 
                     {/* Content */}
-                    <div 
+                    <SafeHtml 
+                      text={q.content}
                       className="text-xs font-bold text-slate-800 leading-relaxed" 
                       title={q.content}
-                      dangerouslySetInnerHTML={{ __html: formatMarkdown(q.content) }}
                     />
 
                     {/* Options */}
@@ -371,7 +297,7 @@ export default function QuestionBankTab({
                             title={opt}
                           >
                             <span className="font-extrabold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
-                            <span dangerouslySetInnerHTML={{ __html: formatMarkdown(opt) }} />
+                            <SafeHtml as="span" text={opt} />
                           </div>
                         ))}
                       </div>

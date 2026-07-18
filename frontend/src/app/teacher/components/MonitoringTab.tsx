@@ -73,6 +73,19 @@ export default function MonitoringTab({
 
   const outliers = monitoringStats.filter(s => s.isOutlier);
 
+  // Add deterministic jittering to expectedMastery for scatter plot rendering to prevent point overlap
+  const jitteredStats = React.useMemo(() => {
+    return monitoringStats.map((s, idx) => {
+      // Deterministic offset based on student ID or index so the points don't jump around on re-renders
+      // Limit jitter to a maximum of +/- 4.5% so they stay close to the actual expectation mark
+      const offset = ((idx % 7) - 3) * 1.5; // -4.5%, -3%, -1.5%, 0%, 1.5%, 3%, 4.5%
+      return {
+        ...s,
+        jitteredExpectedMastery: s.expectedMastery + offset,
+      };
+    });
+  }, [monitoringStats]);
+
   return (
     <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6 animate-[fadeIn_0.3s_ease-out]">
       {/* Outliers Alert Bar */}
@@ -80,8 +93,8 @@ export default function MonitoringTab({
         <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-3xl flex items-start gap-3 shadow-sm animate-pulse">
           <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} />
           <div className="space-y-1">
-            <span className="font-extrabold text-xs">CẢNH BÁO OUTLIERS: Gom nhóm học sinh chệch hướng</span>
-            <p className="text-[10px] text-amber-700 font-semibold leading-relaxed">
+            <span className="font-extrabold text-sm">CẢNH BÁO OUTLIERS: Gom nhóm học sinh chệch hướng</span>
+            <p className="text-xs text-amber-700 font-semibold leading-relaxed">
               Phát hiện <span className="font-black text-amber-900">{outliers.length} học sinh</span> có dấu hiệu hổng kiến thức nghiêm trọng, tỷ lệ chính xác làm bài dưới 40% mặc dù đã có nhiều lượt nộp bài. Khuyến nghị lập lộ trình bổ trợ cá nhân ngay lập tức!
             </p>
           </div>
@@ -95,7 +108,7 @@ export default function MonitoringTab({
             <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
               Phân bố độ thông thạo lớp học
             </h3>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Tỷ lệ học sinh trong các nhóm năng lực Yếu, Trung bình, Khá/Giỏi</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Tỷ lệ học sinh trong các nhóm năng lực Yếu, Trung bình, Khá/Giỏi</p>
           </div>
           
           <div className="h-[260px] w-full flex items-center justify-center">
@@ -130,7 +143,7 @@ export default function MonitoringTab({
                     }
                   </Pie>
                   <Tooltip formatter={(value) => [`${value} học sinh`, 'Số lượng']} />
-                  <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 10, fontWeight: 700 }} />
+                  <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: 12, fontWeight: 700 }} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -143,7 +156,7 @@ export default function MonitoringTab({
             <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">
               Biểu đồ phân tán & Học sinh lệch hướng (Outliers)
             </h3>
-            <p className="text-[10px] text-muted-foreground mt-0.5">So sánh độ thông thạo cá nhân với đường trung bình tập thể lớp</p>
+            <p className="text-xs text-muted-foreground mt-0.5">So sánh độ thông thạo cá nhân với đường trung bình tập thể lớp</p>
           </div>
 
           <div className="h-[260px] w-full">
@@ -151,15 +164,16 @@ export default function MonitoringTab({
               <div className="flex items-center justify-center h-full text-xs text-muted-foreground font-semibold animate-pulse">Đang tải biểu đồ phân tán...</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 25, right: 25, bottom: 55, left: 45 }}>
+                <ScatterChart margin={{ top: 25, right: 25, bottom: 50, left: 45 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     type="number"
-                    dataKey="expectedMastery"
+                    dataKey="jitteredExpectedMastery"
                     name="Kỳ vọng"
                     unit="%"
                     domain={[50, 100]}
-                    label={{ value: 'Độ thông thạo Kỳ vọng (%)', position: 'insideBottom', offset: -12, fontSize: 9, fontWeight: 700 }}
+                    tick={{ fontSize: 11, fontWeight: 600 }}
+                    label={{ value: 'Độ thông thạo Kỳ vọng (%)', position: 'insideBottom', offset: -10, fontSize: 12, fontWeight: 700 }}
                   />
                   <YAxis
                     type="number"
@@ -167,7 +181,8 @@ export default function MonitoringTab({
                     name="Thực tế"
                     unit="%"
                     domain={[0, 100]}
-                    label={{ value: 'Độ thông thạo Thực tế (%)', angle: -90, position: 'insideLeft', fontSize: 9, fontWeight: 700, dx: -10, dy: 45 }}
+                    tick={{ fontSize: 11, fontWeight: 600 }}
+                    label={{ value: 'Độ thông thạo Thực tế (%)', angle: -90, position: 'insideLeft', fontSize: 12, fontWeight: 700, dx: -8, dy: 45 }}
                   />
                   <Tooltip
                     cursor={{ strokeDasharray: '3 3' }}
@@ -175,7 +190,7 @@ export default function MonitoringTab({
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-white p-3 border border-slate-200 rounded-xl shadow-lg text-[10px] font-bold space-y-1">
+                          <div className="bg-white p-3 border border-slate-200 rounded-xl shadow-lg text-xs font-bold space-y-1">
                             <p className="text-slate-900 font-black text-xs border-b border-slate-100 pb-1 mb-1">{data.studentName}</p>
                             <p className="text-indigo-600 flex items-center gap-1">
                               <Target size={11} />
@@ -185,14 +200,13 @@ export default function MonitoringTab({
                               <TrendingUp size={11} />
                               <span>Thực tế: {data.actualMastery?.toFixed(1)}%</span>
                             </p>
-                            <p className="text-slate-500 font-semibold font-mono text-[9px]">Tổng lượt làm: {data.totalAnswers} câu</p>
+                            <p className="text-slate-500 font-semibold font-mono text-xs">Tổng lượt làm: {data.totalAnswers} câu</p>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: 10, fontWeight: 700, paddingTop: 10 }} />
 
                   {/* Target mastery reference line (outlier boundary) */}
                   <ReferenceLine y={40} stroke="#f59e0b" strokeDasharray="3 3" />
@@ -211,14 +225,14 @@ export default function MonitoringTab({
                   {/* Active learning students */}
                   <Scatter
                     name="Học sinh bình thường"
-                    data={monitoringStats.filter(s => !s.isOutlier && s.totalAnswers > 0)}
+                    data={jitteredStats.filter(s => !s.isOutlier && s.totalAnswers > 0)}
                     fill="#6366f1"
                   />
 
                   {/* Outliers */}
                   <Scatter
                     name="Học sinh đi lệch / Cần hỗ trợ"
-                    data={monitoringStats.filter(s => s.isOutlier)}
+                    data={jitteredStats.filter(s => s.isOutlier)}
                     fill="#ef4444"
                   />
                 </ScatterChart>
@@ -227,20 +241,32 @@ export default function MonitoringTab({
           </div>
           
           {/* Custom Guide Block for Reference Lines */}
-          <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-[10px] text-muted-foreground font-semibold">
+          <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-muted-foreground font-semibold">
             <div className="flex items-start gap-2.5 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
               <div className="w-8 h-1 bg-[#6366f1] shrink-0 rounded-full mt-1.5" />
               <div className="space-y-0.5">
-                <span className="font-black text-indigo-700 block text-xs">Đường trung bình lớp</span>
+                <span className="font-black text-indigo-700 block text-sm">Đường trung bình lớp</span>
                 <span className="leading-relaxed">Thể hiện mức độ thông thạo trung bình thực tế hiện tại của cả lớp học.</span>
               </div>
             </div>
             <div className="flex items-start gap-2.5 bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
               <div className="w-8 h-1 border-t border-dashed border-[#f59e0b] shrink-0 mt-1.5" />
               <div className="space-y-0.5">
-                <span className="font-black text-amber-700 block text-xs">Ranh giới hổng kiến thức (40%)</span>
+                <span className="font-black text-amber-700 block text-sm">Ranh giới hổng kiến thức (40%)</span>
                 <span className="leading-relaxed">Ngưỡng cảnh báo tối thiểu. Học sinh có kết quả dưới mức này cần can thiệp sớm.</span>
               </div>
+            </div>
+          </div>
+
+          {/* Scatter Chart Legend */}
+          <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap justify-center items-center gap-x-8 gap-y-2 text-xs font-extrabold text-slate-700">
+            <div className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded-full bg-[#6366f1] inline-block shadow-sm" />
+              <span>Học sinh bình thường</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3.5 h-3.5 rounded-full bg-[#ef4444] inline-block shadow-sm" />
+              <span>Học sinh đi lệch / Cần hỗ trợ</span>
             </div>
           </div>
         </div>
@@ -257,7 +283,7 @@ export default function MonitoringTab({
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-border text-muted-foreground font-black uppercase tracking-wider text-[10px]">
+              <tr className="border-b border-border text-muted-foreground font-black uppercase tracking-wider text-xs">
                 <th className="pb-3">Học sinh</th>
                 <th className="pb-3">Lượt trả lời</th>
                 <th className="pb-3">Tỉ lệ đúng</th>
@@ -280,25 +306,25 @@ export default function MonitoringTab({
                     <tr key={idx} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3">
                         <div className="flex flex-col">
-                          <span className="font-extrabold text-foreground flex items-center gap-1.5">
+                          <span className="font-extrabold text-foreground flex items-center gap-1.5 text-xs">
                             {s.studentName}
                             {s.isOutlier && (
-                              <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[8px] border border-rose-100 font-extrabold uppercase animate-pulse">
+                              <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[10px] border border-rose-100 font-extrabold uppercase animate-pulse">
                                 Outlier
                               </span>
                             )}
                           </span>
-                          <span className="text-[10px] text-muted-foreground font-semibold">{s.studentEmail}</span>
+                          <span className="text-xs text-muted-foreground font-semibold">{s.studentEmail}</span>
                         </div>
                       </td>
-                      <td className="py-3 font-mono font-bold">{s.totalAnswers} câu</td>
-                      <td className="py-3 font-bold">
+                      <td className="py-3 font-mono font-bold text-xs">{s.totalAnswers} câu</td>
+                      <td className="py-3 font-bold text-xs">
                         <span className={s.totalAnswers > 0 && s.actualMastery < 40 ? "text-rose-600 font-black" : "text-foreground"}>
                           {s.totalAnswers === 0 ? "Chưa có" : `${s.actualMastery.toFixed(0)}%`}
                         </span>
                       </td>
-                      <td className="py-3 font-mono font-bold text-slate-500">{s.expectedMastery.toFixed(0)}%</td>
-                      <td className="py-3 font-mono font-bold">
+                      <td className="py-3 font-mono font-bold text-slate-500 text-xs">{s.expectedMastery.toFixed(0)}%</td>
+                      <td className="py-3 font-mono font-bold text-xs">
                         {s.totalAnswers === 0 ? (
                           <span className="text-slate-400">-</span>
                         ) : (
@@ -311,12 +337,12 @@ export default function MonitoringTab({
                         {s.isOutlier ? (
                           <button
                             onClick={() => handleTriggerRemediation(s.studentId)}
-                            className="px-3 py-1.5 bg-rose-900 hover:bg-rose-800 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+                            className="px-3 py-1.5 bg-rose-900 hover:bg-rose-800 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
                           >
                             Lập lộ trình phụ đạo
                           </button>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground font-semibold">Tự động giám sát...</span>
+                          <span className="text-xs text-muted-foreground font-semibold">Tự động giám sát...</span>
                         )}
                       </td>
                     </tr>
