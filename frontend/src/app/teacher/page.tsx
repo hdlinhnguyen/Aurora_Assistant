@@ -37,6 +37,7 @@ import StudentMasteryProfile from "./components/StudentMasteryProfile";
 import StudentActivityFeed from "./components/StudentActivityFeed";
 import ExamBuilderTab from "./components/ExamBuilderTab";
 import ExamScoringTab from "./components/ExamScoringTab";
+import { resolveTeacherSubject } from "./teacher-subject-selection";
 import {
   Users,
   GitBranch,
@@ -304,14 +305,10 @@ export default function TeacherDashboard() {
     setUserName(user.name);
 
     // Restore saved states from localStorage
-    const savedSubject = localStorage.getItem("aurora_teacher_subject");
     const savedTab = localStorage.getItem("aurora_teacher_tab") as ActiveTab | null;
     const savedStudent = localStorage.getItem("aurora_teacher_student");
     const savedViewMode = localStorage.getItem("aurora_teacher_view_mode") as "tree" | "matrix" | null;
 
-    if (savedSubject !== null) {
-      setSelectedSubject(savedSubject);
-    }
     const isTourActive = localStorage.getItem("aurora_tour_active") === "true";
     const savedStepIdxStr = localStorage.getItem("aurora_tour_step");
     let initialTab = savedTab || "student-mgmt";
@@ -682,7 +679,7 @@ export default function TeacherDashboard() {
     if (selectedSubject !== "") {
       localStorage.setItem("aurora_teacher_subject", selectedSubject);
     } else {
-      localStorage.setItem("aurora_teacher_subject", "");
+      localStorage.removeItem("aurora_teacher_subject");
     }
   }, [selectedSubject]);
 
@@ -713,29 +710,7 @@ export default function TeacherDashboard() {
         }
       }
       setSubjects(finalSubjects);
-      const savedSub = localStorage.getItem("aurora_teacher_subject");
-
-      if (tourActive && !selectedSubject) {
-        setSelectedSubject("Môn học Trải nghiệm (Demo)");
-      } else if (selectSubjectName && finalSubjects.includes(selectSubjectName)) {
-        setSelectedSubject(selectSubjectName);
-      } else if (savedSub !== null) {
-        if (savedSub && finalSubjects.includes(savedSub)) {
-          setSelectedSubject(savedSub);
-        } else if (savedSub === "") {
-          setSelectedSubject("");
-        } else if (selectedSubject && finalSubjects.includes(selectedSubject)) {
-          // Keep
-        } else if (finalSubjects.length > 0) {
-          setSelectedSubject(finalSubjects[0]);
-        }
-      } else if (selectedSubject && finalSubjects.includes(selectedSubject)) {
-        // Keep currently selected
-      } else if (finalSubjects.length > 0) {
-        setSelectedSubject(finalSubjects[0]);
-      } else {
-        setSelectedSubject("");
-      }
+      setSelectedSubject(resolveTeacherSubject(finalSubjects, selectSubjectName));
     } catch (err) {
       console.error("Failed to load subjects:", err);
     }
@@ -1945,9 +1920,17 @@ export default function TeacherDashboard() {
               </button>
             </>
           ) : (
-            <div className="text-center py-8 px-4 border border-dashed border-border rounded-2xl text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSubject("");
+                setActiveTab("graph-designer");
+                setSelectedStudent(null);
+              }}
+              className="w-full text-center py-8 px-4 border border-dashed border-border rounded-2xl text-muted-foreground hover:border-[var(--mint)] hover:text-foreground hover:bg-[var(--mint)]/5 text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+            >
               Chọn môn học để bắt đầu
-            </div>
+            </button>
           )}
         </div>
 
@@ -2027,7 +2010,7 @@ export default function TeacherDashboard() {
 
       {/* Main Panel Workspace */}
       <main className="flex-1 flex flex-col p-6 overflow-hidden bg-background relative">
-        {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
+        {!selectedSubject ? (
           // Subject Selection Screen Dashboard
           <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">
             {isSidebarCollapsed && (
