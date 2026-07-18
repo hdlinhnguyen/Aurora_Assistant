@@ -54,7 +54,7 @@ const formatMarkdown = (text: string): string => {
     m = m.replace(/_\{(.*?)\}/g, "<sub>$1</sub>");
     m = m.replace(/_([a-zA-Z0-9\-+])/g, "<sub>$1</sub>");
 
-    return `<span class="font-serif italic text-slate-800 mx-0.5 inline-block">${m}</span>`;
+    return `<span class="font-serif italic text-slate-800 mx-0.5 inline-flex items-center align-middle">${m}</span>`;
   };
 
   html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
