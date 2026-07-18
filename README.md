@@ -55,7 +55,6 @@ Học sinh chỉ đọc được hồ sơ của chính mình tại dashboard cá
 - Go student: `GET /api/student/mastery` và endpoint history tự lấy ID từ token.
 - PostgreSQL: `student_topic_masteries` lưu trạng thái mới nhất;
   `student_topic_mastery_histories` lưu snapshot bất biến.
-
 ## Quick Start
 
 ### Yêu cầu trước khi cài đặt:
@@ -83,7 +82,6 @@ cd Aurora_Assistant
 ```
 
 > Synthetic data được reset về trạng thái mẫu mỗi lần backend khởi động; backend tạo answer events rồi gọi BKT service để tính mastery (frontend không chứa phần trăm mastery hardcode). Đặt `ENABLE_SYNTHETIC_DATA=false` để giữ nguyên database và bỏ qua bước reset/seed.
-
 ## Project Structure
 
 ```

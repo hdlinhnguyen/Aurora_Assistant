@@ -77,7 +77,8 @@ import {
   Home,
   Settings,
   Sun,
-  LogOut
+  LogOut,
+  Lightbulb
 } from "lucide-react";
 
 export interface NodeItem {
@@ -2385,7 +2386,7 @@ export default function TeacherDashboard() {
                 <div className="mb-5 bg-gradient-to-br from-indigo-50 to-violet-50/50 border border-indigo-150 p-4.5 rounded-3xl flex items-start justify-between gap-4 shadow-sm animate-[fadeIn_0.3s_ease-out]">
                   <div className="flex items-start gap-3">
                     <div className="h-8 w-8 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
-                      💡
+                      <Lightbulb size={16} />
                     </div>
                     <div className="text-xs text-slate-800 leading-relaxed font-semibold">
                       <span className="font-black text-indigo-700 uppercase tracking-wider block mb-0.5">{stepTitle}</span>

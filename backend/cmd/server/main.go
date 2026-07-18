@@ -228,6 +228,7 @@ func main() {
 	api.Get("/subjects", tutorHandler.GetSubjects)
 	api.Get("/subjects/:subject/tree", tutorHandler.GetTree)
 	api.Get("/subjects/:subject/questions", tutorHandler.GetSubjectQuestions)
+	api.Get("/nodes/:nodeId/questions/adaptive", tutorHandler.GetAdaptiveQuestions)
 	api.Get("/nodes/:nodeId/questions", tutorHandler.GetQuestions)
 	api.Post("/nodes/:nodeId/questions", tutorHandler.CreateQuestion)
 	api.Post("/nodes/:nodeId/questions/bulk", tutorHandler.CreateQuestionsBulk)
@@ -257,8 +258,10 @@ func main() {
 	api.Post("/nodes/:nodeId/cant-do", tutorHandler.SubmitCantDo)
 	api.Post("/nodes/:nodeId/adaptive-downgrade", tutorHandler.AdaptiveDowngrade)
 	api.Get("/student/learning-path", tutorHandler.GetStudentLearningPath)
+	api.Get("/student/learning-path/live", tutorHandler.GetStudentLearningPathLive)
 	api.Post("/student/learning-path/steps/:topicId/start", learningPathProgressHandler.StartStep)
 	api.Post("/student/hints", tutorHandler.RequestHint)
+	api.Post("/events/feynman", tutorHandler.SubmitFeynmanEvent)
 	api.Post("/nodes/:nodeId/chat-theory", tutorHandler.ChatNodeTheory)
 
 	// Admin Routes (Admin only)
