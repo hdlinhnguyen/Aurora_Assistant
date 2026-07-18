@@ -30,6 +30,8 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from learning_path.adapters import CurriculumGraph, load_chac_goc_graph
+from learning_path.bkt import BKTParams, ConfidenceConfig, knowledge_state
+from learning_path.evidence import EvidenceStore, calibrate_paper, calibrate_quiz
 from learning_path.hints import HintLadder
 from learning_path.mastery_api import (
     MasteryCalculationBody,
@@ -38,11 +40,14 @@ from learning_path.mastery_api import (
 )
 from learning_path.schemas import (
     LearningPathRequest,
+    LearningPathSuggestionRequest,
+    LearningPathSuggestionResponse,
     RawPaperEvidence,
     RawQuizEvidence,
     Topic,
     PrerequisiteEdge,
 )
+from learning_path.suggestions import suggest_from_states
 from learning_path.telemetry import learning_path_metadata
 
 # parents[3] = repo root (api.py → learning_path → src → learning-path → root)
@@ -51,6 +56,13 @@ DEFAULT_GRAPH_JSON = Path(__file__).resolve().parents[3] / "knowledge-graph" / "
 
 class CreatePathBody(BaseModel):
     request: LearningPathRequest
+    raw_quiz: list[RawQuizEvidence] | None = Field(default_factory=list)
+    raw_paper: list[RawPaperEvidence] | None = Field(default_factory=list)
+    as_of: datetime
+
+
+class SuggestPathBody(BaseModel):
+    request: LearningPathSuggestionRequest
     raw_quiz: list[RawQuizEvidence] | None = Field(default_factory=list)
     raw_paper: list[RawPaperEvidence] | None = Field(default_factory=list)
     as_of: datetime
@@ -163,6 +175,41 @@ def create_app(
             _config(thread_id),
         )
         return _respond(thread_id, result, round((perf_counter() - started) * 1000))
+
+    @app.post(
+        "/learning-path/suggestions", response_model=LearningPathSuggestionResponse
+    )
+    def suggest_learning_paths(body: SuggestPathBody) -> LearningPathSuggestionResponse:
+        curr = get_curriculum()
+        calibrated = [calibrate_quiz(e, as_of=body.as_of) for e in body.raw_quiz or []]
+        calibrated += [calibrate_paper(e, as_of=body.as_of) for e in body.raw_paper or []]
+        store = EvidenceStore()
+        store.ingest(calibrated)
+        params = BKTParams()
+        confidence = ConfidenceConfig()
+        states_by_student = {
+            student_id: {
+                topic_id: knowledge_state(
+                    student_id,
+                    topic_id,
+                    evidences,
+                    params=params,
+                    config=confidence,
+                )
+                for topic_id, evidences in store.active_by_topic(student_id).items()
+            }
+            for student_id in body.request.student_ids
+        }
+        try:
+            return suggest_from_states(
+                body.request, states_by_student, curr, body.as_of
+            )
+        except ValueError as error:
+            code = str(error)
+            raise HTTPException(
+                status_code=422,
+                detail={"code": code, "message": "Khong the tao goi y lo trinh"},
+            ) from error
 
     @app.post("/learning-path/{thread_id}/approve")
     def approve_learning_path(thread_id: str, body: ApproveBody) -> dict:
