@@ -1734,7 +1734,11 @@ export default function TeacherDashboard() {
         </div>
         {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
           // Subject Selection Screen Dashboard
-          <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">
+          <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto relative">
+            {/* Glowing Backdrop Blob Accents */}
+            <div className="absolute top-[-10%] left-[-10%] w-[320px] h-[320px] bg-gradient-to-r from-[var(--mint)]/20 to-cyan-500/10 rounded-full blur-[80px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[380px] h-[380px] bg-gradient-to-r from-[var(--purple)]/10 to-indigo-500/10 rounded-full blur-[100px] pointer-events-none" />
+
             {isSidebarCollapsed && (
               <button
                 onClick={() => setIsSidebarCollapsed(false)}
@@ -1744,37 +1748,41 @@ export default function TeacherDashboard() {
                 <ChevronRight size={16} />
               </button>
             )}
-            <div className="text-center mb-10">
-              <span className="px-3 py-1 bg-[var(--mint)]/10 text-[var(--mint)] text-[10px] font-black uppercase tracking-widest rounded-full">
-                Hệ thống Socratic Tutor
+            
+            <div className="text-center mb-12 relative z-10">
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-1 bg-gradient-to-r from-[var(--mint)]/10 to-cyan-500/10 border border-[var(--mint)]/30 text-[var(--mint)] text-[10px] font-black uppercase tracking-widest rounded-full shadow-sm">
+                <Sparkles size={10} className="animate-pulse" /> Hệ thống Socratic Tutor
               </span>
-              <h1 className="text-3xl font-[var(--font-display)] font-extrabold text-foreground mt-3 tracking-tight">
+              <h1 className="text-4xl font-[var(--font-display)] font-black text-foreground mt-4 tracking-tight leading-tight bg-gradient-to-r from-foreground via-slate-800 to-[var(--mint)] bg-clip-text text-transparent">
                 Chào thầy/cô, {userName}
               </h1>
-              <p className="text-sm text-muted-foreground mt-2 max-w-lg mx-auto">
+              <p className="text-sm text-muted-foreground mt-2.5 max-w-lg mx-auto leading-relaxed">
                 Vui lòng chọn môn học đang giảng dạy hoặc tạo môn học mới để bắt đầu thiết kế lộ trình và theo dõi tiến độ của học sinh.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full mt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full mt-2 relative z-10 max-w-5xl">
               {subjects.map((sub) => (
                 <div
                   key={sub}
                   onClick={() => setSelectedSubject(sub)}
-                  className="group relative bg-card border border-border hover:border-[var(--mint)] rounded-3xl p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[160px] cursor-pointer hover:-translate-y-1"
+                  className="group relative bg-gradient-to-b from-card to-card/95 border border-border/80 hover:border-[var(--mint)]/60 rounded-3xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_30px_-6px_rgba(0,0,0,0.12)] transition-all duration-300 flex flex-col justify-between min-h-[175px] cursor-pointer hover:-translate-y-1.5 overflow-hidden"
                 >
+                  {/* Subtle card glow pattern */}
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-[var(--mint)]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  
                   <div className="flex items-start justify-between">
-                    <div className="p-3 bg-muted rounded-2xl text-[var(--mint)] group-hover:bg-[var(--mint)]/10 transition-colors">
-                      <BookOpen size={24} />
+                    <div className="p-3.5 bg-gradient-to-br from-muted to-muted/50 rounded-2xl text-[var(--mint)] group-hover:from-[var(--mint)]/15 group-hover:to-[var(--mint)]/5 group-hover:text-[var(--mint)] transition-all duration-300 shadow-inner">
+                      <BookOpen size={24} className="group-hover:scale-105 transition-transform duration-300" />
                     </div>
-                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRenameSubjectFor(sub);
                         }}
                         title="Đổi tên môn học"
-                        className="p-1.5 hover:bg-border rounded-lg text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        className="p-2 hover:bg-muted bg-background border border-border/60 rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-sm active:scale-95"
                       >
                         <Pencil size={12} />
                       </button>
@@ -1784,7 +1792,7 @@ export default function TeacherDashboard() {
                           handleDeleteSubjectFor(sub);
                         }}
                         title="Xóa môn học"
-                        className="p-1.5 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+                        className="p-2 hover:bg-red-500/10 bg-background border border-border/60 rounded-xl text-muted-foreground hover:text-red-500 transition-all cursor-pointer shadow-sm active:scale-95"
                       >
                         <Trash size={12} />
                       </button>
@@ -1792,10 +1800,10 @@ export default function TeacherDashboard() {
                   </div>
 
                   <div className="mt-4">
-                    <h3 className="text-base font-extrabold text-foreground tracking-tight group-hover:text-[var(--mint)] transition-colors">
+                    <h3 className="text-base font-black text-foreground tracking-tight group-hover:text-[var(--mint)] transition-colors leading-tight">
                       {sub}
                     </h3>
-                    <p className="text-[11px] text-muted-foreground mt-1">
+                    <p className="text-[11px] text-muted-foreground mt-1.5">
                       Nhấp để xem sơ đồ cây lộ trình và quản lý học sinh
                     </p>
                   </div>
@@ -1805,16 +1813,19 @@ export default function TeacherDashboard() {
               {/* Add Subject Card */}
               <div
                 onClick={handleCreateSubject}
-                className="group border border-dashed border-border hover:border-[var(--mint)] bg-card/40 hover:bg-card rounded-3xl p-6 transition-all duration-300 flex flex-col justify-center items-center text-center min-h-[160px] cursor-pointer hover:-translate-y-1"
+                className="group relative border border-dashed border-border/80 hover:border-dashed hover:border-[var(--mint)]/60 bg-gradient-to-b from-card/30 to-card/10 hover:from-card hover:to-card/95 rounded-3xl p-6 transition-all duration-300 flex flex-col justify-center items-center text-center min-h-[175px] cursor-pointer hover:-translate-y-1.5 shadow-sm hover:shadow-[0_12px_30px_-6px_rgba(0,0,0,0.08)] overflow-hidden"
               >
-                <div className="p-3 bg-muted group-hover:bg-[var(--mint)]/10 text-muted-foreground group-hover:text-[var(--mint)] rounded-full transition-colors mb-3">
-                  <Plus size={24} />
+                {/* Subtle card glow pattern */}
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-[var(--mint)]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                
+                <div className="p-3.5 bg-muted/60 group-hover:bg-[var(--mint)]/10 text-muted-foreground group-hover:text-[var(--mint)] rounded-full transition-all duration-300 mb-3 shadow-inner">
+                  <Plus size={24} className="group-hover:rotate-90 transition-transform duration-300" />
                 </div>
-                <span className="text-sm font-extrabold text-foreground group-hover:text-[var(--mint)] transition-colors">
+                <span className="text-sm font-black text-foreground group-hover:text-[var(--mint)] transition-colors tracking-tight">
                   Tạo môn học mới
                 </span>
-                <span className="text-[10px] text-muted-foreground mt-1">
-                  Nhập tên môn học và khởi tạo sơ đồ cây
+                <span className="text-[10px] text-muted-foreground mt-1.5 px-4 leading-normal">
+                  Nhập tên môn học mới và bắt đầu khởi tạo sơ đồ cây học tập
                 </span>
               </div>
             </div>
