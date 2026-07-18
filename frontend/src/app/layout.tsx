@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 export const metadata: Metadata = {
   title: "Aurora Socratic Assistant — Học thật, hiểu thật",
   description:
-    "Hệ thống AI gia sư phản biện giúp học sinh cấp 1 tự tư duy tìm ra đáp án, kết hợp dashboard thông minh cho giáo viên.",
+    "Hệ thống AI gia sư phản biện giúp học sinh tự tư duy tìm ra đáp án, kết hợp dashboard thông minh cho giáo viên.",
 };
 
 export default function RootLayout({

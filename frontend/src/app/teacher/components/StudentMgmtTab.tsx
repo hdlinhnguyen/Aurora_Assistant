@@ -652,6 +652,12 @@ export default function StudentMgmtTab() {
                 </div>
               )}
 
+              {demoNodes.length === 0 && (
+                <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-[11px] font-semibold leading-relaxed">
+                  ⚠️ Môn học này chưa có cây kiến thức. Vui lòng nạp cây kiến thức trước khi thêm học sinh Demo có kết quả mô phỏng.
+                </div>
+              )}
+
               <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
                 <button
                   type="button"
@@ -662,7 +668,7 @@ export default function StudentMgmtTab() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || demoNodes.length === 0}
                   className="px-4 py-2.5 rounded-xl bg-foreground text-background text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition-all active:scale-95"
                 >
                   {submitting ? "Đang xử lý..." : "Xác nhận tạo"}

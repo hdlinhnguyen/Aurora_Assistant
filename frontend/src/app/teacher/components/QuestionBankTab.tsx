@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Upload, FileJson, Pencil, Tags, Trash } from "lucide-react";
+import { Upload, FileJson, Pencil, Tags, Trash, Sparkles } from "lucide-react";
 
 import { NodeItem, Question } from "../page";
 
@@ -24,6 +24,7 @@ interface QuestionBankTabProps {
   handleTagQuestion: (q: Question) => void;
   setEditingNode: (node: NodeItem | null) => void;
   formatDate: (dateStr?: string) => string;
+  handleLoadDemoQuestions: () => void;
 }
 
 export default function QuestionBankTab({
@@ -45,6 +46,7 @@ export default function QuestionBankTab({
   handleTagQuestion,
   setEditingNode,
   formatDate,
+  handleLoadDemoQuestions,
 }: QuestionBankTabProps) {
   const [questionTypeFilter, setQuestionTypeFilter] = React.useState("");
   const filtered = subjectQuestions.filter(q => {
@@ -178,6 +180,19 @@ export default function QuestionBankTab({
               className="hidden"
             />
           </label>
+
+          <button
+            type="button"
+            onClick={handleLoadDemoQuestions}
+            className={`px-4 py-2 rounded-xl text-xs font-black active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer border ${
+              subjectQuestions.length === 0
+                ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-bounce"
+                : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
+            }`}
+            title="Nạp nhanh ngân hàng câu hỏi mẫu hoàn chỉnh để thử nghiệm"
+          >
+            <Sparkles size={14} className={subjectQuestions.length === 0 ? "text-white animate-spin" : "text-indigo-600"} /> Nạp Câu hỏi Mẫu
+          </button>
         </div>
       </div>
 
