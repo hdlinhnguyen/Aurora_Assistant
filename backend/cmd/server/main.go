@@ -57,11 +57,13 @@ func main() {
 	aiSvc := service.NewAIService(config.DB)
 	tutorSvc := service.NewTutorService(config.DB, aiSvc)
 	taggingSvc := service.NewTaggingService(config.DB)
+	questionBankSvc := service.NewQuestionBankService(config.DB)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
 	tutorHandler := handler.NewTutorHandler(tutorSvc)
 	taggingHandler := handler.NewTaggingHandler(taggingSvc)
+	questionBankHandler := handler.NewQuestionBankHandler(questionBankSvc)
 
 	// Seed Demo Accounts & Mock Statistics natively (clean delete and register fresh with cascade)
 	config.DB.Exec("DELETE FROM messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE student_id IN (SELECT id FROM users WHERE email IN (?, ?, ?, ?, ?)))", "student@aurora.edu.vn", "teacher@aurora.edu.vn", "studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn")
@@ -230,6 +232,16 @@ func main() {
 	api.Post("/nodes/:nodeId/questions/bulk", tutorHandler.CreateQuestionsBulk)
 	api.Put("/questions/:id", tutorHandler.UpdateQuestion)
 	api.Delete("/questions/:id", tutorHandler.DeleteQuestion)
+
+	api.Get("/teacher/question-bank/questions", questionBankHandler.ListQuestions)
+	api.Post("/teacher/question-bank/questions", questionBankHandler.CreateQuestion)
+	api.Get("/teacher/question-bank/questions/:questionId", questionBankHandler.GetQuestion)
+	api.Patch("/teacher/question-bank/questions/:questionId", questionBankHandler.UpdateQuestion)
+	api.Delete("/teacher/question-bank/questions/:questionId", questionBankHandler.DeleteQuestion)
+	api.Post("/teacher/question-bank/questions/:questionId/rubric-items", questionBankHandler.CreateRubricItem)
+	api.Patch("/teacher/question-bank/questions/:questionId/rubric-items/:rubricItemId", questionBankHandler.UpdateRubricItem)
+	api.Delete("/teacher/question-bank/questions/:questionId/rubric-items/:rubricItemId", questionBankHandler.DeleteRubricItem)
+	api.Put("/teacher/question-bank/questions/:questionId/rubric-items/reorder", questionBankHandler.ReorderRubricItems)
 
 	api.Get("/teacher/question-bank/questions/:questionId/tagging-context", taggingHandler.GetContext)
 	api.Put("/teacher/question-bank/questions/:questionId/topics", taggingHandler.SetQuestionTopics)
