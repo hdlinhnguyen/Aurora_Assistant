@@ -38,6 +38,7 @@ frontend_backup/
 antigravity_collaboration_log.md
 scratch/
 tmp/
+
 # Document files uploaded for testing
 *.doc
 *.docx
