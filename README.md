@@ -101,24 +101,22 @@ cd Aurora_Assistant
 
 - [x] Source Code (GitHub)
 - [x] README.md
-- [x] Architecture Diagram (`docs/architecture.md`)
+- [x] Architecture Diagram (`architecture.md`)
 - [ ] AI Logs (LangSmith or application traces)
 - [ ] Live URL / Deploy
 - [ ] Video Demo
 - [ ] Pitch Deck (`presentation/`)
-- [x] Weekly Journal (`JOURNAL.md`)
-- [x] Worklog (`WORKLOG.md`)
-- [ ] Evaluation Evidence (`eval/results/`)
+- [ ] Evaluation Evidence (`evals`)
 
 ## Team
 
 | Member | Role |
 |--------|------|
-| Linh | [Role] |
-| Khang | [Role] |
-| Dương | [Role] |
-| Nghiệp | [Role] |
-| Thái | [Role] |
+| Linh | Team Leader |
+| Khang | Tech Lead |
+| Dương | Backend engineer |
+| Nghiệp | Frontend engineer |
+| Thái | AI Engineer |
 
 ## License
 
