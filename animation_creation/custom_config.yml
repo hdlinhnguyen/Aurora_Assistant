@@ -1,0 +1,34 @@
+directories:
+  mirror_module_path: False
+  output: "media"
+  raster_images: "assets/raster_images"
+  vector_images: "assets/vector_images"
+  sounds: "assets/sounds"
+  temporary_storage: "temp"
+
+tex:
+  executable: "latex"
+  template_file: "tex_template.tex"
+  intermediate_filetype: "dvi"
+  text_to_replace: "[tex_expression]"
+
+universal_import_line: "from manimlib import *"
+
+style:
+  font: "Consolas"
+  text_alignment: "center"
+  background_color: "#000000"
+
+window_position: "UR"
+window_monitor: 0
+full_screen: False
+break_into_partial_movies: False
+
+camera_resolutions:
+  low: "854x480"
+  medium: "1280x720"
+  high: "1920x1080"
+  ultra_high: "3840x2160"
+  default_resolutions: "high"
+
+fps: 30

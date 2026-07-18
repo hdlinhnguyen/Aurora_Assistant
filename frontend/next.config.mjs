@@ -9,6 +9,14 @@ const nextConfig = {
   outputFileTracingRoot: __dirname,
   // Cho phép truy cập dev server từ thiết bị khác trong mạng LAN (điện thoại demo, máy đồng đội)
   allowedDevOrigins: ["192.168.1.10"],
+  async rewrites() {
+    return [
+      {
+        source: "/api/hint",
+        destination: "http://127.0.0.1:8089/api/hint", // Proxy to Python FastAPI service
+      },
+    ];
+  },
 };
 
 export default nextConfig;
