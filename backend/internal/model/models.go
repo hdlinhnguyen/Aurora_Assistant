@@ -201,13 +201,17 @@ type GuardrailEvent struct {
 }
 
 type LearningPath struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
-	TeacherID uuid.UUID `gorm:"type:uuid;not null;index" json:"teacherId"`
-	StudentID uuid.UUID `gorm:"type:uuid;not null;index" json:"studentId"`
-	ClassID   string    `gorm:"type:varchar(100);not null" json:"classId"`
-	ThreadID  string    `gorm:"type:varchar(100);not null" json:"threadId"`
-	Status    string    `gorm:"type:varchar(50);not null" json:"status"` // "Draft", "Approved", "Active"
-	StepsJSON string    `gorm:"type:text;not null" json:"stepsJson"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID                  uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	TeacherID           uuid.UUID `gorm:"type:uuid;not null;index" json:"teacherId"`
+	StudentID           uuid.UUID `gorm:"type:uuid;not null;index" json:"studentId"`
+	ClassID             string    `gorm:"type:varchar(100);not null" json:"classId"`
+	ThreadID            string    `gorm:"type:varchar(100);not null" json:"threadId"`
+	Subject             string    `gorm:"type:varchar(255);index" json:"subject"`
+	Source              string    `gorm:"type:varchar(20);index" json:"source"`
+	AnalysisID          string    `gorm:"type:varchar(100);index" json:"analysisId"`
+	EvidenceFingerprint string    `gorm:"type:varchar(64);index" json:"evidenceFingerprint"`
+	Status              string    `gorm:"type:varchar(50);not null" json:"status"` // "Draft", "Approved", "Active"
+	StepsJSON           string    `gorm:"type:text;not null" json:"stepsJson"`
+	CreatedAt           time.Time `json:"createdAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
 }

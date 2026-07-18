@@ -2,6 +2,9 @@ package learningpath
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -72,6 +75,17 @@ func LoadRecommendationStates(ctx context.Context, db *gorm.DB, studentIDs []str
 		})
 	}
 	return states, nil
+}
+
+func RecommendationFingerprint(subject string, states []RecommendationState) string {
+	ordered := append([]RecommendationState(nil), states...)
+	sortRecommendationStates(ordered)
+	hash := sha256.New()
+	_, _ = fmt.Fprintf(hash, "%s\n", strings.TrimSpace(subject))
+	for _, state := range ordered {
+		_, _ = fmt.Fprintf(hash, "%s|%s|%.12f|%.12f\n", state.StudentID, state.TopicID, state.Mastery, state.Confidence)
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 func sortRecommendationStates(states []RecommendationState) {

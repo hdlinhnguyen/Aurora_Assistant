@@ -282,6 +282,7 @@ func main() {
 	teacherGroup.Put("/topics/:id", tutorHandler.UpdateTopic)
 	teacherGroup.Delete("/topics/:id", tutorHandler.DeleteTopic)
 	teacherGroup.Post("/learning-path", tutorHandler.CreateLearningPath)
+	teacherGroup.Post("/learning-path/auto-drafts", tutorHandler.CreateAutomaticLearningPathDrafts)
 	teacherGroup.Get("/learning-path/suggestions", tutorHandler.GetLearningPathSuggestions)
 	teacherGroup.Post("/learning-path/:threadId/approve", tutorHandler.ApproveLearningPath)
 	teacherGroup.Get("/students/:studentId/learning-path/progress", learningPathProgressHandler.GetTeacherProgress)

@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -1293,12 +1294,13 @@ func (h *TutorHandler) GetInternalGraph(c fiber.Ctx) error {
 }
 
 type CreatePathBodyRequest struct {
-	ClassID                    string   `json:"class_id"`
-	StudentIDs                 []string `json:"student_ids"`
-	TargetTopicIDs             []string `json:"target_topic_ids"`
-	TeacherID                  string   `json:"teacher_id"`
-	TargetMasteryThreshold     float64  `json:"target_mastery_threshold"`
-	MinimumConfidenceThreshold float64  `json:"minimum_confidence_threshold"`
+	ClassID                    string              `json:"class_id"`
+	StudentIDs                 []string            `json:"student_ids"`
+	TargetTopicIDs             []string            `json:"target_topic_ids"`
+	TargetTopicIDsByStudent    map[string][]string `json:"target_topic_ids_by_student,omitempty"`
+	TeacherID                  string              `json:"teacher_id"`
+	TargetMasteryThreshold     float64             `json:"target_mastery_threshold"`
+	MinimumConfidenceThreshold float64             `json:"minimum_confidence_threshold"`
 }
 
 type RawQuizEvidence struct {
@@ -1400,6 +1402,19 @@ func validateLearningPathStudents(requested, classroomStudents []string) error {
 	return nil
 }
 
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
 func postLearningPathPython(path string, payload any) ([]byte, int, error) {
 	jsonBytes, err := json.Marshal(payload)
 	if err != nil {
@@ -1447,6 +1462,139 @@ func (h *TutorHandler) GetLearningPathSuggestions(c fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+func (h *TutorHandler) CreateAutomaticLearningPathDrafts(c fiber.Ctx) error {
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	var req struct {
+		Subject string `json:"subject"`
+		Refresh bool   `json:"refresh"`
+	}
+	if err := c.Bind().JSON(&req); err != nil || strings.TrimSpace(req.Subject) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Phải có môn học hiện tại"})
+	}
+	req.Subject = strings.TrimSpace(req.Subject)
+	classroom, studentIDs, err := resolveLearningPathClass(teacherID)
+	if err != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": err.Error()})
+	}
+	states, err := learningpath.LoadRecommendationStates(c.Context(), config.DB, studentIDs, req.Subject)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể đọc hồ sơ mastery"})
+	}
+	recommendations := learningpath.ClassifyRecommendations(states)
+	fingerprint := learningpath.RecommendationFingerprint(req.Subject, states)
+
+	if !req.Refresh {
+		var existing []model.LearningPath
+		if err := config.DB.Where(
+			"teacher_id = ? AND class_id = ? AND subject = ? AND source = ? AND evidence_fingerprint = ? AND status = ?",
+			teacherID, classroom.ID.String(), req.Subject, "automatic", fingerprint, "Draft",
+		).Order("student_id").Find(&existing).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể đọc lộ trình nháp"})
+		}
+		if len(existing) > 0 {
+			return c.JSON(buildAutomaticDraftResponse(req.Subject, existing[0].AnalysisID, existing, recommendations))
+		}
+	}
+
+	analysisID := uuid.NewString()
+	if len(recommendations.TargetsByStudent) == 0 {
+		return c.JSON(buildAutomaticDraftResponse(req.Subject, analysisID, nil, recommendations))
+	}
+	selectedStudents := make([]string, 0, len(recommendations.TargetsByStudent))
+	for studentID := range recommendations.TargetsByStudent {
+		selectedStudents = append(selectedStudents, studentID)
+	}
+	sort.Strings(selectedStudents)
+	rawQuiz, err := learningPathEvidence(selectedStudents, req.Subject)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn lịch sử học tập"})
+	}
+	body, status, err := postLearningPathPython("/learning-path", CreatePathFastAPIBody{
+		Request: CreatePathBodyRequest{
+			ClassID: classroom.ID.String(), StudentIDs: selectedStudents,
+			TargetTopicIDsByStudent: recommendations.TargetsByStudent, TeacherID: teacherID.String(),
+			TargetMasteryThreshold: 0.80, MinimumConfidenceThreshold: 0.60,
+		},
+		RawQuiz: rawQuiz, RawPaper: []interface{}{}, AsOf: time.Now().UTC().Format(time.RFC3339),
+	})
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
+	}
+	if status != http.StatusOK {
+		return c.Status(status).JSON(fiber.Map{"error": string(body)})
+	}
+	var plannerResult struct {
+		ThreadID string                 `json:"thread_id"`
+		Paths    map[string]interface{} `json:"paths"`
+	}
+	if err := json.Unmarshal(body, &plannerResult); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã phản hồi lộ trình"})
+	}
+
+	rows := make([]model.LearningPath, 0, len(plannerResult.Paths))
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.LearningPath{}).Where(
+			"teacher_id = ? AND class_id = ? AND subject = ? AND source = ? AND status = ?",
+			teacherID, classroom.ID.String(), req.Subject, "automatic", "Draft",
+		).Update("status", "Superseded").Error; err != nil {
+			return err
+		}
+		for studentIDRaw, pathData := range plannerResult.Paths {
+			studentID, parseErr := uuid.Parse(studentIDRaw)
+			if parseErr != nil {
+				return parseErr
+			}
+			steps, marshalErr := json.Marshal(pathData)
+			if marshalErr != nil {
+				return marshalErr
+			}
+			row := model.LearningPath{
+				ID: uuid.New(), TeacherID: teacherID, StudentID: studentID, ClassID: classroom.ID.String(),
+				ThreadID: plannerResult.ThreadID, Subject: req.Subject, Source: "automatic",
+				AnalysisID: analysisID, EvidenceFingerprint: fingerprint, Status: "Draft", StepsJSON: string(steps),
+				CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+			}
+			if err := tx.Create(&row).Error; err != nil {
+				return err
+			}
+			rows = append(rows, row)
+		}
+		return nil
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể lưu lộ trình nháp"})
+	}
+	return c.JSON(buildAutomaticDraftResponse(req.Subject, analysisID, rows, recommendations))
+}
+
+func buildAutomaticDraftResponse(subject, analysisID string, rows []model.LearningPath, recommendations learningpath.RecommendationResult) fiber.Map {
+	drafts := make(map[string]interface{}, len(rows))
+	threadID := ""
+	for _, row := range rows {
+		var path interface{}
+		if err := json.Unmarshal([]byte(row.StepsJSON), &path); err == nil {
+			drafts[row.StudentID.String()] = path
+		}
+		threadID = row.ThreadID
+	}
+	byStudent := make(map[string][]learningpath.RecommendationState)
+	for _, state := range recommendations.Reliable {
+		byStudent[state.StudentID] = append(byStudent[state.StudentID], state)
+	}
+	return fiber.Map{
+		"analysisId": analysisID, "threadId": threadID, "subject": subject,
+		"analyzedAt": time.Now().UTC(), "drafts": drafts, "recommendationsByStudent": byStudent,
+		"insufficientEvidence": recommendations.InsufficientEvidence,
+		"summary": fiber.Map{
+			"reliableStudentCount": len(recommendations.TargetsByStudent),
+			"draftCount":           len(drafts), "insufficientEvidenceCount": len(recommendations.InsufficientEvidence),
+		},
+	}
+}
+
 func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	teacherIDStr := c.Locals("userID").(string)
 	teacherID, err := uuid.Parse(teacherIDStr)
@@ -1469,6 +1617,18 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	}
 	if len(req.TargetTopicIDs) == 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Phải chọn học sinh và topic mục tiêu"})
+	}
+	if strings.TrimSpace(req.Subject) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Phải chọn môn học hiện tại"})
+	}
+	var validTopicCount int64
+	if err := config.DB.Model(&model.Node{}).Where(
+		"id IN ? AND subject = ? AND is_root = ?", req.TargetTopicIDs, req.Subject, false,
+	).Count(&validTopicCount).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể kiểm tra topic"})
+	}
+	if int(validTopicCount) != len(uniqueStrings(req.TargetTopicIDs)) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Topic phải thuộc môn học hiện tại"})
 	}
 	if err := validateLearningPathStudents(req.StudentIDs, classStudentIDs); err != nil {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": err.Error()})
@@ -1531,11 +1691,12 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi lưu lộ trình nháp"})
 		}
 		config.DB.Where(
-			"teacher_id = ? AND student_id = ? AND class_id = ? AND status = ?",
-			teacherID, studentID, req.ClassID, "Draft",
+			"teacher_id = ? AND student_id = ? AND class_id = ? AND subject = ? AND status = ?",
+			teacherID, studentID, req.ClassID, req.Subject, "Draft",
 		).Delete(&model.LearningPath{})
 		draft := model.LearningPath{
 			ID: uuid.New(), TeacherID: teacherID, StudentID: studentID, ClassID: req.ClassID,
+			Subject: req.Subject, Source: "manual",
 			ThreadID: threadID, Status: "Draft", StepsJSON: string(steps),
 			CreatedAt: time.Now(), UpdatedAt: time.Now(),
 		}

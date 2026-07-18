@@ -58,3 +58,17 @@ func TestLoadRecommendationStatesUsesCurrentSubjectAndSkipsRootNodes(t *testing.
 	require.Len(t, states, 1)
 	require.Equal(t, toanTopic.ID.String(), states[0].TopicID)
 }
+
+func TestRecommendationFingerprintIgnoresInputOrder(t *testing.T) {
+	first := RecommendationFingerprint("Toan", []RecommendationState{
+		{StudentID: "s2", TopicID: "b", Mastery: .2, Confidence: .7},
+		{StudentID: "s1", TopicID: "a", Mastery: .1, Confidence: .8},
+	})
+	second := RecommendationFingerprint("Toan", []RecommendationState{
+		{StudentID: "s1", TopicID: "a", Mastery: .1, Confidence: .8},
+		{StudentID: "s2", TopicID: "b", Mastery: .2, Confidence: .7},
+	})
+
+	require.Equal(t, first, second)
+	require.Len(t, first, 64)
+}

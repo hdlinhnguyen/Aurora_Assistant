@@ -1,12 +1,15 @@
 package handler
 
 import (
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"backend/internal/model"
 	"backend/internal/testutil"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -37,4 +40,20 @@ func TestLearningPathEvidenceFiltersSubject(t *testing.T) {
 	evidence, err := learningPathEvidenceForDB(db, []string{studentID.String()}, "Toan")
 	require.NoError(t, err)
 	require.Len(t, evidence, 1)
+}
+
+func TestAutomaticDraftRejectsEmptySubject(t *testing.T) {
+	teacherID := uuid.NewString()
+	handler := NewTutorHandler(nil)
+	app := fiber.New()
+	app.Post("/teacher/learning-path/auto-drafts", func(c fiber.Ctx) error {
+		c.Locals("userID", teacherID)
+		return handler.CreateAutomaticLearningPathDrafts(c)
+	})
+	request := httptest.NewRequest("POST", "/teacher/learning-path/auto-drafts", strings.NewReader(`{}`))
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := app.Test(request)
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusBadRequest, response.StatusCode)
 }
