@@ -15,6 +15,12 @@ import (
 
 var maxScore = decimal.RequireFromString("99999.99")
 
+const (
+	ExamStatusDrafting      = "drafting"
+	ExamStatusPreparingExam = "preparing_exam"
+	ExamStatusDone          = "done"
+)
+
 // Score stores an exact decimal score with at most two decimal places.
 type Score struct {
 	decimal.Decimal
