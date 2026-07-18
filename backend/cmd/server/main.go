@@ -203,6 +203,7 @@ func main() {
 	studentMastery.Get("/exams/:examId", studentExamHandler.GetStudentExam)
 	studentMastery.Post("/exams/:examId/submit", studentExamHandler.SubmitStudentExam)
 	studentMastery.Post("/exams/:examId/adaptive/answer", studentExamHandler.SubmitAdaptiveAnswer)
+	studentMastery.Post("/exams/adaptive/reset", studentExamHandler.ResetDiagnostic)
 
 	app.Post("/internal/exams/:examId/first-submission", examHandler.FirstSubmission)
 	app.Post("/internal/exams/:examId/grading-completed", examHandler.GradingCompleted)

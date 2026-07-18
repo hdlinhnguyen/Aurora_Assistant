@@ -699,3 +699,54 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 	})
 }
 
+// ResetDiagnostic resets the student state back to needing diagnostic and deletes their diagnostic exam records.
+func (h *StudentExamHandler) ResetDiagnostic(c fiber.Ctx) error {
+	userIDStr := c.Locals("userID").(string)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+
+	subject := c.Query("subject")
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Vui lòng chọn môn học"})
+	}
+
+	// 1. Reset StudentState.NeedsDiagnostic = true
+	var studentState model.StudentState
+	err = h.db.Where("student_id = ? AND subject = ?", userID, subject).First(&studentState).Error
+	if err == nil {
+		studentState.NeedsDiagnostic = true
+		studentState.UpdatedAt = time.Now()
+		h.db.Save(&studentState)
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		studentState = model.StudentState{
+			ID:              uuid.New(),
+			StudentID:       userID,
+			Subject:         subject,
+			NeedsDiagnostic: true,
+			UpdatedAt:       time.Now(),
+		}
+		h.db.Create(&studentState)
+	}
+
+	// 2. Find and delete adaptive exams for this subject
+	var exams []model.Exam
+	h.db.Where("subject = ? AND title LIKE ?", subject, "Đánh giá chẩn đoán thích ứng%").Find(&exams)
+	for _, ex := range exams {
+		// Delete ExamQuestions
+		h.db.Where("exam_id = ?", ex.ID).Delete(&model.ExamQuestion{})
+		h.db.Delete(&ex)
+	}
+
+	// 3. Clear activity logs for this subject to reset BKT evidence
+	h.db.Where("student_id = ? AND subject = ?", userID, subject).Delete(&model.ActivityLog{})
+
+	// 4. Trigger BKT mastery recalculation immediately so BKT returns to initial state (e.g. 30%)
+	if h.masteryRecalc != nil {
+		_, _ = h.masteryRecalc.RecalculateStudent(context.Background(), userID, subject)
+	}
+
+	return c.JSON(fiber.Map{"success": true})
+}
+

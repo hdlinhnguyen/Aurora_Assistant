@@ -229,6 +229,11 @@ export const getStudentState = (subject: string) =>
 export const getExams = (subject: string) =>
   apiFetch(`/student/exams?subject=${encodeURIComponent(subject)}`) as Promise<any[]>;
 
+export const resetDiagnostic = (subject: string) =>
+  apiFetch(`/student/exams/adaptive/reset?subject=${encodeURIComponent(subject)}`, {
+    method: "POST",
+  }) as Promise<{ success: boolean }>;
+
 export const getExam = (examId: string) =>
   apiFetch(`/student/exams/${examId}`) as Promise<{
     exam: any;

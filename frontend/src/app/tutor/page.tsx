@@ -24,6 +24,7 @@ import {
   getStudentState,
   getExams,
   getExam,
+  resetDiagnostic,
   submitExam,
   submitAdaptiveAnswer,
   submitCantDo,
@@ -37,6 +38,22 @@ import {
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 import { SafeHtml } from "@/components/ui/safe-html";
 import KnowledgeTree from "../components/KnowledgeTree";
+import {
+  BookOpen,
+  PenTool,
+  MessageSquare,
+  FileText,
+  LogOut,
+  Clock,
+  GraduationCap,
+  Trophy,
+  BarChart3,
+  Network,
+  RefreshCw,
+  Lock,
+  TrendingUp,
+  TrendingDown
+} from "lucide-react";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
@@ -333,6 +350,29 @@ export default function TutorHubPage() {
       toast.error("Lỗi khi tải đề thi: " + (err.message || err));
     } finally {
       setLoadingExam(false);
+    }
+  }
+
+  async function handleResetDiagnostic() {
+    const ok = window.confirm(
+      "Bạn có chắc chắn muốn thi lại bài chẩn đoán không?\nToàn bộ dữ liệu BKT mastery cũ và lịch sử học tập của môn học này sẽ được đặt lại từ đầu để bắt đầu làm bài mới."
+    );
+    if (!ok) return;
+
+    try {
+      setLoading(true);
+      const res = await resetDiagnostic(subject);
+      if (res && res.success) {
+        toast.success("Đã reset trạng thái chẩn đoán! Hãy tiến hành làm bài đánh giá mới.");
+        await loadAll();
+      } else {
+        toast.error("Không thể reset trạng thái chẩn đoán.");
+        setLoading(false);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Đã xảy ra lỗi khi reset trạng thái chẩn đoán: " + (e?.message || e));
+      setLoading(false);
     }
   }
 
@@ -670,12 +710,13 @@ export default function TutorHubPage() {
   const tabOff: CSSProperties = { ...tabBase, background: "#fff", color: "#5b6072", border: "1px solid #eef1f4" };
   const isLastAnswered = answered && qIndex >= qTotal - 1;
 
-  // ---- loading / error ----
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "grid", placeItems: "center", background: "#F4FBF9" }}>
         <div style={{ textAlign: "center", color: "#5b6072" }}>
-          <div style={{ fontSize: 34, marginBottom: 10 }}>🦊</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <RefreshCw className="animate-spin" size={36} style={{ color: "#0FB9A6" }} />
+          </div>
           <div style={{ ...POPPINS, fontWeight: 700 }}>Đang tải không gian học…</div>
         </div>
       </div>
@@ -685,7 +726,9 @@ export default function TutorHubPage() {
     return (
       <div style={{ height: "100vh", display: "grid", placeItems: "center", background: "#F4FBF9", padding: 24 }}>
         <div style={{ textAlign: "center", maxWidth: 420 }}>
-          <div style={{ fontSize: 34, marginBottom: 10 }}>😅</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <GraduationCap size={44} style={{ color: "#c23a54" }} />
+          </div>
           <div style={{ ...POPPINS, fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Chưa tải được</div>
           <div style={{ color: "#5b6072", fontSize: 14, marginBottom: 18 }}>{loadError}</div>
           <button
@@ -852,11 +895,11 @@ export default function TutorHubPage() {
                 whiteSpace: "nowrap",
                 color: active ? "#5b2fc0" : done ? "#16161F" : "#a2a8b4",
               };
-              const tag = active ? "đang học" : locked ? "🔒" : "";
+              const tag = active ? "đang học" : locked ? <Lock size={12} style={{ color: "#a2a8b4" }} /> : null;
               const tagStyle: CSSProperties = {
                 fontSize: 10,
                 fontWeight: 700,
-                padding: "2px 8px",
+                padding: active ? "2px 8px" : "0",
                 borderRadius: 999,
                 flexShrink: 0,
                 ...(active ? { background: "#fff", color: "#7C46E8" } : { color: "#c2c8d2" }),
@@ -920,7 +963,7 @@ export default function TutorHubPage() {
                 transition: "all .15s",
               }}
             >
-              🚪 Đăng xuất
+              <LogOut size={14} /> Đăng xuất
             </button>
           </div>
         </aside>
@@ -986,13 +1029,13 @@ export default function TutorHubPage() {
             {!needsDiagnostic ? (
               <>
                 <div onClick={() => setActiveTab("graph")} style={activeTab === "graph" ? tabOn : tabOff}>
-                  📊 Sơ đồ năng lực
+                  <Network size={15} /> Sơ đồ năng lực
                 </div>
                 <div onClick={() => setActiveTab("theory")} style={activeTab === "theory" ? tabOn : tabOff}>
-                  📖 Học lý thuyết
+                  <BookOpen size={15} /> Học lý thuyết
                 </div>
                 <div onClick={() => setActiveTab("practice")} style={activeTab === "practice" ? tabOn : tabOff}>
-                  ✏️ Luyện tập{" "}
+                  <PenTool size={15} /> Luyện tập{" "}
                   <span
                     style={{
                       background: activeTab === "practice" ? "rgba(255,255,255,.22)" : "#EFE9FD",
@@ -1007,16 +1050,16 @@ export default function TutorHubPage() {
                   </span>
                 </div>
                 <div onClick={() => setActiveTab("chat")} style={activeTab === "chat" ? tabOn : tabOff}>
-                  💬 Hỏi thầy AI
+                  <MessageSquare size={15} /> Hỏi thầy AI
                 </div>
               </>
             ) : (
               <div style={{ ...POPPINS, fontSize: 13, fontWeight: 800, color: "#c23a54", background: "#fef3f5", border: "1px solid #f8d3da", padding: "10px 16px", borderRadius: 14, display: "flex", alignItems: "center", gap: 6 }}>
-                🔒 Khóa lộ trình: Yêu cầu Đánh giá Chẩn đoán bắt buộc
+                <Lock size={15} /> Khóa lộ trình: Yêu cầu Đánh giá Chẩn đoán bắt buộc
               </div>
             )}
             <div onClick={() => setActiveTab("exams")} style={activeTab === "exams" ? tabOn : tabOff}>
-              ✍️ Đề thi & Kiểm tra
+              <FileText size={15} /> Đề thi & Kiểm tra
             </div>
           </div>
 
@@ -1695,7 +1738,7 @@ export default function TutorHubPage() {
                                 color: examTimeRemaining < 60 ? "#c23a54" : "#7C46E8",
                               }}
                             >
-                              ⏱️ {formattedTime}
+                              <Clock size={12} /> {formattedTime}
                             </div>
                           )}
                         </div>
@@ -1935,6 +1978,41 @@ export default function TutorHubPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Cột 3: Đánh giá chẩn đoán thích ứng */}
+                  <div style={{ flex: 1, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                    <div>
+                      <span style={{ ...POPPINS, fontSize: 10, background: "#F3FBF9", color: "#0FB9A6", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
+                        Chẩn đoán
+                      </span>
+                      <div style={{ ...BALOO, fontWeight: 800, fontSize: 18, marginTop: 8 }}>Đánh giá chẩn đoán</div>
+                      <p style={{ fontSize: 13, color: "#7c8194", lineHeight: 1.5, marginTop: 6 }}>
+                        Thi lại bài kiểm tra chẩn đoán 25 câu để làm mới toàn bộ lộ trình học tập và chỉ số thấu hiểu chủ đề.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleResetDiagnostic}
+                      style={{
+                        ...POPPINS,
+                        width: "100%",
+                        border: "none",
+                        borderRadius: 14,
+                        padding: "13px 14px",
+                        background: "linear-gradient(135deg,#0FB9A6,#14D9C0)",
+                        color: "#fff",
+                        fontWeight: 800,
+                        fontSize: 13,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        boxShadow: "0 8px 16px -6px rgba(15,185,166,.4)",
+                      }}
+                    >
+                      <RefreshCw size={14} className="animate-spin-hover" /> Thi lại chẩn đoán
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -2121,7 +2199,7 @@ export default function TutorHubPage() {
                             color: examTimeRemaining < 60 ? "#c23a54" : "#7C46E8",
                           }}
                         >
-                          ⏱️ {formattedTime}
+                          <Clock size={12} /> {formattedTime}
                         </div>
                       )}
                     </div>
@@ -2199,7 +2277,7 @@ export default function TutorHubPage() {
                           gap: 6,
                         }}
                       >
-                        🚪 Hủy/Thoát thi
+                        <LogOut size={13} /> Hủy/Thoát thi
                       </button>
 
                       <button
@@ -2234,7 +2312,9 @@ export default function TutorHubPage() {
 
               return (
                 <div style={{ background: "#fff", borderRadius: 28, maxWidth: 640, width: "100%", padding: "34px 40px", textAlign: "center", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)", animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)" }}>
-                  <div style={{ fontSize: 60, marginBottom: 12 }}>📊</div>
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+                    <BarChart3 size={56} style={{ color: "#7C46E8" }} />
+                  </div>
                   <div style={{ ...BALOO, fontWeight: 800, fontSize: 25, marginBottom: 6 }}>Kết quả Chẩn đoán năng lực sơ bộ</div>
                   <p style={{ fontSize: 13.5, color: "#5b6072", lineHeight: 1.6, marginBottom: 20 }}>
                     Hệ thống đã phân tích câu trả lời của em qua 25 câu hỏi chẩn đoán để xác định mức độ hiểu biết đối với từng chủ đề kiến thức.
@@ -2244,7 +2324,7 @@ export default function TutorHubPage() {
                     {/* Strengths */}
                     <div style={{ flex: 1, background: "#F3FBF9", border: "1px solid #d4f2ea", borderRadius: 20, padding: 16 }}>
                       <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#0FB9A6", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>
-                        🟢 Kỹ năng vững vàng ({masteredNodes.length})
+                        <TrendingUp size={14} /> Kỹ năng vững vàng ({masteredNodes.length})
                       </div>
                       {masteredNodes.length > 0 ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 150, overflowY: "auto" }}>
@@ -2262,7 +2342,7 @@ export default function TutorHubPage() {
                     {/* Weaknesses */}
                     <div style={{ flex: 1, background: "#fef3f5", border: "1px solid #f9dae0", borderRadius: 20, padding: 16 }}>
                       <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#c23a54", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>
-                        🔴 Cần cải thiện ({weakNodes.length})
+                        <TrendingDown size={14} /> Cần cải thiện ({weakNodes.length})
                       </div>
                       {weakNodes.length > 0 ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 150, overflowY: "auto" }}>
@@ -2318,7 +2398,9 @@ export default function TutorHubPage() {
                 animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)",
               }}
             >
-              <div style={{ fontSize: 56, marginBottom: 12, animation: "ah-float 3s ease-in-out infinite" }}>📐</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 12, animation: "ah-float 3s ease-in-out infinite" }}>
+                <GraduationCap size={56} style={{ color: "#7C46E8" }} />
+              </div>
               <div style={{ ...BALOO, fontWeight: 800, fontSize: 26, color: "#16161F", marginBottom: 10 }}>
                 Yêu cầu đánh giá chẩn đoán!
               </div>
