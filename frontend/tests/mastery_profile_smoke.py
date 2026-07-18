@@ -41,3 +41,17 @@ def test_teacher_page_mounts_student_mastery_profile() -> None:
     source = read("frontend/src/app/teacher/page.tsx")
     assert 'import StudentMasteryProfile from "./components/StudentMasteryProfile"' in source
     assert "<StudentMasteryProfile" in source
+
+
+def test_student_dashboard_uses_self_scoped_api() -> None:
+    source = read("frontend/src/app/tutor/components/StudentMasteryDashboard.tsx")
+    assert "/student/mastery?subject=" in source
+    assert "/teacher/students/" not in source
+    assert "MasteryTopicPanel" in source
+
+
+def test_tutor_page_uses_persisted_mastery() -> None:
+    source = read("frontend/src/app/tutor/page.tsx")
+    assert "masteryByTopic" in source
+    assert "<StudentMasteryDashboard" in source
+    assert "masteryByTopic={masteryByTopic}" in source
