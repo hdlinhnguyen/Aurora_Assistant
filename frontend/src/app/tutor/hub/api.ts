@@ -239,6 +239,16 @@ export const submitExam = (examId: string, answers: Record<string, string>) =>
     body: JSON.stringify({ answers }),
   }) as Promise<{ totalScore: string; maxScore: string }>;
 
+export const submitAdaptiveAnswer = (examId: string, questionId: string, selectedChoiceId: string) =>
+  apiFetch(`/student/exams/${examId}/adaptive/answer`, {
+    method: "POST",
+    body: JSON.stringify({ questionId, selectedChoiceId }),
+  }) as Promise<{
+    isFinished: boolean;
+    isCorrect: boolean;
+    nextQuestion?: any;
+  }>;
+
 export const submitCantDo = (nodeId: string) =>
   apiFetch(`/nodes/${nodeId}/cant-do`, {
     method: "POST",
@@ -313,7 +323,11 @@ export function buildRoadmap(
     const t = mastery.topics?.[id];
     return !!t && (t.masteryStatus === "mastered" || t.masteryProbability >= MASTERED_THRESHOLD);
   };
-  const masteryOf = (id: string) => mastery.topics?.[id]?.masteryProbability ?? 0;
+  const masteryOf = (id: string) => {
+    const t = mastery.topics?.[id];
+    if (!t || t.masteryStatus === "unknown") return 0;
+    return t.masteryProbability;
+  };
 
   // 1) Có learning-path đã duyệt (bỏ qua nút gốc cấu trúc)
   if (steps && steps.length > 0) {

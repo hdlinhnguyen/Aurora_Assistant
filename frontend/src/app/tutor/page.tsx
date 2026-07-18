@@ -25,6 +25,7 @@ import {
   getExams,
   getExam,
   submitExam,
+  submitAdaptiveAnswer,
   submitCantDo,
   submitAdaptiveDowngrade,
   type GameSummary,
@@ -195,7 +196,8 @@ export default function TutorHubPage() {
       setSummary(summaryRes);
       setStudentState(stateRes);
       setExamsList(examsRes);
-      if (stateRes?.needsDiagnostic) {
+      const isDiag = stateRes === null || stateRes?.needsDiagnostic;
+      if (isDiag) {
         setActiveTab("exams");
       }
       const cur = rm.find((s) => s.status === "current") ?? rm[0];
@@ -351,6 +353,33 @@ export default function TutorHubPage() {
     }
   }
 
+  async function handleAdaptiveAnswer() {
+    const currentQuestion = examQuestions[examQIndex];
+    if (!currentQuestion) return;
+    const selectedAnswer = examAnswers[currentQuestion.id];
+    if (!selectedAnswer) {
+      toast.error("Vui lòng chọn phương án trả lời trước.");
+      return;
+    }
+    setSubmittingExam(true);
+    try {
+      const res = await submitAdaptiveAnswer(activeExam.id, currentQuestion.id, selectedAnswer);
+      if (res.isFinished) {
+        toast.success("Hoàn thành bài đánh giá chẩn đoán!");
+        setExamFinishedScore({ totalScore: "Hoàn thành", maxScore: "Chẩn đoán" });
+      } else if (res.nextQuestion) {
+        setExamQuestions((prev) => [...prev, res.nextQuestion]);
+        setExamQIndex((idx) => idx + 1);
+      } else {
+        toast.error("Không tìm thấy câu hỏi tiếp theo.");
+      }
+    } catch (err: any) {
+      toast.error("Lỗi khi gửi câu trả lời: " + (err.message || err));
+    } finally {
+      setSubmittingExam(false);
+    }
+  }
+
   function handleAutoSubmitExam() {
     toast.warning("Hết giờ làm bài! Hệ thống tự động nộp bài của bạn.");
     handleSubmitExam(true);
@@ -450,6 +479,7 @@ export default function TutorHubPage() {
   }
 
   // ---- derived ----
+  const needsDiagnostic = studentState === null || studentState?.needsDiagnostic;
   const currentNode = nodes.find((n) => n.id === currentStepId);
   const filteredQuestions = difficultyFilter
     ? questions.filter((item) => item.tag === "Nhận biết")
@@ -461,7 +491,10 @@ export default function TutorHubPage() {
   const chapterPct = Math.round((doneCount / totalSteps) * 100);
   const lessonIndex = Math.max(0, roadmap.findIndex((s) => s.id === currentStepId));
   const chapterName = currentNode?.topicGroup || subject || "Kiến thức";
-  const masteryPct = Math.round((mastery.topics?.[currentStepId]?.masteryProbability ?? 0) * 100);
+  const currentMastery = mastery.topics?.[currentStepId];
+  const masteryPct = currentMastery && currentMastery.masteryStatus !== "unknown"
+    ? Math.round(currentMastery.masteryProbability * 100)
+    : 0;
   const stars = summary?.stars ?? 0;
   const streak = summary?.currentStreak ?? 0;
   const lessonBlurb =
@@ -766,7 +799,7 @@ export default function TutorHubPage() {
             </div>
 
             {roadmap.map((st, i) => {
-              const gated = !!studentState?.needsDiagnostic;
+              const gated = needsDiagnostic;
               const active = st.id === currentStepId && !gated;
               const done = st.status === "done" && !gated;
               const locked = (st.status === "locked" && !active) || gated;
@@ -945,7 +978,7 @@ export default function TutorHubPage() {
 
           {/* merged tabs */}
           <div style={{ display: "flex", gap: 9, margin: "22px 0 18px", alignItems: "center" }}>
-            {!studentState?.needsDiagnostic ? (
+            {!needsDiagnostic ? (
               <>
                 <div onClick={() => setActiveTab("theory")} style={activeTab === "theory" ? tabOn : tabOff}>
                   📖 Học lý thuyết
@@ -1475,6 +1508,7 @@ export default function TutorHubPage() {
               {activeExam ? (
                 (() => {
                   const currentQuestion = examQuestions[examQIndex];
+                  const isAdaptive = activeExam && activeExam.title.includes("Đánh giá chẩn đoán thích ứng");
                   let options: string[] = [];
                   if (currentQuestion && currentQuestion.choicesJson) {
                     try {
@@ -1491,64 +1525,81 @@ export default function TutorHubPage() {
                   return (
                     <div style={{ display: "flex", gap: 22, alignItems: "stretch" }}>
                       {/* Left: list of questions */}
-                      <div style={{ width: 220, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flexShrink: 0 }}>
-                        <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #f2f4f7", paddingBottom: 10, marginBottom: 14 }}>
-                          Danh sách câu hỏi
+                      {!isAdaptive ? (
+                        <div style={{ width: 220, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flexShrink: 0 }}>
+                          <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #f2f4f7", paddingBottom: 10, marginBottom: 14 }}>
+                            Danh sách câu hỏi
+                          </div>
+                          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, overflowY: "auto", maxHeight: 300, paddingRight: 4 }}>
+                            {examQuestions.map((q, idx) => {
+                              const isSelected = examQIndex === idx;
+                              const isAnswered = !!examAnswers[q.id];
+                              return (
+                                <button
+                                  key={q.id}
+                                  onClick={() => setExamQIndex(idx)}
+                                  style={{
+                                    ...POPPINS,
+                                    height: 38,
+                                    border: "none",
+                                    borderRadius: 12,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 800,
+                                    fontSize: 13,
+                                    cursor: "pointer",
+                                    transition: "all .15s",
+                                    ...(isSelected
+                                      ? { background: "#7C46E8", color: "#fff", boxShadow: "0 4px 10px rgba(124,70,232,.3)" }
+                                      : isAnswered
+                                        ? { background: "#F3FBF9", border: "1px solid #14D9C0", color: "#0d7a6c" }
+                                        : { background: "#f4f6f9", color: "#5b6072" }),
+                                  }}
+                                >
+                                  {idx + 1}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div style={{ borderTop: "1px solid #f2f4f7", paddingTop: 14, marginTop: 14 }}>
+                            <button
+                              onClick={() => handleSubmitExam(false)}
+                              disabled={submittingExam}
+                              style={{
+                                ...POPPINS,
+                                width: "100%",
+                                border: "none",
+                                borderRadius: 12,
+                                padding: "12px 14px",
+                                background: "linear-gradient(135deg,#7C46E8,#5b2fc0)",
+                                color: "#fff",
+                                fontWeight: 800,
+                                fontSize: 13,
+                                cursor: "pointer",
+                                boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
+                              }}
+                            >
+                              {submittingExam ? "Đang nộp..." : "Nộp bài thi"}
+                            </button>
+                          </div>
                         </div>
-                        <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, overflowY: "auto", maxHeight: 300, paddingRight: 4 }}>
-                          {examQuestions.map((q, idx) => {
-                            const isSelected = examQIndex === idx;
-                            const isAnswered = !!examAnswers[q.id];
-                            return (
-                              <button
-                                key={q.id}
-                                onClick={() => setExamQIndex(idx)}
-                                style={{
-                                  ...POPPINS,
-                                  height: 38,
-                                  border: "none",
-                                  borderRadius: 12,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontWeight: 800,
-                                  fontSize: 13,
-                                  cursor: "pointer",
-                                  transition: "all .15s",
-                                  ...(isSelected
-                                    ? { background: "#7C46E8", color: "#fff", boxShadow: "0 4px 10px rgba(124,70,232,.3)" }
-                                    : isAnswered
-                                      ? { background: "#F3FBF9", border: "1px solid #14D9C0", color: "#0d7a6c" }
-                                      : { background: "#f4f6f9", color: "#5b6072" }),
-                                }}
-                              >
-                                {idx + 1}
-                              </button>
-                            );
-                          })}
+                      ) : (
+                        <div style={{ width: 220, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flexShrink: 0 }}>
+                          <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #f2f4f7", paddingBottom: 10, marginBottom: 14 }}>
+                            Chẩn đoán thích ứng
+                          </div>
+                          <div style={{ textAlign: "center", padding: "20px 10px" }}>
+                            <div style={{ fontSize: 32, fontWeight: 850, color: "#16161F", ...POPPINS }}>
+                              {examQuestions.length} <span style={{ fontSize: 14, color: "#9aa1b0", fontWeight: 700 }}>/ 25</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "#5b6072", marginTop: 4, fontWeight: 600 }}>câu hỏi đã làm</div>
+                          </div>
+                          <div style={{ height: 6, background: "#eef1f4", borderRadius: 6, width: "100%", marginTop: 10 }}>
+                            <div style={{ height: 6, background: "#7C46E8", borderRadius: 6, width: `${Math.min(100, (examQuestions.length / 25) * 100)}%` }} />
+                          </div>
                         </div>
-                        <div style={{ borderTop: "1px solid #f2f4f7", paddingTop: 14, marginTop: 14 }}>
-                          <button
-                            onClick={() => handleSubmitExam(false)}
-                            disabled={submittingExam}
-                            style={{
-                              ...POPPINS,
-                              width: "100%",
-                              border: "none",
-                              borderRadius: 12,
-                              padding: "12px 14px",
-                              background: "linear-gradient(135deg,#7C46E8,#5b2fc0)",
-                              color: "#fff",
-                              fontWeight: 800,
-                              fontSize: 13,
-                              cursor: "pointer",
-                              boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
-                            }}
-                          >
-                            {submittingExam ? "Đang nộp..." : "Nộp bài thi"}
-                          </button>
-                        </div>
-                      </div>
+                      )}
 
                       {/* Right: question content */}
                       <div style={{ flex: 1, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 24, display: "flex", flexDirection: "column", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
@@ -1633,20 +1684,44 @@ export default function TutorHubPage() {
                         )}
 
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, borderTop: "1px solid #f2f4f7", paddingTop: 16 }}>
-                          <button
-                            onClick={() => setExamQIndex((idx) => Math.max(0, idx - 1))}
-                            disabled={examQIndex === 0}
-                            style={{ ...POPPINS, border: "1px solid #eef1f4", background: "#fff", color: "#5b6072", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: examQIndex === 0 ? "not-allowed" : "pointer", opacity: examQIndex === 0 ? 0.5 : 1 }}
-                          >
-                            Câu trước
-                          </button>
-                          <button
-                            onClick={() => setExamQIndex((idx) => Math.min(examQuestions.length - 1, idx + 1))}
-                            disabled={examQIndex === examQuestions.length - 1}
-                            style={{ ...POPPINS, border: "1px solid #eef1f4", background: "#fff", color: "#5b6072", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: examQIndex === examQuestions.length - 1 ? "not-allowed" : "pointer", opacity: examQIndex === examQuestions.length - 1 ? 0.5 : 1 }}
-                          >
-                            Câu tiếp
-                          </button>
+                          {!isAdaptive ? (
+                            <>
+                              <button
+                                onClick={() => setExamQIndex((idx) => Math.max(0, idx - 1))}
+                                disabled={examQIndex === 0}
+                                style={{ ...POPPINS, border: "1px solid #eef1f4", background: "#fff", color: "#5b6072", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: examQIndex === 0 ? "not-allowed" : "pointer", opacity: examQIndex === 0 ? 0.5 : 1 }}
+                              >
+                                Câu trước
+                              </button>
+                              <button
+                                onClick={() => setExamQIndex((idx) => Math.min(examQuestions.length - 1, idx + 1))}
+                                disabled={examQIndex === examQuestions.length - 1}
+                                style={{ ...POPPINS, border: "1px solid #eef1f4", background: "#fff", color: "#5b6072", borderRadius: 12, padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: examQIndex === examQuestions.length - 1 ? "not-allowed" : "pointer", opacity: examQIndex === examQuestions.length - 1 ? 0.5 : 1 }}
+                              >
+                                Câu tiếp
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={handleAdaptiveAnswer}
+                              disabled={submittingExam}
+                              style={{
+                                ...POPPINS,
+                                border: "none",
+                                borderRadius: 12,
+                                padding: "11px 24px",
+                                background: "linear-gradient(135deg,#7C46E8,#5b2fc0)",
+                                color: "#fff",
+                                fontWeight: 800,
+                                fontSize: 13,
+                                cursor: "pointer",
+                                marginLeft: "auto",
+                                boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
+                              }}
+                            >
+                              {submittingExam ? "Đang gửi..." : "Gửi câu trả lời & Tiếp tục"}
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1660,11 +1735,22 @@ export default function TutorHubPage() {
                   <p style={{ fontSize: 13.5, color: "#5b6072", lineHeight: 1.6, marginBottom: 20 }}>
                     Chúc mừng em đã hoàn thành bài làm. Kết quả chi tiết đã được gửi đến hệ thống để ghi nhận.
                   </p>
-                  <div style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 18, padding: 18, width: 220, margin: "0 auto 24px" }}>
-                    <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#0FB9A6", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Điểm số đạt được</div>
-                    <div style={{ ...POPPINS, fontWeight: 850, fontSize: 32, color: "#16161F" }}>
-                      {examFinishedScore.totalScore} <span style={{ fontSize: 16, color: "#9aa1b0", fontWeight: 700 }}>/ {examFinishedScore.maxScore}</span>
-                    </div>
+                  <div style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 18, padding: 18, width: 260, margin: "0 auto 24px" }}>
+                    {examFinishedScore.maxScore === "Chẩn đoán" ? (
+                      <>
+                        <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Trạng thái chẩn đoán</div>
+                        <div style={{ ...POPPINS, fontWeight: 850, fontSize: 22, color: "#16161F" }}>
+                          Đã ghi nhận năng lực 🎉
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#0FB9A6", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Điểm số đạt được</div>
+                        <div style={{ ...POPPINS, fontWeight: 850, fontSize: 32, color: "#16161F" }}>
+                          {examFinishedScore.totalScore} <span style={{ fontSize: 16, color: "#9aa1b0", fontWeight: 700 }}>/ {examFinishedScore.maxScore}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <button
                     onClick={async () => {
@@ -1872,6 +1958,146 @@ export default function TutorHubPage() {
               >
                 Đóng
               </div>
+          </div>
+        </div>
+      </div>
+      )}
+      {/* ===== ONBOARDING DIAGNOSTIC MODAL OVERLAY ===== */}
+      {needsDiagnostic && !activeExam && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(10px)",
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 28,
+              maxWidth: 580,
+              width: "100%",
+              padding: "40px 36px 32px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
+              textAlign: "center",
+              animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)",
+            }}
+          >
+            <div style={{ fontSize: 56, marginBottom: 12, animation: "ah-float 3s ease-in-out infinite" }}>📐</div>
+            <div style={{ ...BALOO, fontWeight: 800, fontSize: 26, color: "#16161F", marginBottom: 10 }}>
+              Yêu cầu đánh giá chẩn đoán!
+            </div>
+            <p style={{ fontSize: 14, color: "#4b5060", lineHeight: 1.6, marginBottom: 26 }}>
+              Chào mừng em đến với <b>Aurora Socratic Tutor</b>. Lộ trình học tập của em tạm thời bị khóa. Em cần hoàn thành bài khảo sát/kiểm tra đầu vào để hệ thống chẩn đoán và xác định lỗ hổng kiến thức nền tảng của em.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, textAlign: "left" }}>
+              {/* Cách 1: Đề thi được giao sẵn */}
+              {examsList.length > 0 ? (
+                <div>
+                  <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
+                    Đề thi được giao cho em:
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
+                    {examsList.map((ex) => (
+                      <div
+                        key={ex.id}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "12px 16px" }}
+                      >
+                        <div style={{ minWidth: 0, flex: 1, paddingRight: 10 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 800, color: "#16161F", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ex.title}</span>
+                          <span style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600, display: "block", marginTop: 2 }}>Thời gian: {ex.durationMinutes} phút</span>
+                        </div>
+                        <button
+                          onClick={() => handleStartExam(ex.id)}
+                          style={{
+                            ...POPPINS,
+                            border: "none",
+                            borderRadius: 12,
+                            padding: "9px 16px",
+                            background: "linear-gradient(135deg,#7C46E8,#6D28D9)",
+                            color: "#fff",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            cursor: "pointer",
+                            boxShadow: "0 6px 12px -4px rgba(109,40,217,.4)",
+                          }}
+                        >
+                          Vào thi
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "16px 10px", fontSize: 12.5, color: "#9aa1b0", fontWeight: 600, border: "1px dashed #eef1f4", borderRadius: 16, background: "#fcfdfe", fontStyle: "italic", marginBottom: 6 }}>
+                  Chưa có đề thi được giao sẵn cho lớp của em.
+                </div>
+              )}
+
+              {/* Cách 2: Nhập mã đề thi tự do */}
+              <div style={{ borderTop: "1px solid #f2f4f7", paddingTop: 18, marginTop: 4 }}>
+                <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
+                  Hoặc nhập mã đề thi (Exam ID) khác:
+                </div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <input
+                    type="text"
+                    placeholder="Nhập mã đề thi (UUID)..."
+                    value={customExamCode}
+                    onChange={(e) => setCustomExamCode(e.target.value)}
+                    style={{ flex: 1, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 650, color: "#16161F", outline: "none" }}
+                  />
+                  <button
+                    onClick={() => handleStartExam(customExamCode)}
+                    disabled={loadingExam}
+                    style={{
+                      ...POPPINS,
+                      border: "none",
+                      borderRadius: 14,
+                      padding: "12px 20px",
+                      background: "#16161F",
+                      color: "#fff",
+                      fontWeight: 800,
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {loadingExam ? "Tải..." : "Bắt đầu"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 32, borderTop: "1px solid #f2f4f7", paddingTop: 20 }}>
+              <button
+                onClick={() => {
+                  localStorage.clear();
+                  router.push("/");
+                }}
+                style={{
+                  ...POPPINS,
+                  border: "1px solid #f8d3da",
+                  borderRadius: 14,
+                  padding: "11px 24px",
+                  background: "#fef3f5",
+                  color: "#c23a54",
+                  fontWeight: 800,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                🚪 Đăng xuất tài khoản
+              </button>
             </div>
           </div>
         </div>

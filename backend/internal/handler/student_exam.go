@@ -47,6 +47,74 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải danh sách đề thi: " + err.Error()})
 	}
 
+	if len(exams) == 0 {
+		// Tự động sinh đề chẩn đoán mẫu và chọn câu hỏi xuất phát từ Hub Node đầu tiên
+		var firstQ model.Question
+		var rootNode model.Node
+		h.db.Where("subject = ? AND is_root = ?", subject, true).First(&rootNode)
+		if rootNode.ID == uuid.Nil {
+			h.db.Where("subject = ?", subject).First(&rootNode)
+		}
+
+		var err error
+		if rootNode.ID != uuid.Nil {
+			err = h.db.Where("node_id = ?", rootNode.ID).Order("RANDOM()").First(&firstQ).Error
+		}
+		if err != nil || rootNode.ID == uuid.Nil {
+			err = h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
+				Where("nodes.subject = ?", subject).
+				Order("RANDOM()").First(&firstQ).Error
+		}
+
+		if err == nil {
+			var creator model.User
+			if err := h.db.Where("role = ?", "teacher").First(&creator).Error; err != nil {
+				if err := h.db.Where("role = ?", "admin").First(&creator).Error; err != nil {
+					creator.ID = uuid.Nil
+				}
+			}
+
+			newExam := model.Exam{
+				ID:              uuid.New(),
+				Title:           "Đánh giá chẩn đoán thích ứng - " + subject,
+				Subject:         subject,
+				GradeLevel:      "Cả lớp",
+				DurationMinutes: 45,
+				Status:          "preparing_exam",
+				CreatedBy:       creator.ID,
+				CreatedAt:       time.Now(),
+				UpdatedAt:       time.Now(),
+			}
+
+			errTx := h.db.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Create(&newExam).Error; err != nil {
+					return err
+				}
+				correctChoice := fmt.Sprintf("%d", firstQ.CorrectOption)
+				examQ := model.ExamQuestion{
+					ID:               uuid.New(),
+					ExamID:           newExam.ID,
+					SourceType:       "system",
+					SourceQuestionID: &firstQ.ID,
+					QuestionType:     firstQ.QuestionType,
+					Content:          firstQ.Content,
+					Points:           model.MustScore("1.00"),
+					Position:         1,
+					ChoicesJSON:      firstQ.OptionsJSON,
+					CorrectChoiceID:  &correctChoice,
+					TopicNodeIDsJSON: fmt.Sprintf("[%q]", firstQ.NodeID.String()),
+					CreatedAt:        time.Now(),
+					UpdatedAt:        time.Now(),
+				}
+				return tx.Create(&examQ).Error
+			})
+
+			if errTx == nil {
+				exams = append(exams, newExam)
+			}
+		}
+	}
+
 	return c.JSON(exams)
 }
 
@@ -332,3 +400,234 @@ func (h *StudentExamHandler) SubmitStudentExam(c fiber.Ctx) error {
 		"maxScore":   fmt.Sprintf("%.2f", maxScore),
 	})
 }
+
+type SubmitAdaptiveAnswerRequest struct {
+	QuestionID       string `json:"questionId"`
+	SelectedChoiceID string `json:"selectedChoiceId"` // "0", "1", "2", "3"
+}
+
+func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
+	userIDStr, ok := c.Locals("userID").(string)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	userID := uuid.MustParse(userIDStr)
+
+	examIDStr := c.Params("examId")
+	examID, err := uuid.Parse(examIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID đề thi không hợp lệ"})
+	}
+
+	var req SubmitAdaptiveAnswerRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu không hợp lệ"})
+	}
+
+	questionID, err := uuid.Parse(req.QuestionID)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID câu hỏi không hợp lệ"})
+	}
+
+	// 1. Lấy thông tin câu hỏi hiện tại trong đề thi
+	var examQ model.ExamQuestion
+	if err := h.db.Where("exam_id = ? AND id = ?", examID, questionID).First(&examQ).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Không tìm thấy câu hỏi trong đề thi"})
+	}
+
+	// 2. Lấy thông tin đề thi
+	var exam model.Exam
+	if err := h.db.First(&exam, "id = ?", examID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Không tìm thấy đề thi"})
+	}
+
+	// 3. Chấm điểm phương án trả lời
+	isCorrect := false
+	if examQ.CorrectChoiceID != nil && req.SelectedChoiceID != "" && *examQ.CorrectChoiceID == req.SelectedChoiceID {
+		isCorrect = true
+	}
+
+	// 4. Ghi nhận ActivityLog để BKT cập nhật
+	var nodeIDStr string
+	var nodeID uuid.UUID
+	if examQ.TopicNodeIDsJSON != "" {
+		var nodeIDs []string
+		_ = json.Unmarshal([]byte(examQ.TopicNodeIDsJSON), &nodeIDs)
+		if len(nodeIDs) > 0 {
+			nodeIDStr = nodeIDs[0]
+			nodeID, _ = uuid.Parse(nodeIDStr)
+		}
+	}
+
+	action := "answer_incorrect"
+	if isCorrect {
+		action = "answer_correct"
+	}
+
+	if nodeID != uuid.Nil {
+		logEntry := model.ActivityLog{
+			ID:        uuid.New(),
+			StudentID: userID,
+			Subject:   exam.Subject,
+			NodeID:    nodeID,
+			Action:    action,
+			Detail:    fmt.Sprintf("Mã câu hỏi: %s. Phương án chọn: %s (Adaptive)", examQ.SourceQuestionID, req.SelectedChoiceID),
+			CreatedAt: time.Now(),
+		}
+		h.db.Create(&logEntry)
+	}
+
+	// 5. Đếm số câu hỏi đã làm trong đề thi này
+	var answeredCount int64
+	h.db.Model(&model.ExamQuestion{}).Where("exam_id = ?", examID).Count(&answeredCount)
+
+	// Kiểm tra điều kiện dừng (25 câu)
+	if answeredCount >= 25 {
+		// Hoàn thành chẩn đoán
+		var studentState model.StudentState
+		err = h.db.Where("student_id = ? AND subject = ?", userID, exam.Subject).First(&studentState).Error
+		if err == nil {
+			studentState.NeedsDiagnostic = false
+			studentState.UpdatedAt = time.Now()
+			h.db.Save(&studentState)
+		}
+		return c.JSON(fiber.Map{
+			"isFinished": true,
+			"isCorrect":  isCorrect,
+		})
+	}
+
+	// 6. Lựa chọn câu hỏi tiếp theo dựa trên Thuật toán CAT 3 chặng
+	var nextQ model.Question
+	foundNext := false
+
+	// CHẶNG 1: Routing (Khảo sát sơ bộ) - Từ câu 1 đến câu 7
+	if answeredCount < 7 {
+		var hubNodes []model.Node
+		h.db.Where("subject = ? AND is_root = ?", exam.Subject, true).Find(&hubNodes)
+		if len(hubNodes) == 0 {
+			h.db.Where("subject = ?", exam.Subject).Limit(5).Find(&hubNodes)
+		}
+		hubIDs := make([]uuid.UUID, len(hubNodes))
+		for idx, n := range hubNodes {
+			hubIDs[idx] = n.ID
+		}
+
+		targetDiff := "medium"
+		if isCorrect {
+			targetDiff = "hard"
+		} else {
+			targetDiff = "easy"
+		}
+
+		err = h.db.Where("node_id IN ? AND difficulty = ?", hubIDs, targetDiff).
+			Order("RANDOM()").First(&nextQ).Error
+		if err == nil {
+			foundNext = true
+		}
+	}
+
+	// CHẶNG 2: Drilling & Backtracking (Đào sâu & Truy vết ngược) - Từ câu 8 đến 17
+	if !foundNext && answeredCount >= 7 && answeredCount < 18 {
+		var wrongLogs []model.ActivityLog
+		h.db.Where("student_id = ? AND subject = ? AND action = ?", userID, exam.Subject, "answer_incorrect").
+			Order("created_at desc").Limit(3).Find(&wrongLogs)
+
+		if len(wrongLogs) > 0 {
+			wrongNodeIDs := make([]uuid.UUID, len(wrongLogs))
+			for idx, wl := range wrongLogs {
+				wrongNodeIDs[idx] = wl.NodeID
+			}
+
+			var parentNodes []model.Node
+			h.db.Table("nodes").
+				Select("nodes.*").
+				Joins("join edges on nodes.id = edges.source_id").
+				Where("edges.target_id IN ?", wrongNodeIDs).
+				Find(&parentNodes)
+
+			if len(parentNodes) > 0 {
+				parentIDs := make([]uuid.UUID, len(parentNodes))
+				for idx, pn := range parentNodes {
+					parentIDs[idx] = pn.ID
+				}
+				err = h.db.Where("node_id IN ?", parentIDs).Order("RANDOM()").First(&nextQ).Error
+				if err == nil {
+					foundNext = true
+				}
+			}
+		}
+	}
+
+	// CHẶNG 3: Cross-Verification (Xác thực chéo) - Từ câu 18 đến 24
+	if !foundNext {
+		err = h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
+			Where("nodes.subject = ? AND questions.difficulty IN ?", exam.Subject, []string{"easy", "medium"}).
+			Order("RANDOM()").First(&nextQ).Error
+		if err == nil {
+			foundNext = true
+		}
+	}
+
+	if !foundNext {
+		err = h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
+			Where("nodes.subject = ?", exam.Subject).
+			Order("RANDOM()").First(&nextQ).Error
+		if err == nil {
+			foundNext = true
+		}
+	}
+
+	if !foundNext {
+		var studentState model.StudentState
+		err = h.db.Where("student_id = ? AND subject = ?", userID, exam.Subject).First(&studentState).Error
+		if err == nil {
+			studentState.NeedsDiagnostic = false
+			studentState.UpdatedAt = time.Now()
+			h.db.Save(&studentState)
+		}
+		return c.JSON(fiber.Map{
+			"isFinished": true,
+			"isCorrect":  isCorrect,
+		})
+	}
+
+	// 7. Tạo bản ghi ExamQuestion tiếp theo cho đề thi thích ứng
+	correctChoice := fmt.Sprintf("%d", nextQ.CorrectOption)
+	nextPosition := int(answeredCount) + 1
+	nextExamQ := model.ExamQuestion{
+		ID:               uuid.New(),
+		ExamID:           examID,
+		SourceType:       "system",
+		SourceQuestionID: &nextQ.ID,
+		QuestionType:     nextQ.QuestionType,
+		Content:          nextQ.Content,
+		Points:           model.MustScore("1.00"),
+		Position:         nextPosition,
+		ChoicesJSON:      nextQ.OptionsJSON,
+		CorrectChoiceID:  &correctChoice,
+		TopicNodeIDsJSON: fmt.Sprintf("[%q]", nextQ.NodeID.String()),
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	}
+
+	if err := h.db.Create(&nextExamQ).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể khởi tạo câu hỏi tiếp theo"})
+	}
+
+	return c.JSON(fiber.Map{
+		"isFinished": false,
+		"isCorrect":  isCorrect,
+		"nextQuestion": fiber.Map{
+			"id":               nextExamQ.ID.String(),
+			"examId":           nextExamQ.ExamID.String(),
+			"questionType":     nextExamQ.QuestionType,
+			"content":          nextExamQ.Content,
+			"points":           nextExamQ.Points.String(),
+			"position":         nextExamQ.Position,
+			"choicesJson":      nextExamQ.ChoicesJSON,
+			"topicNodeIdsJson": nextExamQ.TopicNodeIDsJSON,
+		},
+	})
+}
+
