@@ -55,6 +55,46 @@ export default function QuestionBankTab({
     return matchSearch && matchNode && matchDiff && matchType;
   });
 
+  const formatMarkdown = (text: string): string => {
+    if (!text) return "";
+    let html = text;
+
+    html = html
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, "<strong><em>$1</em></strong>");
+    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+    const renderMathExpr = (expr: string) => {
+      let m = expr;
+      m = m.replace(/\\d?frac\{([^}]+)\}\{([^}]+)\}/g, (_match, num, den) => {
+        return `<span class="inline-flex flex-col items-center align-middle mx-1 font-semibold text-[12px] leading-tight font-sans">
+          <span class="border-b border-indigo-700 px-1 text-center pb-0.5">${num}</span>
+          <span class="px-1 text-center pt-0.5">${den}</span>
+        </span>`;
+      });
+      m = m.replace(/\\cdot/g, "·");
+      m = m.replace(/\\neq/g, "≠");
+      m = m.replace(/\\Rightarrow|\\implies/g, "⇒");
+      m = m.replace(/\\le|\\leq/g, "≤");
+      m = m.replace(/\\ge|\\geq/g, "≥");
+      m = m.replace(/\\times/g, "×");
+      m = m.replace(/\\div/g, "÷");
+
+      return `<span class="font-mono bg-indigo-50/70 text-indigo-900 px-1.5 py-0.5 rounded text-[11px] font-bold border border-indigo-200/60 mx-0.5 inline-flex items-center">${m}</span>`;
+    };
+
+    html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
+      return renderMathExpr(p1);
+    });
+
+    html = html.replace(/\n/g, "<br />");
+    return html;
+  };
+
   return (
     <div className="flex-1 flex flex-col gap-5 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
       {/* Search & Filters & Import excel row */}
@@ -177,9 +217,11 @@ export default function QuestionBankTab({
                     </div>
 
                     {/* Content */}
-                    <p className="text-xs font-bold text-slate-800 leading-relaxed line-clamp-3" title={q.content}>
-                      {q.content}
-                    </p>
+                    <div 
+                      className="text-xs font-bold text-slate-800 leading-relaxed" 
+                      title={q.content}
+                      dangerouslySetInnerHTML={{ __html: formatMarkdown(q.content) }}
+                    />
 
                     {/* Options */}
                     {(q.questionType || "multiple_choice") === "essay" ? (
@@ -198,7 +240,7 @@ export default function QuestionBankTab({
                             title={opt}
                           >
                             <span className="font-extrabold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
-                            {opt}
+                            <span dangerouslySetInnerHTML={{ __html: formatMarkdown(opt) }} />
                           </div>
                         ))}
                       </div>
