@@ -4,6 +4,19 @@ type ApiOptions = RequestInit & {
   requireAuth?: boolean;
 };
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+    public readonly details?: unknown,
+    public readonly latestContext?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiFetch(endpoint: string, options: ApiOptions = {}) {
   const { requireAuth = true, ...fetchOptions } = options;
   const headers = new Headers(options.headers || {});
@@ -72,7 +85,13 @@ export async function apiFetch(endpoint: string, options: ApiOptions = {}) {
           }
         }
         
-        throw new Error(rawError);
+        throw new ApiError(
+          rawError,
+          response.status,
+          typeof errorData.error?.code === "string" ? errorData.error.code : undefined,
+          errorData.error?.details,
+          errorData.latestContext,
+        );
       }
 
       if (response.status === 204) return null;
