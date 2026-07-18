@@ -25,13 +25,20 @@ func ParseScore(raw string) (Score, error) {
 	if err != nil {
 		return Score{}, fmt.Errorf("invalid score %q: %w", raw, err)
 	}
-	if value.Exponent() < -2 {
-		return Score{}, fmt.Errorf("score must have at most two decimal places")
-	}
-	if value.Abs().GreaterThan(maxScore) {
-		return Score{}, fmt.Errorf("score must be between -99999.99 and 99999.99")
+	if err := validateScore(value); err != nil {
+		return Score{}, err
 	}
 	return Score{Decimal: value}, nil
+}
+
+func validateScore(value decimal.Decimal) error {
+	if value.Exponent() < -2 {
+		return fmt.Errorf("score must have at most two decimal places")
+	}
+	if value.Abs().GreaterThan(maxScore) {
+		return fmt.Errorf("score must be between -99999.99 and 99999.99")
+	}
+	return nil
 }
 
 func MustScore(raw string) Score {
@@ -70,6 +77,9 @@ func (s *Score) UnmarshalJSON(data []byte) error {
 }
 
 func (s Score) Value() (driver.Value, error) {
+	if err := validateScore(s.Decimal); err != nil {
+		return nil, err
+	}
 	return s.String(), nil
 }
 
@@ -118,6 +128,7 @@ type Exam struct {
 	Status                    string         `gorm:"not null;index:idx_exam_created_by_status,priority:2" json:"status"`
 	Version                   int            `gorm:"not null;default:1" json:"version"`
 	CreatedBy                 uuid.UUID      `gorm:"type:uuid;not null;index;index:idx_exam_created_by_status,priority:1;index:idx_exam_created_by_updated_at,priority:1" json:"createdBy"`
+	Creator                   User           `gorm:"foreignKey:CreatedBy;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
 	FirstSubmissionReceivedAt *time.Time     `json:"firstSubmissionReceivedAt"`
 	LockedSnapshotID          *uuid.UUID     `gorm:"type:uuid" json:"lockedSnapshotId"`
 	CreatedAt                 time.Time      `json:"createdAt"`

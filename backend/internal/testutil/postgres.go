@@ -60,16 +60,25 @@ func OpenPostgres(t *testing.T) *gorm.DB {
 		t.Fatalf("create test schema: %v", err)
 	}
 
-	testDB := openDatabase(t, host, user, password, examTestDatabase, port, sslmode, schemaName+",public")
+	var testDB *gorm.DB
 	t.Cleanup(func() {
-		closeDatabase(t, testDB)
-		if err := setupDB.Exec(fmt.Sprintf(`DROP SCHEMA "%s" CASCADE`, schemaName)).Error; err != nil {
-			t.Errorf("drop test schema: %v", err)
-		}
-		closeDatabase(t, setupDB)
+		cleanupPostgresSchema(t, setupDB, testDB, schemaName)
 	})
+	testDB = openDatabase(t, host, user, password, examTestDatabase, port, sslmode, schemaName+",public")
 
 	return testDB
+}
+
+func cleanupPostgresSchema(t *testing.T, setupDB, testDB *gorm.DB, schemaName string) {
+	t.Helper()
+
+	if testDB != nil {
+		closeDatabase(t, testDB)
+	}
+	if err := setupDB.Exec(fmt.Sprintf(`DROP SCHEMA "%s" CASCADE`, schemaName)).Error; err != nil {
+		t.Errorf("drop test schema: %v", err)
+	}
+	closeDatabase(t, setupDB)
 }
 
 func openDatabase(

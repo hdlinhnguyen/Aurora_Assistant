@@ -5,7 +5,16 @@ import (
 
 	"backend/internal/model"
 	"backend/internal/testutil"
+
+	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
+
+type scoreRecord struct {
+	ID    uint `gorm:"primaryKey"`
+	Score model.Score
+}
 
 func TestExamModelsMigrateWithExpectedConstraints(t *testing.T) {
 	db := testutil.OpenPostgres(t)
@@ -43,5 +52,39 @@ func TestScoreRejectsMoreThanTwoDecimalPlaces(t *testing.T) {
 	score, err := model.ParseScore("10.00")
 	if err != nil || score.String() != "10.00" {
 		t.Fatalf("unexpected score: %v %v", score, err)
+	}
+}
+
+func TestExamMigrationCreatesCreatedByForeignKey(t *testing.T) {
+	db := testutil.OpenPostgres(t)
+	if err := db.AutoMigrate(&model.User{}, &model.Exam{}); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasConstraint(&model.Exam{}, "Creator") {
+		t.Fatal("missing Exam.CreatedBy foreign key to User")
+	}
+}
+
+func TestScoreValueRejectsInvalidDirectConstruction(t *testing.T) {
+	for _, raw := range []string{"1.239", "100000.00", "-100000.00"} {
+		score := model.Score{Decimal: decimal.RequireFromString(raw)}
+		if _, err := score.Value(); err == nil {
+			t.Errorf("Score.Value() accepted invalid direct value %s", raw)
+		}
+	}
+}
+
+func TestScorePersistenceRejectsInvalidDirectConstruction(t *testing.T) {
+	db := testutil.OpenPostgres(t)
+	if err := db.AutoMigrate(&scoreRecord{}); err != nil {
+		t.Fatal(err)
+	}
+
+	record := scoreRecord{
+		Score: model.Score{Decimal: decimal.RequireFromString("1.239")},
+	}
+	quietDB := db.Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)})
+	if err := quietDB.Create(&record).Error; err == nil {
+		t.Fatal("persistence accepted a directly constructed score with excessive scale")
 	}
 }
