@@ -269,6 +269,7 @@ func main() {
 
 	// New Student & Classroom Management under /teacher
 	teacherGroup.Get("/classrooms", studentMgmtHandler.GetTeacherClassrooms)
+	teacherGroup.Post("/classrooms", studentMgmtHandler.CreateTeacherClassroom)
 	teacherGroup.Get("/classrooms/:classId/students", studentMgmtHandler.GetClassroomStudents)
 	teacherGroup.Post("/students", studentMgmtHandler.CreateStudent)
 	teacherGroup.Post("/students/bulk", studentMgmtHandler.CreateStudentsBulk)

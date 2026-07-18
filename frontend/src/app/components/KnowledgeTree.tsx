@@ -211,9 +211,52 @@ export default function KnowledgeTree({
   const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.15, 2.5));
   const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.15, 0.4));
   const handleResetZoom = () => {
-    setPan({ x: 0, y: 0 });
-    setScale(1);
+    const container = containerRef.current;
+    if (!container || localNodes.length === 0) {
+      setPan({ x: 0, y: 0 });
+      setScale(1);
+      return;
+    }
+
+    const xs = localNodes.map(n => n.posX);
+    const ys = localNodes.map(n => n.posY);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs) + 230; // node width
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys) + 85;  // node height
+
+    const graphWidth = maxX - minX;
+    const graphHeight = maxY - minY;
+
+    const containerWidth = container.clientWidth || 800;
+    const containerHeight = container.clientHeight || 500;
+
+    const padding = 40;
+    const scaleX = (containerWidth - padding * 2) / graphWidth;
+    const scaleY = (containerHeight - padding * 2) / graphHeight;
+    const newScale = Math.max(0.5, Math.min(Math.min(scaleX, scaleY), 1.2));
+
+    const graphCenterX = minX + graphWidth / 2;
+    const graphCenterY = minY + graphHeight / 2;
+    const containerCenterX = containerWidth / 2;
+    const containerCenterY = containerHeight / 2;
+
+    const panX = containerCenterX - graphCenterX * newScale;
+    const panY = containerCenterY - graphCenterY * newScale;
+
+    setPan({ x: Math.round(panX), y: Math.round(panY) });
+    setScale(newScale);
   };
+
+  // Auto-center on load
+  useEffect(() => {
+    if (nodes && nodes.length > 0 && containerRef.current) {
+      const timer = setTimeout(() => {
+        handleResetZoom();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [nodes]);
 
   // Auto-layout: matches backend algorithm (global topological levels, centered)
   const handleAutoLayout = async () => {

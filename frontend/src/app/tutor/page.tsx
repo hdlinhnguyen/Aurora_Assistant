@@ -306,11 +306,15 @@ export default function StudentTutorPage() {
 
 
   const handleImportMockTree = async () => {
+    if (!selectedSubject) {
+      toast.warning("Vui lòng chọn môn học trước khi nạp cây mẫu!");
+      return;
+    }
     try {
       const res = await fetch("/mock_knowledge_tree.json");
       const mockGraph = await res.json();
       
-      await apiFetch(`/subjects/${encodeURIComponent(mockGraph.subject)}/save-tree`, {
+      await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/save-tree`, {
         method: "POST",
         body: JSON.stringify({
           nodes: mockGraph.nodes,
@@ -318,13 +322,14 @@ export default function StudentTutorPage() {
         })
       });
 
-      toast.success(`🎉 Đã nạp thành công Sơ Đồ Cây Mẫu "${mockGraph.subject}"!`);
-      if (!subjects.includes(mockGraph.subject)) {
-        setSubjects((prev) => [...prev, mockGraph.subject]);
+      toast.success(`🎉 Đã nạp thành công Sơ Đồ Cây Mẫu vào môn "${selectedSubject}"!`);
+      if (!subjects.includes(selectedSubject)) {
+        setSubjects((prev) => [...prev, selectedSubject]);
       }
-      setSelectedSubject(mockGraph.subject);
-      localStorage.setItem("aurora_student_subject", mockGraph.subject);
+      setSelectedSubject(selectedSubject);
+      localStorage.setItem("aurora_student_subject", selectedSubject);
       setActiveMainTab("graph");
+      await loadTreeData();
     } catch (err: any) {
       toast.error("Lỗi khi nạp Cây Mẫu: " + (err.message || err));
     }
