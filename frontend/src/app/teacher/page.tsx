@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import KnowledgeTree from "../components/KnowledgeTree";
 import QuestionBankTab from "./components/QuestionBankTab";
+import QuestionTaggingPanel from "./components/QuestionTaggingPanel";
 import MonitoringTab from "./components/MonitoringTab";
 import LearningPathTab from "./components/LearningPathTab";
 import StudentsProgressTab from "./components/StudentsProgressTab";
@@ -117,6 +118,21 @@ export interface Question {
   optionsJson: string;
   correctOption: number;
   difficulty: string;
+  questionType?: "multiple_choice" | "essay";
+  gradeLevel?: string;
+  rubricItems?: Array<{
+    id: string;
+    questionId: string;
+    content: string;
+    points: string;
+    position: number;
+  }>;
+}
+
+interface RubricDraft {
+  id?: string;
+  content: string;
+  points: string;
 }
 
 type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring";
@@ -152,6 +168,7 @@ export default function TeacherDashboard() {
   const [qbSearchText, setQbSearchText] = useState("");
   const [qbFilterNodeId, setQbFilterNodeId] = useState("");
   const [qbFilterDifficulty, setQbFilterDifficulty] = useState("");
+  const [taggingQuestionId, setTaggingQuestionId] = useState<string | null>(null);
   const [monitoringStats, setMonitoringStats] = useState<any[]>([]);
   const [loadingMonitoring, setLoadingMonitoring] = useState(false);
   const [studentNodeStatus, setStudentNodeStatus] = useState<Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">>({});
@@ -180,6 +197,9 @@ export default function TeacherDashboard() {
   const [qOptions, setQOptions] = useState<string[]>(["", "", "", ""]);
   const [qCorrect, setQCorrect] = useState(0);
   const [qDifficulty, setQDifficulty] = useState("medium");
+  const [qQuestionType, setQQuestionType] = useState<"multiple_choice" | "essay">("multiple_choice");
+  const [qGradeLevel, setQGradeLevel] = useState("");
+  const [qRubrics, setQRubrics] = useState<RubricDraft[]>([]);
 
   useEffect(() => {
     const userStr = localStorage.getItem("aurora_user");
@@ -224,7 +244,9 @@ export default function TeacherDashboard() {
   const loadSubjectQuestions = async () => {
     if (!selectedSubject) return;
     try {
-      const data = await apiFetch(`/subjects/${encodeURIComponent(selectedSubject)}/questions`);
+      const data = await apiFetch(
+        `/teacher/question-bank/questions?subject=${encodeURIComponent(selectedSubject)}`,
+      );
       setSubjectQuestions(data || []);
     } catch (err) {
       console.error("Failed to load subject questions:", err);
@@ -984,6 +1006,9 @@ export default function TeacherDashboard() {
     setQOptions(["", "", "", ""]);
     setQCorrect(0);
     setQDifficulty("medium");
+    setQQuestionType("multiple_choice");
+    setQGradeLevel("");
+    setQRubrics([]);
     if (nodes.length > 0) {
       setEditingNode(nodes[0]);
     } else {
@@ -1001,6 +1026,15 @@ export default function TeacherDashboard() {
     setQOptions(opts);
     setQCorrect(q.correctOption);
     setQDifficulty(q.difficulty);
+    setQQuestionType(q.questionType || "multiple_choice");
+    setQGradeLevel(q.gradeLevel || "");
+    setQRubrics(
+      (q.rubricItems || []).map((item) => ({
+        id: item.id,
+        content: item.content,
+        points: item.points,
+      })),
+    );
   };
 
   const handleSaveQuestion = async (e: React.FormEvent) => {
@@ -1012,25 +1046,79 @@ export default function TeacherDashboard() {
       return;
     }
 
+    if (
+      qQuestionType === "essay" &&
+      qRubrics.some(
+        (rubric) =>
+          !rubric.content.trim() ||
+          !Number.isFinite(Number(rubric.points)) ||
+          Number(rubric.points) <= 0,
+      )
+    ) {
+      toast.warning("Mỗi ý barem cần có nội dung và số điểm lớn hơn 0.");
+      return;
+    }
+
     const payload = {
+      nodeId: editingNode.id,
       content: qContent.trim(),
-      optionsJson: JSON.stringify(qOptions),
+      options: qQuestionType === "multiple_choice" ? qOptions : [],
       correctOption: qCorrect,
       difficulty: qDifficulty,
+      questionType: qQuestionType,
+      gradeLevel: qGradeLevel.trim(),
     };
 
     setLoading(true);
     try {
+      let savedQuestion: Question;
       if (editingQuestion.id) {
-        await apiFetch(`/questions/${editingQuestion.id}`, {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        });
+        savedQuestion = await apiFetch(
+          `/teacher/question-bank/questions/${editingQuestion.id}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          },
+        );
       } else {
-        await apiFetch(`/nodes/${editingNode.id}/questions`, {
+        savedQuestion = await apiFetch(`/teacher/question-bank/questions`, {
           method: "POST",
           body: JSON.stringify(payload),
         });
+      }
+
+      if (qQuestionType === "essay") {
+        const originalRubricIds = new Set(
+          (editingQuestion.rubricItems || []).map((item) => item.id),
+        );
+        const retainedRubricIds = new Set(
+          qRubrics.flatMap((item) => (item.id ? [item.id] : [])),
+        );
+        for (const rubricId of originalRubricIds) {
+          if (!retainedRubricIds.has(rubricId)) {
+            await apiFetch(
+              `/teacher/question-bank/questions/${savedQuestion.id}/rubric-items/${rubricId}`,
+              { method: "DELETE" },
+            );
+          }
+        }
+        for (const rubric of qRubrics) {
+          const rubricPayload = {
+            content: rubric.content.trim(),
+            points: rubric.points,
+          };
+          if (rubric.id) {
+            await apiFetch(
+              `/teacher/question-bank/questions/${savedQuestion.id}/rubric-items/${rubric.id}`,
+              { method: "PATCH", body: JSON.stringify(rubricPayload) },
+            );
+          } else {
+            await apiFetch(
+              `/teacher/question-bank/questions/${savedQuestion.id}/rubric-items`,
+              { method: "POST", body: JSON.stringify(rubricPayload) },
+            );
+          }
+        }
       }
       toast.success("Lưu câu hỏi thành công!");
       loadNodeQuestions(editingNode.id);
@@ -1046,7 +1134,7 @@ export default function TeacherDashboard() {
     if (!confirm("Bạn có chắc chắn muốn xóa câu hỏi này?")) return;
     setLoading(true);
     try {
-      await apiFetch(`/questions/${qId}`, {
+      await apiFetch(`/teacher/question-bank/questions/${qId}`, {
         method: "DELETE",
       });
       toast.success("Xóa câu hỏi thành công!");
@@ -1881,6 +1969,7 @@ export default function TeacherDashboard() {
                 handleExcelImport={handleExcelImport}
                 handleStartEditQuestion={handleStartEditQuestion}
                 handleDeleteQuestion={handleDeleteQuestion}
+                handleTagQuestion={(question) => setTaggingQuestionId(question.id)}
                 setEditingNode={setEditingNode}
                 formatDate={formatDate}
               />
@@ -1901,6 +1990,13 @@ export default function TeacherDashboard() {
           </div>
         )}
       </main>
+      <QuestionTaggingPanel
+        questionId={taggingQuestionId}
+        open={taggingQuestionId !== null}
+        onOpenChange={(open) => {
+          if (!open) setTaggingQuestionId(null);
+        }}
+      />
       {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-foreground/60 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
@@ -1975,6 +2071,35 @@ export default function TeacherDashboard() {
                 </select>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Loại câu hỏi
+                  </label>
+                  <select
+                    value={qQuestionType}
+                    onChange={(e) =>
+                      setQQuestionType(e.target.value as "multiple_choice" | "essay")
+                    }
+                    className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground"
+                  >
+                    <option value="multiple_choice">Trắc nghiệm</option>
+                    <option value="essay">Tự luận</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Khối lớp
+                  </label>
+                  <input
+                    value={qGradeLevel}
+                    onChange={(e) => setQGradeLevel(e.target.value)}
+                    placeholder="Ví dụ: Lớp 5"
+                    className="w-full rounded-xl bg-white border border-border px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-semibold text-foreground"
+                  />
+                </div>
+              </div>
+
               {/* Content text-area */}
               <div className="space-y-1.5">
                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
@@ -2025,6 +2150,7 @@ export default function TeacherDashboard() {
               </div>
 
               {/* Options A, B, C, D inputs */}
+              {qQuestionType === "multiple_choice" ? (
               <div className="space-y-2">
                 <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                   Các phương án trả lời
@@ -2048,6 +2174,88 @@ export default function TeacherDashboard() {
                   </div>
                 ))}
               </div>
+              ) : (
+                <div className="space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-indigo-800">
+                        Barem câu tự luận
+                      </p>
+                      <p className="mt-1 text-[10px] font-semibold text-indigo-700/70">
+                        Mỗi ý có thể được gắn topic riêng sau khi lưu.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setQRubrics((current) => [
+                          ...current,
+                          { content: "", points: "1.00" },
+                        ])
+                      }
+                      className="rounded-xl border border-indigo-200 bg-white px-3 py-2 text-[10px] font-black text-indigo-800 hover:bg-indigo-50"
+                    >
+                      Thêm ý
+                    </button>
+                  </div>
+                  {qRubrics.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-indigo-200 px-3 py-5 text-center text-[10px] font-semibold text-indigo-500">
+                      Chưa có ý barem.
+                    </p>
+                  ) : (
+                    qRubrics.map((rubric, index) => (
+                      <div
+                        key={rubric.id || `new-${index}`}
+                        className="grid grid-cols-[1fr_90px_auto] items-center gap-2"
+                      >
+                        <input
+                          value={rubric.content}
+                          onChange={(e) =>
+                            setQRubrics((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, content: e.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                          placeholder={`Nội dung ý ${index + 1}`}
+                          className="rounded-xl border border-indigo-100 bg-white px-3 py-2 text-xs font-semibold"
+                        />
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={rubric.points}
+                          onChange={(e) =>
+                            setQRubrics((current) =>
+                              current.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, points: e.target.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                          aria-label={`Điểm ý ${index + 1}`}
+                          className="rounded-xl border border-indigo-100 bg-white px-3 py-2 text-xs font-semibold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setQRubrics((current) =>
+                              current.filter((_, itemIndex) => itemIndex !== index),
+                            )
+                          }
+                          className="rounded-lg px-2 py-2 text-xs font-black text-rose-600 hover:bg-rose-50"
+                          aria-label={`Xóa ý ${index + 1}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-2 justify-end pt-3 border-t border-border mt-4">
                 <button
