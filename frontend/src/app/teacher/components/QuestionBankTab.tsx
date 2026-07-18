@@ -119,6 +119,14 @@ export default function QuestionBankTab({
       m = m.replace(/\\times/g, "×");
       m = m.replace(/\\div/g, "÷");
 
+      // Replace exponents (superscripts)
+      m = m.replace(/\^\{(.*?)\}/g, "<sup>$1</sup>");
+      m = m.replace(/\^([a-zA-Z0-9\-+])/g, "<sup>$1</sup>");
+
+      // Replace subscripts
+      m = m.replace(/_\{(.*?)\}/g, "<sub>$1</sub>");
+      m = m.replace(/_([a-zA-Z0-9\-+])/g, "<sub>$1</sub>");
+
       return `<span class="font-serif italic text-slate-800 mx-0.5 inline-block">${m}</span>`;
     };
 
