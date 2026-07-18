@@ -137,6 +137,22 @@ func TestStartStepRejectsPendingStepAndIsIdempotentForActiveStep(t *testing.T) {
 	require.NotNil(t, second.StartedAt)
 }
 
+func TestStartStepPublishesStartedEventOnce(t *testing.T) {
+	db := setupLearningPathDB(t)
+	studentID, path, topics := seedApprovedPath(t, db, 1)
+	publisher := &recordingPublisher{}
+	svc := NewService(db, publisher, fakeMasteryReader{})
+	require.NoError(t, svc.Initialize(context.Background(), &path))
+
+	_, err := svc.StartStep(context.Background(), studentID, topics[0])
+	require.NoError(t, err)
+	_, err = svc.StartStep(context.Background(), studentID, topics[0])
+	require.NoError(t, err)
+
+	require.Len(t, publisher.events, 1)
+	require.Equal(t, "learning_path_step_started", publisher.events[0].Name)
+}
+
 func TestInitializeCompletesQualifiedStepsBeforeActivatingNext(t *testing.T) {
 	db := setupLearningPathDB(t)
 	_, path, topics := seedApprovedPath(t, db, 3)

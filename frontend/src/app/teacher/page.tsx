@@ -985,7 +985,7 @@ export default function TeacherDashboard() {
   };
   const formatBackendError = (errStr: string) => {
     if (!errStr) return "Lỗi không xác định";
-    let cleanStr = errStr.replace(/^Máy chủ tính toán báo lỗi:\s*/, "");
+    const cleanStr = errStr.replace(/^Máy chủ tính toán báo lỗi:\s*/, "");
     try {
       const parsed = JSON.parse(cleanStr);
       if (parsed.detail && Array.isArray(parsed.detail)) {

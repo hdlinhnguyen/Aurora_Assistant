@@ -238,14 +238,18 @@ func (s *Service) ApplyEvidence(ctx context.Context, input ApplyEvidenceInput) (
 }
 
 func (s *Service) publishProgressEvent(ctx context.Context, studentID uuid.UUID, before string, row model.LearningPathStepProgress) {
-	if s.publisher == nil {
-		return
-	}
 	name := "learning_path_step_progressed"
 	if row.Status == StatusCompleted && before != StatusCompleted {
 		name = "learning_path_step_completed"
 	} else if row.Status == StatusBlocked && before != StatusBlocked {
 		name = "learning_path_step_blocked"
+	}
+	s.publishStepEvent(ctx, studentID, name, before, row)
+}
+
+func (s *Service) publishStepEvent(ctx context.Context, studentID uuid.UUID, name, before string, row model.LearningPathStepProgress) {
+	if s.publisher == nil {
+		return
 	}
 	properties := map[string]any{
 		"learning_path_id": row.LearningPathID.String(), "topic_id": row.TopicID.String(),
@@ -364,6 +368,7 @@ func (s *Service) getProgressForPath(ctx context.Context, path *model.LearningPa
 
 func (s *Service) StartStep(ctx context.Context, studentID, topicID uuid.UUID) (ProgressStepView, error) {
 	var result model.LearningPathStepProgress
+	started := false
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var path model.LearningPath
 		if err := tx.Where("student_id = ? AND status = ?", studentID, "Approved").Order("created_at DESC").First(&path).Error; err != nil {
@@ -389,6 +394,7 @@ func (s *Service) StartStep(ctx context.Context, studentID, topicID uuid.UUID) (
 		now := time.Now().UTC()
 		result.StartedAt = &now
 		result.LastActivityAt = &now
+		started = true
 		if s.mastery != nil {
 			mastery, confidence, found, err := s.mastery.TopicMastery(ctx, studentID, topicID)
 			if err != nil {
@@ -401,6 +407,9 @@ func (s *Service) StartStep(ctx context.Context, studentID, topicID uuid.UUID) (
 		}
 		return tx.Save(&result).Error
 	})
+	if err == nil && started {
+		s.publishStepEvent(ctx, studentID, "learning_path_step_started", result.Status, result)
+	}
 	return stepView(result), err
 }
 
