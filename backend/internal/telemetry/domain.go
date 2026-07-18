@@ -28,6 +28,9 @@ type Event struct {
 	Name           string         `json:"event_name"`
 	SchemaVersion  int            `json:"schema_version"`
 	OccurredAt     time.Time      `json:"occurred_at"`
+	ReceivedAt     time.Time      `json:"received_at,omitempty"`
+	ActorID        string         `json:"actor_id,omitempty"`
+	ActorRole      string         `json:"actor_role,omitempty"`
 	SessionID      string         `json:"session_id,omitempty"`
 	AttemptID      string         `json:"attempt_id,omitempty"`
 	ClassID        string         `json:"class_id,omitempty"`
@@ -80,10 +83,8 @@ func ValidateEvent(event Event) error {
 		!allowedValue(event.Source, "frontend", "go_backend", "learning_path") {
 		return ErrInvalidEvent
 	}
-	for key := range event.Properties {
-		if _, denied := sensitivePropertyKeys[strings.ToLower(key)]; denied {
-			return ErrSensitiveProperty
-		}
+	if containsSensitiveProperty(event.Properties) {
+		return ErrSensitiveProperty
 	}
 	for _, key := range rule.RequiredProperties {
 		if _, exists := event.Properties[key]; !exists {
@@ -95,6 +96,27 @@ func ValidateEvent(event Event) error {
 		return ErrInvalidEvent
 	}
 	return nil
+}
+
+func containsSensitiveProperty(value any) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, nested := range typed {
+			if _, denied := sensitivePropertyKeys[strings.ToLower(key)]; denied {
+				return true
+			}
+			if containsSensitiveProperty(nested) {
+				return true
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if containsSensitiveProperty(nested) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func allowedValue(value string, allowed ...string) bool {

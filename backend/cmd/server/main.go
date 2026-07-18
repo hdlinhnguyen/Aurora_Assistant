@@ -23,6 +23,7 @@ import (
 	"backend/internal/scoring"
 	"backend/internal/service"
 	"backend/internal/syntheticseed"
+	"backend/internal/telemetry"
 )
 
 func envOrDefault(name, fallback string) string {
@@ -92,6 +93,17 @@ func main() {
 		return exam.NewScoringGateway(db)
 	})
 	scoringHandler := handler.NewScoringHandler(scoringSvc)
+	telemetryKey := os.Getenv("TELEMETRY_HMAC_KEY")
+	if telemetryKey == "" {
+		telemetryKey = "development-only-telemetry-key"
+		log.Println("TELEMETRY_HMAC_KEY is not set; using development telemetry key")
+	}
+	telemetryCollector := telemetry.NewCollector(
+		telemetry.NoopPublisher{},
+		[]byte(telemetryKey),
+		"v1",
+		telemetry.SystemClock{},
+	)
 
 	// Ensure at least one admin exists.
 	var adminCount int64
@@ -116,6 +128,7 @@ func main() {
 
 	// Protected Routes
 	api := app.Group("/api", middleware.Protected(config.DB))
+	api.Post("/telemetry/events", telemetryCollector)
 	teacherExams := api.Group("/teacher", middleware.RequireRole("teacher"))
 	studentMastery := api.Group("/student", middleware.RequireRole("student"))
 	teacherExams.Post("/exams", examHandler.Create)

@@ -39,6 +39,17 @@ func TestValidateEventRejectsSensitiveProperties(t *testing.T) {
 	}
 }
 
+func TestValidateEventRejectsNestedSensitiveProperties(t *testing.T) {
+	event := validEvent()
+	event.Properties["metadata"] = map[string]any{
+		"profile": map[string]any{"email": "student@example.test"},
+	}
+
+	if err := ValidateEvent(event); !errors.Is(err, ErrSensitiveProperty) {
+		t.Fatalf("expected ErrSensitiveProperty, got %v", err)
+	}
+}
+
 func TestValidateEventRejectsUnknownEvent(t *testing.T) {
 	event := validEvent()
 	event.Name = "unknown_event"
