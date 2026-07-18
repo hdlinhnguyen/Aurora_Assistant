@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import uuid
 import json
+from time import perf_counter
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -42,6 +43,7 @@ from learning_path.schemas import (
     Topic,
     PrerequisiteEdge,
 )
+from learning_path.telemetry import learning_path_metadata
 
 # parents[3] = repo root (api.py → learning_path → src → learning-path → root)
 DEFAULT_GRAPH_JSON = Path(__file__).resolve().parents[3] / "knowledge-graph" / "data" / "graph.json"
@@ -134,18 +136,20 @@ def create_app(
             "class_insight": insight.model_dump(mode="json") if insight else None,
         }
 
-    def _respond(thread_id: str, result: dict) -> dict:
+    def _respond(thread_id: str, result: dict, latency_ms: int = 0) -> dict:
         interrupts = result.get("__interrupt__", [])
         return {
             "thread_id": thread_id,
             "status": "awaiting_approval" if interrupts else "finalized",
             "interrupt": interrupts[0].value if interrupts else None,
+            "decision_metadata": learning_path_metadata(result.get("paths", {}), latency_ms),
             **_serialize(result),
         }
 
     @app.post("/learning-path")
     def create_learning_path(body: CreatePathBody) -> dict:
         thread_id = uuid.uuid4().hex
+        started = perf_counter()
         curr = get_curriculum()
         pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
         result = pipeline.invoke(
@@ -158,7 +162,7 @@ def create_app(
             },
             _config(thread_id),
         )
-        return _respond(thread_id, result)
+        return _respond(thread_id, result, round((perf_counter() - started) * 1000))
 
     @app.post("/learning-path/{thread_id}/approve")
     def approve_learning_path(thread_id: str, body: ApproveBody) -> dict:
@@ -172,7 +176,12 @@ def create_app(
         result = pipeline.invoke(
             Command(resume={"approve": body.approve, "note": body.note}), _config(thread_id)
         )
-        return {"thread_id": thread_id, "status": "finalized", **_serialize(result)}
+        return {
+            "thread_id": thread_id,
+            "status": "finalized",
+            "decision_metadata": learning_path_metadata(result.get("paths", {}), 0),
+            **_serialize(result),
+        }
 
     @app.post("/learning-path/{thread_id}/evidence")
     def submit_evidence(thread_id: str, body: EvidenceBody) -> dict:
