@@ -1356,7 +1356,8 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := "http://127.0.0.1:8000/learning-path"
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
 	}
@@ -1418,7 +1419,8 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := fmt.Sprintf("http://127.0.0.1:8000/learning-path/%s/approve", threadID)
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
 	}
@@ -1535,7 +1537,8 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := "http://127.0.0.1:8000/hints"
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ gợi ý: " + err.Error()})
 	}

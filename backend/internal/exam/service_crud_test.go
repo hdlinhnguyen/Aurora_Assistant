@@ -193,20 +193,31 @@ func TestExamPatchMutationState(t *testing.T) {
 func TestExamListOwnershipStatusAndSearch(t *testing.T) {
 	fixture := newCRUDFixture(t)
 	algebra := createExam(t, fixture, fixture.teacherA.ID, "Phân số nâng cao")
-	_ = createExam(t, fixture, fixture.teacherA.ID, "Hình học cơ bản")
+	geometry := createExam(t, fixture, fixture.teacherA.ID, "Hình học cơ bản")
 	_ = createExam(t, fixture, fixture.teacherB.ID, "Phân số của giáo viên khác")
 
 	require.NoError(t, fixture.db.Model(&model.Exam{}).
 		Where("id = ?", algebra.ID).
 		Update("status", exam.ExamStatusPreparing).Error)
+	require.NoError(t, fixture.db.Model(&model.Exam{}).
+		Where("id = ?", geometry.ID).
+		Update("subject", "Hình học").Error)
 
 	list, err := fixture.service.List(fixture.teacherA.ID, exam.ListFilter{
-		Status: exam.ExamStatusPreparing,
-		Search: "  PHÂN SỐ ",
+		Subject: "  Toán đại số  ",
+		Status:  exam.ExamStatusPreparing,
+		Search:  "  PHÂN SỐ ",
 	})
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	require.Equal(t, algebra.ID, list[0].ID)
+
+	algebraOnly, err := fixture.service.List(fixture.teacherA.ID, exam.ListFilter{
+		Subject: "Toán đại số",
+	})
+	require.NoError(t, err)
+	require.Len(t, algebraOnly, 1)
+	require.Equal(t, algebra.ID, algebraOnly[0].ID)
 
 	allOwned, err := fixture.service.List(fixture.teacherA.ID, exam.ListFilter{})
 	require.NoError(t, err)

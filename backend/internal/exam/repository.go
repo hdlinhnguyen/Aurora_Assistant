@@ -312,6 +312,9 @@ func (r *Repository) ownedExam(
 
 func (r *Repository) listOwned(actor uuid.UUID, filter ListFilter) ([]model.Exam, error) {
 	query := r.db.Where("created_by = ?", actor)
+	if filter.Subject != "" {
+		query = query.Where("subject = ?", filter.Subject)
+	}
 	if filter.Status != "" {
 		query = query.Where("status = ?", filter.Status)
 	}

@@ -23,35 +23,105 @@ const results = [
   { value: "unanswered", label: "Không làm", icon: RotateCcw },
 ];
 
-type Session = { batch: any; submission: any };
+interface Exam {
+  id: string;
+  title: string;
+  subject: string;
+  gradeLevel: string;
+  durationMinutes: number;
+  totalPoints: string;
+  status: string;
+  version: number;
+}
 
-export default function ExamScoringTab() {
-  const [exams, setExams] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
+interface Student {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface GradingBatch {
+  id: string;
+  examId: string;
+  examTitle: string;
+  teacherId: string;
+  status: string;
+  createdAt: string;
+}
+
+interface QuestionResponse {
+  id: string;
+  reviewed: boolean;
+  status: string;
+  points: string;
+  content: string;
+  questionType?: string;
+  rubricItems?: any[];
+}
+
+interface RubricResponse {
+  id: string;
+  reviewed: boolean;
+  status: string;
+  points: string;
+  content?: string;
+  description?: string;
+}
+
+interface Submission {
+  id: string;
+  batchId: string;
+  studentId: string;
+  studentName: string;
+  status: string;
+  totalScore: string;
+  version: number;
+  questions?: QuestionResponse[];
+  rubrics?: RubricResponse[];
+  gradedAt?: string;
+  awardedPoints?: string | number;
+}
+
+interface Session {
+  batch: GradingBatch;
+  submission: Submission | null;
+}
+
+export default function ExamScoringTab({ selectedSubject }: { selectedSubject: string }) {
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [exam, setExam] = useState<any>(null);
-  const [student, setStudent] = useState<any>(null);
-  const [submission, setSubmission] = useState<any>(null);
+  const [exam, setExam] = useState<Exam | null>(null);
+  const [student, setStudent] = useState<Student | null>(null);
+  const [submission, setSubmission] = useState<Submission | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
+    if (!selectedSubject) {
+      setExams([]);
+      setExam(null);
+      return;
+    }
+    setExam(null);
+    setStudent(null);
+    setSubmission(null);
     Promise.all([
-      apiFetch("/teacher/exams?status=preparing_exam"),
+      apiFetch(`/teacher/exams?status=preparing_exam&subject=${encodeURIComponent(selectedSubject)}`),
       apiFetch("/teacher/scoring/students"),
       apiFetch("/teacher/grading-batches"),
     ])
       .then(([examRows, studentRows, sessionRows]) => {
         setExams(examRows);
         setStudents(studentRows);
-        setSessions(sessionRows.map((batch: any) => ({ batch, submission: null })));
+        setSessions(sessionRows.map((batch: GradingBatch) => ({ batch, submission: null })));
       })
       .catch((error) => setNotice(error.message));
-  }, []);
+  }, [selectedSubject]);
 
-  const selectExam = async (nextExam: any) => {
+  const selectExam = async (nextExam: Exam) => {
     setExam(nextExam);
     setStudent(null);
     setSubmission(null);
@@ -59,10 +129,10 @@ export default function ExamScoringTab() {
     setBusy("exam");
     try {
       const related = (await apiFetch("/teacher/grading-batches")).filter(
-        (batch: any) => batch.examId === nextExam.id,
+        (batch: GradingBatch) => batch.examId === nextExam.id,
       );
       const hydrated = await Promise.all(
-        related.map(async (batch: any) => ({
+        related.map(async (batch: GradingBatch) => ({
           batch,
           submission: (await apiFetch(`/teacher/grading-batches/${batch.id}`)).submissions?.[0],
         })),
@@ -84,7 +154,7 @@ export default function ExamScoringTab() {
   );
   const sessionFor = (studentId: string) =>
     sessions.find((item) => item.submission?.studentId === studentId);
-  const selectStudent = async (nextStudent: any) => {
+  const selectStudent = async (nextStudent: Student) => {
     if (!exam) return;
     setStudent(nextStudent);
     setBusy("student");
@@ -105,7 +175,7 @@ export default function ExamScoringTab() {
         session = { batch: detail, submission: detail.submissions[0] };
         setSessions((current) => [...current, session!]);
       }
-      setSubmission(await apiFetch(`/teacher/scoring-submissions/${session.submission.id}`));
+      setSubmission(await apiFetch(`/teacher/scoring-submissions/${session.submission!.id}`));
     } catch (error: any) {
       setNotice(error.message);
       setStudent(null);

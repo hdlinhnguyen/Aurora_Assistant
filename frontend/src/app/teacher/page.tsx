@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import dynamic from "next/dynamic";
+
+const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 import { telemetry } from "@/lib/telemetry";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -159,6 +162,17 @@ type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-ban
 
 export default function TeacherDashboard() {
   const router = useRouter();
+
+  // Lottie Book animation state
+  const [bookAnimation, setBookAnimation] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/book.json")
+      .then((res) => res.json())
+      .then((data) => setBookAnimation(data))
+      .catch((err) => console.error("Error loading book animation:", err));
+  }, []);
+
   const [userName, setUserName] = useState("Giáo viên");
   const [activeTab, setActiveTab] = useState<ActiveTab>("graph-designer");
   const [subjects, setSubjects] = useState<string[]>([]);
@@ -2103,72 +2117,87 @@ export default function TeacherDashboard() {
           // Student Path Viewer Subpanel
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {isSidebarCollapsed && (
+            <div className="mb-6 bg-card border border-border rounded-3xl p-5 shadow-sm space-y-4">
+              {/* Top Row: Navigation and Actions */}
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-3">
+                  {isSidebarCollapsed && (
+                    <button
+                      onClick={() => setIsSidebarCollapsed(false)}
+                      className="p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1"
+                      title="Mở rộng sidebar"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  )}
                   <button
-                    onClick={() => setIsSidebarCollapsed(false)}
-                    className="p-2 border border-border bg-card text-muted-foreground hover:text-foreground rounded-xl flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all mr-1"
-                    title="Mở rộng sidebar"
+                    onClick={handleBackToStudents}
+                    className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center gap-2 active:scale-95"
                   >
-                    <ChevronRight size={16} />
+                    <ArrowLeft size={14} className="text-slate-500" />
+                    <span>Quay lại danh sách</span>
                   </button>
-                )}
-                <button
-                  onClick={handleBackToStudents}
-                  className="p-2 bg-card border border-border rounded-xl text-muted-foreground hover:bg-muted active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5 text-xs font-bold font-mono"
-                >
-                  <ArrowLeft size={16} /> Quay lại
-                </button>
-                <button
-                  onClick={handleReDiagnostic}
-                  className="p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-black shadow-sm transition-all hover:bg-rose-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  title="Yêu cầu học sinh làm lại chẩn đoán năng lực"
-                >
-                  <RefreshCw size={12} /> Yêu cầu chẩn đoán lại
-                </button>
-                <div>
-                  <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground">
-                    Bản đồ tiến trình của: <span className="text-[var(--mint)] font-black">{selectedStudent.studentName}</span>
-                  </h1>
-                  <div className="flex gap-4 mt-0.5 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Mail size={12} /> {selectedStudent.studentEmail}</span>
-                    <span className="flex items-center gap-1"><Calendar size={12} /> Môn học: {selectedStudent.subject}</span>
-                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleReDiagnostic}
+                    className="px-4 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                    title="Yêu cầu học sinh làm lại chẩn đoán năng lực"
+                  >
+                    <RefreshCw size={13} className="text-rose-600" />
+                    <span>Yêu cầu chẩn đoán lại</span>
+                  </button>
                 </div>
               </div>
 
-              {/* View Mode Toggle & Legend */}
-              <div className="flex items-center gap-3">
-                <div className="flex bg-muted border border-border rounded-xl p-0.5 shadow-sm">
-                  <button
-                    onClick={() => setStudentViewMode("tree")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${studentViewMode === "tree"
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                      }`}
-                  >
-                    Bản đồ cây
-                  </button>
-                  <button
-                    onClick={() => setStudentViewMode("matrix")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${studentViewMode === "matrix"
-                        ? "bg-card text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                      }`}
-                  >
-                    Ma trận theo dõi
-                  </button>
+              {/* Bottom Row: Title/Info and View Controls */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <h1 className="text-xl font-[var(--font-display)] font-extrabold text-foreground flex items-center gap-2 flex-wrap">
+                    Bản đồ tiến trình của:{" "}
+                    <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent font-black px-1.5 py-0.5 rounded-lg bg-emerald-50/50 border border-emerald-100/50 text-lg">
+                      {selectedStudent.studentName}
+                    </span>
+                  </h1>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground font-semibold">
+                    <span className="flex items-center gap-1.5"><Mail size={13} className="text-slate-400" /> {selectedStudent.studentEmail}</span>
+                    <span className="flex items-center gap-1.5"><Calendar size={13} className="text-slate-400" /> Môn học: <span className="text-slate-700 font-bold">{selectedStudent.subject}</span></span>
+                  </div>
                 </div>
 
-                {studentViewMode === "tree" && (
-                  <div className="flex gap-2.5 bg-card px-3 py-1.5 border border-border rounded-xl text-[9px] font-black tracking-wide text-muted-foreground shadow-sm">
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> Bắt đầu</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-orange-500" /> Vị trí hiện tại</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Đã vượt qua</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Lỗ hổng (Sai/Không làm được)</span>
+                {/* View Mode Toggle & Legend */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 self-end md:self-auto">
+                  <div className="flex bg-slate-100 border border-slate-200/60 rounded-2xl p-1 shadow-inner">
+                    <button
+                      onClick={() => setStudentViewMode("tree")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${studentViewMode === "tree"
+                          ? "bg-white text-slate-800 shadow-sm border border-slate-200/40"
+                          : "text-slate-500 hover:text-slate-700"
+                        }`}
+                    >
+                      Bản đồ cây
+                    </button>
+                    <button
+                      onClick={() => setStudentViewMode("matrix")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${studentViewMode === "matrix"
+                          ? "bg-white text-slate-800 shadow-sm border border-slate-200/40"
+                          : "text-slate-500 hover:text-slate-700"
+                        }`}
+                    >
+                      Ma trận theo dõi
+                    </button>
                   </div>
-                )}
+
+                  {studentViewMode === "tree" && (
+                    <div className="flex flex-wrap gap-2 bg-slate-50 px-3 py-2 border border-slate-200/40 rounded-2xl text-[10px] font-bold text-slate-600 shadow-sm">
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-blue-50/50 border border-blue-100/50"><span className="h-2.5 w-2.5 rounded-full bg-blue-500 shadow-sm" /> Bắt đầu</span>
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-orange-50/50 border border-orange-100/50"><span className="h-2.5 w-2.5 rounded-full bg-orange-500 shadow-sm animate-pulse" /> Vị trí hiện tại</span>
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-50/50 border border-emerald-100/50"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-sm" /> Đã vượt qua</span>
+                      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-rose-50/50 border border-rose-100/50"><span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-sm" /> Lỗ hổng</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2186,8 +2215,18 @@ export default function TeacherDashboard() {
                   activityContent={<StudentActivityFeed logs={studentDetail?.logs || []} />}
                 />
               ) : (
-                <div className="flex-1 flex items-center justify-center rounded-3xl border border-border bg-card text-muted-foreground">
-                  Đang tải sơ đồ...
+                <div className="flex-1 flex flex-col items-center justify-center rounded-3xl border border-border bg-card text-muted-foreground gap-3">
+                  {bookAnimation ? (
+                    <Lottie
+                      animationData={bookAnimation}
+                      loop={true}
+                      autoplay={true}
+                      className="h-16 w-16"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-[var(--mint)]" />
+                  )}
+                  <span className="text-xs font-semibold">Đang tải sơ đồ...</span>
                 </div>
               )
             ) : (
@@ -2374,9 +2413,9 @@ export default function TeacherDashboard() {
             {activeTab === "student-mgmt" ? (
               <StudentMgmtTab />
             ) : activeTab === "exam-builder" ? (
-              <ExamBuilderTab subjects={subjects} />
+              <ExamBuilderTab subjects={subjects} selectedSubject={selectedSubject} />
             ) : activeTab === "exam-scoring" ? (
-              <ExamScoringTab />
+              <ExamScoringTab selectedSubject={selectedSubject} />
             ) : activeTab === "students" ? (
               <StudentsProgressTab
                 studentsProgress={studentsProgress}
@@ -2961,7 +3000,16 @@ export default function TeacherDashboard() {
       {loading && (
         <div className="fixed inset-0 bg-foreground/60 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-card p-8 rounded-3xl border border-border shadow-2xl flex flex-col items-center gap-4 max-w-sm text-center">
-            <Loader2 className="h-10 w-10 text-[var(--mint)] animate-spin" />
+            {bookAnimation ? (
+              <Lottie
+                animationData={bookAnimation}
+                loop={true}
+                autoplay={true}
+                className="h-20 w-20"
+              />
+            ) : (
+              <Loader2 className="h-10 w-10 text-[var(--mint)] animate-spin" />
+            )}
             <div className="space-y-1">
               <h3 className="font-[var(--font-display)] font-extrabold text-foreground text-sm uppercase tracking-wide">Đang xử lý</h3>
               <p className="text-xs text-muted-foreground font-semibold leading-relaxed">

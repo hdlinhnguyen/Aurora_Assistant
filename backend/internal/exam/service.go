@@ -95,6 +95,7 @@ func (s *Service) Create(actor uuid.UUID, input CreateInput) (*Detail, error) {
 }
 
 func (s *Service) List(actor uuid.UUID, filter ListFilter) ([]model.Exam, error) {
+	filter.Subject = strings.TrimSpace(filter.Subject)
 	filter.Status = strings.TrimSpace(filter.Status)
 	filter.Search = strings.TrimSpace(filter.Search)
 	if err := validateListFilter(filter); err != nil {

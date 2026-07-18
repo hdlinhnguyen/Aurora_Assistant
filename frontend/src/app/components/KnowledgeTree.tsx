@@ -260,10 +260,10 @@ export default function KnowledgeTree({
 
   // Auto-layout: matches backend algorithm (global topological levels, centered)
   const handleAutoLayout = async () => {
-    const NODE_SPACING = 280.0;
+    const NODE_SPACING = 350.0;
     const LEFT_MARGIN = 100.0;
     const TOP_MARGIN = 80.0;
-    const LEVEL_HEIGHT = 200.0;
+    const LEVEL_HEIGHT = 260.0;
 
     // Build adjacency and in-degree
     const adj: Record<string, string[]> = {};
@@ -765,7 +765,7 @@ export default function KnowledgeTree({
     for (let lvl = 0; lvl <= maxLocalLevel; lvl++) {
       const levelNodes = nodesByLocalLevel[lvl] || [];
       const count = levelNodes.length;
-      const nodeSpacing = 280;
+      const nodeSpacing = 350;
       const totalWidth = nodeSpacing * count;
       const startX = 100;
 
@@ -776,7 +776,7 @@ export default function KnowledgeTree({
         } else {
           posX = startX + idx * nodeSpacing;
         }
-        const posY = 80 + lvl * 180;
+        const posY = 80 + lvl * 250;
         localCoords[id] = { x: posX, y: posY };
       });
     }
@@ -895,34 +895,34 @@ export default function KnowledgeTree({
       <div className="w-full border-b border-border bg-card/90 px-4 py-3 flex items-center justify-between gap-4 z-20 shadow-sm">
         {/* Left Side: Zoom and Undo/Redo */}
         <div className="flex items-center gap-2">
-          <div className="flex bg-muted border border-border rounded-xl p-0.5 shadow-sm items-center">
+          <div className="flex bg-slate-100 border border-slate-200/50 rounded-2xl p-1 shadow-inner items-center">
             <button
               onClick={handleZoomIn}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
               title="Phóng to"
             >
               <ZoomIn size={14} />
             </button>
             <button
               onClick={handleZoomOut}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
               title="Thu nhỏ"
             >
               <ZoomOut size={14} />
             </button>
             <button
               onClick={handleResetZoom}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-card hover:text-foreground active:scale-95 transition-all cursor-pointer"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
               title="Căn giữa"
             >
               <Move size={14} />
             </button>
             <button
               onClick={() => setShowGroups(!showGroups)}
-              className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+              className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 showGroups
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-card hover:text-foreground"
+                  ? "bg-white text-slate-800 shadow-sm border border-slate-200/40"
+                  : "text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm"
               }`}
               title={showGroups ? "Ẩn nhóm chủ đề" : "Hiện nhóm chủ đề"}
             >
@@ -931,15 +931,15 @@ export default function KnowledgeTree({
           </div>
 
           {mode === "teacher" && !isFocusedView && (
-            <div className="flex bg-muted border border-border rounded-xl p-0.5 shadow-sm items-center">
+            <div className="flex bg-slate-100 border border-slate-200/50 rounded-2xl p-1 shadow-inner items-center ml-1">
               <button
                 onClick={handleUndo}
                 disabled={historyIndex <= 0}
                 title="Hoàn tác (Ctrl+Z)"
-                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   historyIndex > 0
-                    ? "hover:bg-card text-foreground"
-                    : "text-muted-foreground/30 cursor-not-allowed"
+                    ? "hover:bg-white text-slate-800 hover:shadow-sm"
+                    : "text-slate-400/40 cursor-not-allowed"
                 }`}
               >
                 <Undo size={14} />
@@ -948,10 +948,10 @@ export default function KnowledgeTree({
                 onClick={handleRedo}
                 disabled={historyIndex >= history.length - 1}
                 title="Làm lại (Ctrl+Y)"
-                className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                   historyIndex < history.length - 1
-                    ? "hover:bg-card text-foreground"
-                    : "text-muted-foreground/30 cursor-not-allowed"
+                    ? "hover:bg-white text-slate-800 hover:shadow-sm"
+                    : "text-slate-400/40 cursor-not-allowed"
                 }`}
               >
                 <Redo size={14} />
@@ -963,10 +963,11 @@ export default function KnowledgeTree({
             <div className="flex items-center gap-1.5 ml-2">
               <button
                 onClick={handleAutoLayout}
-                className="h-8 px-3 rounded-xl border border-border bg-card text-foreground hover:bg-muted flex items-center gap-1.5 text-xs font-bold shadow-sm hover:brightness-95 active:scale-95 transition-all cursor-pointer"
+                className="h-8 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 text-xs font-black shadow-sm active:scale-95 transition-all cursor-pointer"
                 title="Tự động sắp xếp cây theo cấu trúc"
               >
-                <LayoutGrid size={13} /> Sắp xếp
+                <LayoutGrid size={13} className="text-slate-500" />
+                <span>Sắp xếp</span>
               </button>
             </div>
           )}
@@ -1127,7 +1128,7 @@ export default function KnowledgeTree({
                 const ringPad = 6;
                 const ringW = nodeWidth + ringPad * 2;
                 const ringH = nodeHeight + ringPad * 2;
-                const ringR = 18;
+                const ringR = 22;
                 const ringPerimeter = 2 * (ringW - 2 * ringR) + 2 * (ringH - 2 * ringR) + 2 * Math.PI * ringR;
                 const ringFill = (displayedMasteryPercent / 100) * ringPerimeter;
                 const ringGap = ringPerimeter - ringFill;
@@ -1141,11 +1142,24 @@ export default function KnowledgeTree({
                       ? "#2563eb"
                       : "#ef4444";
 
+                const isHovered = hoveredNodeId === node.id;
                 return (
                   <g 
                     key={node.id} 
-                    className="group/node"
-                    style={{ opacity, transition: "opacity 0.2s" }}
+                    className="group/node transition-all duration-200"
+                    onMouseEnter={() => setHoveredNodeId(node.id)}
+                    onMouseLeave={() => setHoveredNodeId(null)}
+                    style={{
+                      opacity,
+                      transform: isActiveNode 
+                        ? "scale(1.06)" 
+                        : isHovered 
+                          ? "scale(1.03)" 
+                          : "scale(1)",
+                      transformOrigin: `${node.posX + nodeWidth / 2}px ${node.posY + nodeHeight / 2}px`,
+                      transition: "transform 0.2s ease, opacity 0.2s ease",
+                      cursor: selectable ? "pointer" : "default"
+                    }}
                   >
                     {/* Mastery Progress Ring */}
                     {showMastery && (
@@ -1208,11 +1222,10 @@ export default function KnowledgeTree({
                           }
                         }}
                         className={`h-full w-full rounded-2xl border-2 p-3 flex flex-col justify-between items-start shadow-sm select-none transition-all duration-200 relative ${colorClass} ${
-                          selectable ? "cursor-pointer hover:shadow-md hover:scale-[1.03]" : "cursor-pointer hover:shadow-md hover:scale-[1.01]"
-                        } ${isActiveNode
-                            ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] scale-[1.06] shadow-lg shadow-[var(--purple)]/20 z-10"
+                          isActiveNode
+                            ? "ring-[3px] ring-[var(--purple)] border-[var(--purple)] shadow-lg shadow-[var(--purple)]/20 z-10"
                             : isHighlighted
-                              ? "ring-1 ring-[var(--purple)]/40 border-[var(--purple)]/40 scale-[1.01]"
+                              ? "ring-1 ring-[var(--purple)]/40 border-[var(--purple)]/40"
                               : ""
                         }`}
                       >
