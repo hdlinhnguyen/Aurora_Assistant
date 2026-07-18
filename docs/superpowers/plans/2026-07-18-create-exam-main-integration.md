@@ -1133,7 +1133,13 @@ git commit -m "feat(exams): add typed frontend exam client"
 - Consumes: Task 8 `examApi`, types, and helpers.
 - Produces: `ExamBuilderTab` and sidebar tab ID `exam-builder`.
 
-- [ ] **Step 1: Add component-test dependencies**
+- [ ] **Step 1: Write the failing Playwright smoke before UI wiring**
+
+Create `tests/exam_builder_smoke.py` with the complete flow described in Task
+10. Run it once against the current teacher dashboard and verify it fails at
+the missing `Tạo đề kiểm tra` sidebar tab.
+
+- [ ] **Step 2: Add component-test dependencies**
 
 Run:
 
@@ -1145,7 +1151,7 @@ npm install --save-dev @testing-library/react@16.3.2 @testing-library/user-event
 Configure Vitest with `environment: "jsdom"` and a setup file importing
 `@testing-library/jest-dom/vitest`.
 
-- [ ] **Step 2: Write failing navigation and component tests**
+- [ ] **Step 3: Write failing navigation and component tests**
 
 Navigation test asserts:
 
@@ -1167,7 +1173,7 @@ Component tests, with `examApi` mocked only at the HTTP boundary, assert:
 - Locked/done exam disables mutations.
 - Export invokes `apiFetchBlob` and revokes the object URL.
 
-- [ ] **Step 3: Run tests and verify RED**
+- [ ] **Step 4: Run tests and verify RED**
 
 Run:
 
@@ -1178,7 +1184,7 @@ npm test -- src/app/teacher/navigation.test.ts src/app/teacher/components/ExamBu
 
 Expected: missing component/navigation modules.
 
-- [ ] **Step 4: Implement focused UI components**
+- [ ] **Step 5: Implement focused UI components**
 
 Responsibilities:
 
@@ -1193,7 +1199,7 @@ Responsibilities:
 Use HTML drag events already used by the project; do not add a drag-and-drop
 dependency. All Vietnamese copy must match the spec’s state meanings.
 
-- [ ] **Step 5: Integrate the sidebar and main content**
+- [ ] **Step 6: Integrate the sidebar and main content**
 
 Refactor sidebar labels into `teacherNavigation`, add Lucide `FilePenLine`, add
 `"exam-builder"` to `ActiveTab`, include title/subtitle mapping, and render:
@@ -1205,7 +1211,7 @@ Refactor sidebar labels into `teacherNavigation`, add Lucide `FilePenLine`, add
 The tab must be available after login without first selecting a subject;
 subject is selected inside exam metadata.
 
-- [ ] **Step 6: Run GREEN and frontend regression**
+- [ ] **Step 7: Run GREEN and frontend regression**
 
 Run:
 
@@ -1218,7 +1224,7 @@ npm run build
 
 Expected: tests, typecheck, and production build pass.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```powershell
 git add frontend/src/app/teacher frontend/package.json frontend/package-lock.json frontend/vitest.config.ts
@@ -1241,9 +1247,9 @@ git commit -m "feat(exams): add teacher exam builder tab"
 - Consumes: complete backend and frontend.
 - Produces: repeatable browser evidence and local startup instructions.
 
-- [ ] **Step 1: Write the failing Playwright smoke before final UI wiring**
+- [ ] **Step 1: Confirm the Task 9 Playwright smoke contract**
 
-`tests/exam_builder_smoke.py` must:
+`tests/exam_builder_smoke.py`, created and observed RED in Task 9, must:
 
 1. Open `http://127.0.0.1:3000/login`.
 2. Click teacher demo login.
@@ -1257,8 +1263,8 @@ git commit -m "feat(exams): add teacher exam builder tab"
 10. Export DOCX and assert suggested filename ends in `.docx`.
 11. Save screenshots to a temp directory only when a step fails.
 
-Before the full wiring is present, run once and confirm it fails at the missing
-tab or create action.
+Do not replace it with a second smoke script; Task 10 runs the same contract
+against the complete live system.
 
 - [ ] **Step 2: Update local startup**
 
