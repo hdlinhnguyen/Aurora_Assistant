@@ -87,6 +87,8 @@ func ConnectDB() {
 		&model.ActivityLog{},
 		&model.AICache{},
 		&model.LearningPath{},
+		&model.StudentTopicMastery{},
+		&model.StudentTopicMasteryHistory{},
 		&model.GuardrailEvent{},
 		&model.Exam{},
 		&model.ExamQuestion{},

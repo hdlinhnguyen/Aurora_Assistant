@@ -12,7 +12,7 @@ Start-Sleep -Seconds 2
 
 # 2. Start Go Backend in a new PowerShell window
 Write-Host "2. Dang khoi chay May chu API Backend (Cong 8082)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host 'AURORA BACKEND RUNNING ON PORT 8082' -ForegroundColor Green; cd backend; go run ./cmd/server"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host 'AURORA BACKEND RUNNING ON PORT 8082' -ForegroundColor Green; `$env:LEARNING_PATH_URL='http://127.0.0.1:8000'; cd backend; go run ./cmd/server"
 
 # 3. Start Next.js Frontend in a new PowerShell window
 Write-Host "3. Dang khoi chay Giao dien Website (Cong 3000)..." -ForegroundColor Yellow
