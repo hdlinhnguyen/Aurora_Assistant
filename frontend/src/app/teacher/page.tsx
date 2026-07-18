@@ -515,26 +515,83 @@ export default function TeacherDashboard() {
 
   const handleLoadDemoQuestions = async () => {
     setLoading(true);
-    setLoadingMessage("Đang tải và nạp câu hỏi mẫu từ hệ thống...");
+    setLoadingMessage("Đang nạp câu hỏi mẫu từ file Excel hệ thống...");
     try {
-      const resFile = await fetch("/master_bank.json");
-      const json = await resFile.json();
-      const res = await apiFetch("/import/master-bank", {
-        method: "POST",
-        body: JSON.stringify(json),
-      });
-      toast.success(
-        `Nạp câu hỏi mẫu thành công: Đã import ${res.imported} câu hỏi!`,
-        {
-          description: [
-            res.skippedDedup > 0 ? `${res.skippedDedup} câu trùng sig (bỏ qua)` : "",
-            res.skippedNonTN4 > 0 ? `${res.skippedNonTN4} câu TuLuan/DungSai (bỏ qua)` : "",
-            res.skippedNoNode > 0 ? `${res.skippedNoNode} câu thiếu node (bỏ qua)` : "",
-          ].filter(Boolean).join(". ") || undefined,
+      const response = await fetch("/mau_nhap_cau_hoi.xlsx");
+      if (!response.ok) throw new Error("Không thể tải file câu hỏi mẫu từ server.");
+      const arrayBuffer = await response.arrayBuffer();
+      const wb = XLSX.read(arrayBuffer, { type: "array" });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[];
+
+      if (data.length <= 1) {
+        toast.warning("File Excel mẫu không có dữ liệu câu hỏi.");
+        setLoading(false);
+        return;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+      const questionsByNode: Record<string, any[]> = {};
+
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        if (!row || row.length < 2) continue;
+
+        const topicName = row[0]?.toString().trim();
+        const content = row[1]?.toString().trim();
+        const optA = row[2]?.toString().trim() || "";
+        const optB = row[3]?.toString().trim() || "";
+        const optC = row[4]?.toString().trim() || "";
+        const optD = row[5]?.toString().trim() || "";
+        let correctOption = parseInt(row[6]?.toString().trim());
+        if (isNaN(correctOption)) correctOption = 0;
+        const difficulty = row[7]?.toString().trim().toLowerCase() || "medium";
+
+        if (!topicName || !content) {
+          failCount++;
+          continue;
         }
-      );
+
+        const matchedNode = nodes.find(n => n.name.toLowerCase() === topicName.toLowerCase());
+        if (!matchedNode) {
+          failCount++;
+          continue;
+        }
+
+        const options = [optA, optB, optC, optD];
+        const questionPayload = {
+          content: content,
+          optionsJson: JSON.stringify(options),
+          correctOption: correctOption,
+          difficulty: difficulty
+        };
+
+        if (!questionsByNode[matchedNode.id]) {
+          questionsByNode[matchedNode.id] = [];
+        }
+        questionsByNode[matchedNode.id].push(questionPayload);
+      }
+
+      for (const nodeId in questionsByNode) {
+        const qs = questionsByNode[nodeId];
+        await apiFetch(`/nodes/${nodeId}/questions/bulk`, {
+          method: "POST",
+          body: JSON.stringify(qs)
+        });
+        successCount += qs.length;
+      }
+
+      toast.success(`Nạp câu hỏi mẫu thành công: Đã import ${successCount} câu hỏi!`, {
+        description: failCount > 0 ? `Bỏ qua ${failCount} dòng do không khớp tên chủ đề hoặc thiếu thông tin.` : undefined
+      });
+
       loadSubjectQuestions();
       loadExamsStatus();
+      if (editingNode) {
+        loadNodeQuestions(editingNode.id);
+      }
     } catch (err: any) {
       toast.error("Lỗi khi nạp câu hỏi mẫu: " + err.message);
     } finally {
@@ -2874,6 +2931,7 @@ export default function TeacherDashboard() {
                 handleTagQuestion={(question) => setTaggingQuestionId(question.id)}
                 setEditingNode={setEditingNode}
                 formatDate={formatDate}
+                handleLoadDemoQuestions={handleLoadDemoQuestions}
               />
             ) : (
               <MonitoringTab

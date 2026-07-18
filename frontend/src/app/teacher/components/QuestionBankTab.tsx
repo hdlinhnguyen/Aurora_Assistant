@@ -44,6 +44,7 @@ interface QuestionBankTabProps {
   handleTagQuestion: (q: Question) => void;
   setEditingNode: (node: NodeItem | null) => void;
   formatDate: (dateStr?: string) => string;
+  handleLoadDemoQuestions: () => void;
 }
 
 export default function QuestionBankTab({
@@ -65,6 +66,7 @@ export default function QuestionBankTab({
   handleTagQuestion,
   setEditingNode,
   formatDate,
+  handleLoadDemoQuestions,
 }: QuestionBankTabProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [questionTypeFilter, setQuestionTypeFilter] = React.useState("");
@@ -178,14 +180,23 @@ export default function QuestionBankTab({
           </button>
 
           <button
-            onClick={() => document.getElementById("excel-file-input")?.click()}
+            onClick={handleLoadDemoQuestions}
             className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm border flex items-center gap-1.5 cursor-pointer active:scale-95 ${
               subjectQuestions.length === 0
                 ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-pulse-glow"
                 : "bg-white hover:bg-muted text-foreground border-border"
             }`}
+            title="Tự động nạp 97 câu hỏi mẫu chuẩn hóa từ file Excel hệ thống"
           >
-            <Upload size={14} className={subjectQuestions.length === 0 ? "text-white" : "text-muted-foreground"} />
+            <Sparkles size={14} className={subjectQuestions.length === 0 ? "text-white animate-pulse" : "text-violet-600"} />
+            Nạp câu hỏi mẫu
+          </button>
+
+          <button
+            onClick={() => document.getElementById("excel-file-input")?.click()}
+            className="px-4 py-2 bg-white hover:bg-muted text-foreground border border-border text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
+          >
+            <Upload size={14} className="text-muted-foreground" />
             Nhập từ Excel (.xlsx)
           </button>
 
