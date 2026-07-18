@@ -41,6 +41,7 @@ interface QuestionBankTabProps {
   handleMasterBankImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleStartEditQuestion: (q: Question) => void;
   handleDeleteQuestion: (qId: string) => void;
+  handleDeleteQuestionsBulk: (qIds: string[]) => void;
   handleTagQuestion: (q: Question) => void;
   setEditingNode: (node: NodeItem | null) => void;
   formatDate: (dateStr?: string) => string;
@@ -63,11 +64,13 @@ export default function QuestionBankTab({
   handleMasterBankImport,
   handleStartEditQuestion,
   handleDeleteQuestion,
+  handleDeleteQuestionsBulk,
   handleTagQuestion,
   setEditingNode,
   formatDate,
   handleLoadDemoQuestions,
 }: QuestionBankTabProps) {
+  const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [questionTypeFilter, setQuestionTypeFilter] = React.useState("");
   const filtered = subjectQuestions.filter(q => {
     const matchSearch = qbSearchText ? q.content.toLowerCase().includes(qbSearchText.toLowerCase()) : true;
@@ -258,7 +261,43 @@ export default function QuestionBankTab({
             Không tìm thấy câu hỏi nào phù hợp với bộ lọc.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <>
+            {/* Bulk Actions Toolbar */}
+            <div className="mb-4 bg-muted/40 p-3 rounded-2xl border border-border flex flex-wrap items-center justify-between gap-3 text-xs">
+              <label className="flex items-center gap-2 font-bold cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.length > 0 && selectedIds.length === filtered.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(filtered.map(q => q.id));
+                    } else {
+                      setSelectedIds([]);
+                    }
+                  }}
+                  className="rounded border-border focus:ring-[var(--mint)] h-4 w-4"
+                />
+                <span>Chọn tất cả ({filtered.length})</span>
+              </label>
+
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-3 animate-[fadeIn_0.2s_ease-out]">
+                  <span className="font-bold text-muted-foreground">Đã chọn: <strong className="text-foreground">{selectedIds.length}</strong></span>
+                  <button
+                    onClick={() => {
+                      handleDeleteQuestionsBulk(selectedIds);
+                      setSelectedIds([]);
+                    }}
+                    className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white text-xs font-black rounded-xl transition-all cursor-pointer flex items-center gap-1 active:scale-95 shadow-sm"
+                  >
+                    <Trash size={13} />
+                    Xóa các câu đã chọn
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map(q => {
               const matchedNode = nodes.find(n => n.id === q.nodeId);
               let opts = ["", "", "", ""];
@@ -272,6 +311,16 @@ export default function QuestionBankTab({
                     {/* Row 1: Badges & metadata */}
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex flex-wrap gap-1.5 items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(q.id)}
+                          onChange={() => {
+                            setSelectedIds(prev =>
+                              prev.includes(q.id) ? prev.filter(id => id !== q.id) : [...prev, q.id]
+                            );
+                          }}
+                          className="rounded border-border focus:ring-[var(--mint)] h-3.5 w-3.5 mr-1.5 cursor-pointer"
+                        />
                         <span className="px-2 py-0.5 rounded bg-slate-50 border border-slate-100 text-[9px] text-slate-500 font-extrabold">
                           {selectedSubject}
                         </span>
@@ -368,7 +417,7 @@ export default function QuestionBankTab({
               );
             })}
           </div>
-        )}
+        </>)}
       </div>
     </div>
   );

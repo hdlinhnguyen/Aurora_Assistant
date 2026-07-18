@@ -1560,6 +1560,34 @@ export default function TeacherDashboard() {
     });
   };
 
+  const handleDeleteQuestionsBulk = async (qIds: string[]) => {
+    if (qIds.length === 0) return;
+    setConfirmModalState({
+      open: true,
+      title: "Xóa nhiều câu hỏi",
+      message: `Bạn có chắc chắn muốn xóa ${qIds.length} câu hỏi đã chọn khỏi ngân hàng?`,
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          await Promise.all(
+            qIds.map((id) =>
+              apiFetch(`/teacher/question-bank/questions/${id}`, {
+                method: "DELETE",
+              })
+            )
+          );
+          toast.success(`Đã xóa thành công ${qIds.length} câu hỏi!`);
+          if (editingNode) loadNodeQuestions(editingNode.id);
+          loadSubjectQuestions();
+        } catch (err: any) {
+          toast.error("Lỗi khi xóa câu hỏi: " + err.message);
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
+  };
+
   const handleSaveNodeName = async (name: string) => {
     if (!editingNode || !name.trim()) return;
     try {
@@ -2806,6 +2834,7 @@ export default function TeacherDashboard() {
                 handleMasterBankImport={handleMasterBankImport}
                 handleStartEditQuestion={handleStartEditQuestion}
                 handleDeleteQuestion={handleDeleteQuestion}
+                handleDeleteQuestionsBulk={handleDeleteQuestionsBulk}
                 handleTagQuestion={(question) => setTaggingQuestionId(question.id)}
                 setEditingNode={setEditingNode}
                 formatDate={formatDate}
