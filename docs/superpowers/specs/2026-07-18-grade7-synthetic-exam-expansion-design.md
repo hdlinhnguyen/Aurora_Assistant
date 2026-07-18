@@ -79,6 +79,8 @@ The new inventory stays in `backend/internal/syntheticseed`. Existing API handle
 
 `historicalExamFixtures` will load the committed topic-specific fixture collections instead of a short inline list. Fixture parsing and validation complete in memory before any exam rows are inserted. Any invalid question, duplicate stable key, duplicate normalized prompt, unresolved topic, or score mismatch aborts the `ResetAndSeed` transaction.
 
+Every authored fixture stores the related topic stable key. During seed materialization, that key must resolve to exactly one curriculum node UUID, and each persisted `ExamQuestion.TopicNodeIDsJSON` must contain a one-element array with that UUID. Database integration tests query the stored JSON and prove that all 40 questions in the first batch are tagged with `l7-so-huu-ti-khai-niem`.
+
 All exam, question, submission, result, snapshot, approval, audit, and idempotency identifiers remain namespace-derived UUIDs. Reseeding deletes only synthetic-owned records and recreates exactly the same graph from the committed fixture revision.
 
 To keep startup practical at this volume, database creation should use bounded batch inserts where model relationships permit it. The transaction remains atomic; batching is an insertion strategy, not partial-commit behavior.
