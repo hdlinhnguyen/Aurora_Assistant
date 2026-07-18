@@ -30,6 +30,11 @@ from pydantic import BaseModel, Field
 
 from learning_path.adapters import CurriculumGraph, load_chac_goc_graph
 from learning_path.hints import HintLadder
+from learning_path.mastery_api import (
+    MasteryCalculationBody,
+    MasteryCalculationResponse,
+    calculate_mastery,
+)
 from learning_path.schemas import (
     LearningPathRequest,
     RawPaperEvidence,
@@ -208,6 +213,10 @@ def create_app(
             chosen_misconception=body.chosen_misconception,
         )
         return hint.model_dump(mode="json")
+
+    @app.post("/mastery/calculate", response_model=MasteryCalculationResponse)
+    def calculate_mastery_endpoint(body: MasteryCalculationBody) -> MasteryCalculationResponse:
+        return calculate_mastery(body)
 
     return app
 

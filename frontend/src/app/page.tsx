@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function LandingPage() {
             </span>
           </h1>
           <p className="text-muted-foreground text-base leading-relaxed max-w-lg mx-auto lg:mx-0">
-            Hệ thống AI không cho sẵn lời giải. Thay vào đó, AI đóng vai trò người bạn thông thái đặt câu hỏi gợi mở, giúp các bạn nhỏ cấp 1 tự tư duy để tìm ra đáp án cuối cùng.
+            Hệ thống AI không cho sẵn lời giải. Thay vào đó, AI đóng vai trò người bạn thông thái đặt câu hỏi gợi mở, giúp các em học sinh tự tư duy để tìm ra đáp án cuối cùng.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
@@ -81,10 +82,26 @@ export default function LandingPage() {
               </svg>
             </button>
             <button
-              onClick={() => router.push("/login?role=teacher")}
-              className="bg-card border border-border hover:bg-muted text-foreground px-8 py-4 rounded-full font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] backdrop-blur"
+              onClick={async () => {
+                try {
+                  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: "student@aurora.edu.vn", password: "demo123" }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem("aurora_token", data.token);
+                    localStorage.setItem("aurora_user", JSON.stringify(data.user));
+                  }
+                } catch (e) {}
+                localStorage.setItem("aurora_tour_active", "true");
+                localStorage.setItem("aurora_tour_step", "0");
+                router.push("/tutor");
+              }}
+              className="bg-gradient-to-r from-[var(--purple)] to-indigo-600 hover:brightness-110 text-white px-8 py-4 rounded-full font-bold shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
             >
-              Bảng điểm Lớp học
+              <span>🚀 Tour Hướng Dẫn (2 phút)</span>
             </button>
           </div>
         </div>
@@ -161,7 +178,7 @@ export default function LandingPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
-            <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh Cấp 1</h3>
+            <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-[var(--mint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

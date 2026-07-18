@@ -3,6 +3,15 @@
 Write-Host "=== BAT DAU KHOI CHAY HE THONG AURORA SOCRATIC TUTOR ===" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Gray
 
+# Giai phong cac cong bi chiem neu co de tranh xung dot
+Write-Host "Dang kiem tra va giai phong cac cong 8082, 3000, 8000..." -ForegroundColor Yellow
+Get-NetTCPConnection -LocalPort 8082,3000,8000 -ErrorAction SilentlyContinue | ForEach-Object {
+    try {
+        Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
+    } catch {}
+}
+Start-Sleep -Seconds 1
+
 # 1. Start Docker Database
 Write-Host "1. Dang bat Co so du lieu PostgreSQL..." -ForegroundColor Yellow
 docker compose -f backend/docker/docker-compose.yml -p aurora up -d
@@ -12,7 +21,7 @@ Start-Sleep -Seconds 2
 
 # 2. Start Go Backend in a new PowerShell window
 Write-Host "2. Dang khoi chay May chu API Backend (Cong 8082)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host 'AURORA BACKEND RUNNING ON PORT 8082' -ForegroundColor Green; cd backend; go run ./cmd/server"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Write-Host 'AURORA BACKEND RUNNING ON PORT 8082' -ForegroundColor Green; `$env:LEARNING_PATH_URL='http://127.0.0.1:8000'; cd backend; go run ./cmd/server"
 
 # 3. Start Next.js Frontend in a new PowerShell window
 Write-Host "3. Dang khoi chay Giao dien Website (Cong 3000)..." -ForegroundColor Yellow

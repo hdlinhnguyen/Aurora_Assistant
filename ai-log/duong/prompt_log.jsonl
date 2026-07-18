@@ -1,0 +1,73 @@
+{"timestamp":"2026-07-17T21:01:49.803+07:00","prompt":"/goal Thực hiện code backend cho [Question_Tagging_Module](module_documentation/Question_Tagging_Module/) không hỏi gì thêm, chưa cần nối lên UI, làm một demo nhỏ bằng html trước ở trong backend luôn."}
+{"timestamp":"2026-07-17T21:02:08.648+07:00","prompt":"/goal Thực hiện code backend cho [Handwritten OCR and Rubric Mapping](module_documentation/Handwritten OCR and Rubric Mapping/) không hỏi gì thêm, chưa cần nối lên UI, làm một demo nhỏ bằng html trước ở trong backend luôn"}
+{"timestamp":"2026-07-17T21:13:16.417+07:00","prompt":"/goal Thực hiện code backend cho [Handwritten OCR and Rubric Mapping](module_documentation/Handwritten OCR and Rubric Mapping/) không hỏi gì thêm, chưa cần nối lên UI, làm một demo nhỏ bằng html trước ở trong backend luôn"}
+{"timestamp":"2026-07-17T21:35:40.430+07:00","prompt":"verify lại thật chắc chắn để đảm bảo đã hoàn thành công việc"}
+{"timestamp":"2026-07-17T21:35:50.199+07:00","prompt":"verify lại thật chắc chắn để đảm bảo đã hoàn thành công việc"}
+{"timestamp":"2026-07-17T21:37:38.636+07:00","prompt":"Tóm tắt lại method đang dùng của [Handwritten OCR and Rubric Mapping](module_documentation/Handwritten OCR and Rubric Mapping/) và  [Question_Tagging_Module](module_documentation/Question_Tagging_Module/) trong 2 đoạn văn ngắn"}
+{"timestamp":"2026-07-17T21:41:55.559+07:00","prompt":"bật demo chỉ tính năng này lên một port 8009 cho tôi xem"}
+{"timestamp":"2026-07-17T21:48:26.932+07:00","prompt":"Không phải kiểu chọn tag cụ thể như này. Mà sẽ là dạng kiểu danh sách ví dụ ban đầu chưa có tag thì hiện\n\"+ Thêm tag cho câu hỏi\". Sau đó sẽ có 1 menu dropdown hoặc cái gì đó hiển thị lên màn hình, giáo viên sẽ ấn vào và tìm tag, khi ấn vào tag đó thì nó sẽ được tagging vào câu hỏi\n\nSau khi thêm tag thì \"+ Thêm tag cho câu hỏi\" vẫn ở cuối cùng."}
+{"timestamp":"2026-07-17T21:52:17.348+07:00","prompt":"Kiểm tra xem đã có dữ liệu liên quan đến quan hệ cha-con giữa các topic chưa trong hệ thống"}
+{"timestamp":"2026-07-17T21:56:01.040+07:00","prompt":"không tìm trong những file đang được edit bởi tôi"}
+{"timestamp":"2026-07-17T21:57:03.917+07:00","prompt":"có dữ liệu nào đang hard_code ở frontend ko"}
+{"timestamp":"2026-07-17T22:02:12.175+07:00","prompt":"Thiết kế thêm 1 mục nằm bên phải na ná dạng folder với file nằm trong folder nhưng mà cho việc chọn topic. Giảng viên có thể kéo thả topic từ bên sidepanel đó sang nữa"}
+{"timestamp":"2026-07-17T22:03:06.516+07:00","prompt":"Không cần làm offline, bỏ điều kiện offline đi. Bây giờ chỉ để OCR + qwen là option phụ thôi, option chính là để giảng viên tự làm thủ công"}
+{"timestamp":"2026-07-17T22:16:05.950+07:00","prompt":"bật demo lên để tôi xem"}
+{"timestamp":"2026-07-17T22:18:28.188+07:00","prompt":"Nếu giáo viên làm thủ công thì không cần upload ảnh, chỉ cần chọn đề thi hiện tại và tên học sinh, sau đó sẽ có checkbox barem điểm cho từng câu"}
+{"timestamp":"2026-07-17T22:19:18.328+07:00","prompt":"có 1 job liên quan đến việc giáo viên tạo đề kiểm tra bằng hệ thống mình. \r\n\r\nGiả định ngân hàng đề đã được tích hợp sẵn (kèm tagging cụ thể topic cho từng câu), giờ giáo viên sẽ tạo một cái đề thi / 15p nào đó rồi tạo barem điểm (nếu là câu tự luận) (các ý trong barem điểm cần giáo viên tagging cụ thể) cho cái đề đấy. Sau khi tạo đề thì có thể giúp giáo viên làm format đẹp hơn hoặc không. Sau đó xuất file docx hoặc pdf chẳng hạn. Ưu tiên front-end làm việc đơn giản ví dụ giáo viên có thể kéo thả các câu cũng được. \r\n\r\nSau đó lưu vào mục đề thi sẽ có trạng thái drafting (bản nháp) / preparing exam (đã xong và chuẩn bị phát đề) / done ( đã hoàn thành). trạng thái done chỉ được cập nhật khi mà giáo viên đã thực hiện chấm xong và cho điểm trên hệ thống theo cái module OCR handwriting các thứ.\n\n\nThiết kế và triển khai trong C:\\Users\\Admin\\Desktop\\Aurora_Assistant\\create_exam_backend hỏi lại nếu cần"}
+{"timestamp":"2026-07-17T22:20:34.031+07:00","prompt":"A"}
+{"timestamp":"2026-07-17T22:20:56.048+07:00","prompt":"tôi chọn A"}
+{"timestamp":"2026-07-17T22:22:08.456+07:00","prompt":"B"}
+{"timestamp":"2026-07-17T22:22:37.189+07:00","prompt":"A"}
+{"timestamp":"2026-07-17T22:23:06.139+07:00","prompt":"B"}
+{"timestamp":"2026-07-17T22:23:43.028+07:00","prompt":"A, không đụng folder frontend"}
+{"timestamp":"2026-07-17T22:24:33.009+07:00","prompt":"A"}
+{"timestamp":"2026-07-17T22:26:00.923+07:00","prompt":"tôi chọn hướng 1. Thêm cả trường hợp giáo viên không chọn đề trong ngân hàng câu hỏi mà tự thêm câu hỏi bằng tay thủ công và tự gán tag câu hỏi thủ công."}
+{"timestamp":"2026-07-17T22:26:30.286+07:00","prompt":"A"}
+{"timestamp":"2026-07-17T22:26:57.801+07:00","prompt":"ok"}
+{"timestamp":"2026-07-17T22:27:19.164+07:00","prompt":"ok"}
+{"timestamp":"2026-07-17T22:27:39.718+07:00","prompt":"ok"}
+{"timestamp":"2026-07-17T22:28:07.421+07:00","prompt":"ok tiến hành viết kế hoạch cụ thể và mô tả chi tiết trước khi làm"}
+{"timestamp":"2026-07-17T22:28:18.253+07:00","prompt":"ok tiến hành viết kế hoạch cụ thể và mô tả chi tiết trước khi làm, lưu vào file .md trong folder"}
+{"timestamp":"2026-07-17T22:28:29.562+07:00","prompt":"continue"}
+{"timestamp":"2026-07-17T22:30:23.461+07:00","prompt":"Đổi tên folder backend thành Real_exam_scoring_backend rồi làm tiếp"}
+{"timestamp":"2026-07-17T22:31:08.905+07:00","prompt":"ok"}
+{"timestamp":"2026-07-17T22:35:31.896+07:00","prompt":"continue"}
+{"timestamp":"2026-07-17T22:36:14.262+07:00","prompt":"ok tiến hành làm luôn"}
+{"timestamp":"2026-07-17T22:36:58.059+07:00","prompt":"ko làm luôn tại đây đừng commit vội là được"}
+{"timestamp":"2026-07-17T22:37:56.549+07:00","prompt":"ok"}
+{"timestamp":"2026-07-17T22:41:39.844+07:00","prompt":"continue nếu chưa xong"}
+{"timestamp":"2026-07-17T22:55:41.688+07:00","prompt":"làm full task luôn, tôi sẽ tạm thời chưa đưa yêu cầu thêm nhé. Bao giờ xong thì hẵng dừng lại"}
+{"timestamp":"2026-07-18T06:51:44.946+07:00","prompt":"check lại trong backend và frontend, tóm tắt xem đã có tính năng gì rồi (không tính phần tôi chưa commit và push lên)"}
+{"timestamp":"2026-07-18T06:55:36.455+07:00","prompt":"tải các phần cần thiết và bật giao diện cho tôi xem"}
+{"timestamp":"2026-07-18T07:01:55.467+07:00","prompt":"Giúp tôi tích hợp module tạo bài kiểm tra [create_exam_backend](create_exam_backend/) vào backend chính, ưu tiên cách làm data như trong backend chính, đọc document cụ thể và tích hợp lên cả backend và frontend,"}
+{"timestamp":"2026-07-18T07:04:06.894+07:00","prompt":"ok ưu tiên dùng techstack của backend chính"}
+{"timestamp":"2026-07-18T07:05:19.777+07:00","prompt":"thêm tab trong side bar"}
+{"timestamp":"2026-07-18T07:06:30.738+07:00","prompt":"ok"}
+{"timestamp":"2026-07-18T07:07:09.781+07:00","prompt":"ok"}
+{"timestamp":"2026-07-18T07:08:44.469+07:00","prompt":"ok"}
+{"timestamp":"2026-07-18T07:14:52.845+07:00","prompt":"Sửa lỗi và pull origin"}
+{"timestamp":"2026-07-18T07:16:37.292+07:00","prompt":"ok"}
+{"timestamp":"2026-07-18T07:18:59.679+07:00","prompt":"tôi muốn tích hợp module đánh tag bài tập thủ công [question_tagging_backend](question_tagging_backend/) vào backend chính, ưu tiên cách làm data như trong backend chính, đọc document cụ thể và tích hợp lên cả backend và frontend, Ưu tiên dùng techstack có sẵn của backend và frontend. So sánh các đang làm trong backend hiện tại và file question_tagging_backend. Đề xuất cái nào tốt hơn và yếu hơn như nào để tích hợp tốt nhất"}
+{"timestamp":"2026-07-18T07:19:42.111+07:00","prompt":"tôi muốn tích hợp module chấm điểm bài kiểm tra [Real_exam_scoring_backend](Real_exam_scoring_backend/) vào backend chính, ưu tiên cách làm data như trong backend chính, đọc document cụ thể và tích hợp lên cả backend và frontend, Ưu tiên dùng techstack có sẵn của backend và frontend. So sánh các đang làm trong backend hiện tại và file real_exam_scoring_backend. Đề xuất cái nào tốt hơn và yếu hơn như nào để tích hợp tốt nhất"}
+{"timestamp":"2026-07-18T07:19:55.623+07:00","prompt":"cài go và đưa vào trong path"}
+{"timestamp":"2026-07-18T07:21:18.343+07:00","prompt":"3"}
+{"timestamp":"2026-07-18T07:22:17.151+07:00","prompt":"**Snapshot độc lập — khuyến nghị:** sao chép tag hiện tại vào đề; thay đổi tag ngân hàng sau đó không ảnh hưởng đề và ngược lại."}
+{"timestamp":"2026-07-18T07:22:28.548+07:00","prompt":"2"}
+{"timestamp":"2026-07-18T07:22:56.571+07:00","prompt":"**Mở rộng ngân hàng — khuyến nghị:** hỗ trợ cả trắc nghiệm và tự luận, thêm QuestionRubricItem, rồi tagging hoạt động đầy đủ ở cả cấp câu và từng ý barem."}
+{"timestamp":"2026-07-18T07:23:10.951+07:00","prompt":"không làm luôn ở branch duong"}
+{"timestamp":"2026-07-18T07:23:32.905+07:00","prompt":"**Ngân hàng dùng chung — khuyến nghị theo tài liệu module:** mọi giáo viên được xem và sửa tag của mọi câu; optimistic locking ngăn ghi đè, lưu người cập nhật."}
+{"timestamp":"2026-07-18T07:24:03.448+07:00","prompt":"ok tự làm luôn đi tôi không chỉ thị thêm"}
+{"timestamp":"2026-07-18T07:24:25.366+07:00","prompt":"không cần"}
+{"timestamp":"2026-07-18T07:24:46.719+07:00","prompt":"**Dialog/side panel từ từng thẻ câu hỏi — khuyến nghị:** thêm nút “Gắn topic”; mở trình chỉnh tag câu và từng ý barem mà không rời tab Ngân hàng câu hỏi."}
+{"timestamp":"2026-07-18T07:25:42.581+07:00","prompt":"ưu tiên giữ mô hình hiện tại của backend có thểm thêm nhưng không được xóa hay chỉnh sửa"}
+{"timestamp":"2026-07-18T07:26:38.021+07:00","prompt":"ok"}
+{"timestamp":"2026-07-18T07:29:15.101+07:00","prompt":"1"}
+{"timestamp":"2026-07-18T07:30:29.045+07:00","prompt":"lưu lại lịch sử prompt vào [duong](ai-log/duong/)"}
+{"timestamp":"2026-07-18T07:31:03.131+07:00","prompt":"ok, không hỏi thêm nữa tự lập plan rồi làm luôn"}
+{"timestamp":"2026-07-18T07:32:22.875+07:00","prompt":"phải hiện thị đúng thời gian đã prompt thực tế"}
+{"timestamp":"2026-07-18T07:32:55.456+07:00","prompt":"lưu lại lịch sử prompt vào [duong](ai-log/duong/) phải hiện thị đúng thời gian đã prompt thực tế"}
+{"timestamp":"2026-07-18T07:37:53.645+07:00","prompt":"lưu lại lịch sử prompt codex của tôi từ 14:00 ngày 17/7 đến hiện tại vào [duong](ai-log/duong/) phải hiện thị đúng thời gian đã prompt thực tế"}
+{"timestamp":"2026-07-18T07:40:55.219+07:00","prompt":"đã có cấu trúc cụ thể cách tích hợp create_exam vào trong backend, đọc cấu trúc đó tạm thời khi create_exam đang implement dở"}
+{"timestamp":"2026-07-18T07:41:55.115+07:00","prompt":"ok"}
+{"timestamp":"2026-07-18T07:42:37.428+07:00","prompt":"không giữ full_manual"}
+{"timestamp":"2026-07-18T07:43:06.572+07:00","prompt":"nếu không dùng AI thì không cần bước đó"}

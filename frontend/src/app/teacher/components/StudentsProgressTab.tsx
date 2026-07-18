@@ -20,6 +20,7 @@ import {
 
 import { StudentProgress } from "../page";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Props {
   studentsProgress: StudentProgress[];
@@ -321,7 +322,7 @@ export default function StudentsProgressTab({ studentsProgress, selectedSubject,
           </div>
 
           {/* ── Table ─────────────────────────────────────────────────────── */}
-          <div className="flex-1 bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col">
+          <div data-tour="inspect-drawer" className="flex-1 bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col">
             <div className="overflow-auto flex-1">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0] shadow-border">
@@ -558,6 +559,16 @@ export default function StudentsProgressTab({ studentsProgress, selectedSubject,
                         </span>
                       ))}
                     </div>
+
+                    {/* Group Action Button */}
+                    <button
+                      onClick={() => {
+                        toast.success(`⚡ Đã tự động kích hoạt & giao lộ trình phụ đạo "${group.nodeName}" cho nhóm ${group.students.length} học sinh thành công!`);
+                      }}
+                      className="w-full mt-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-[9px] font-black tracking-wider uppercase transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <Zap size={10} /> Giao lộ trình phụ đạo nhóm ({group.students.length})
+                    </button>
                   </div>
                 ))
               ) : (

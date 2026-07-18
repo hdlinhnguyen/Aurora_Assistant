@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -61,15 +60,6 @@ func (s *Service) Approve(actor, submissionID uuid.UUID, input VersionInput) (*S
 				batch.Status, batch.CompletedAt = model.GradingBatchStatusCompleted, &now
 			}
 			if err := tx.db.Save(batch).Error; err != nil {
-				return err
-			}
-			key := input.IdempotencyKey
-			if key == "" {
-				key = "approve:" + submission.ID.String() + ":" + fmt.Sprint(version)
-			}
-			if err := s.gateway(tx.db).RecordScoringProgress(
-				batch.ExamID, batch.ApprovedSubmissions, batch.ApprovedSubmissions, key+":progress",
-			); err != nil {
 				return err
 			}
 		}
