@@ -1329,42 +1329,6 @@ func (s *tutorService) ParseAndBuildTree(subject string, fileContent string) err
 				return err
 			}
 			nameToNode[name] = node
-
-			// Optional mock default questions for newly imported nodes
-			defaultQuestions := []struct {
-				Content string
-				Options []string
-				Correct int
-			}{
-				{
-					Content: fmt.Sprintf("Kiến thức cốt lõi của chủ đề '%s' là gì?", name),
-					Options: []string{"Là lý thuyết nền tảng", "Là các công thức tính toán nâng cao", "Là sự kết hợp thực hành và lý thuyết", "Cả 3 phương án trên đều đúng"},
-					Correct: 3,
-				},
-				{
-					Content: fmt.Sprintf("Để học tốt chủ đề '%s', chúng ta nên làm gì?", name),
-					Options: []string{"Đọc lý thuyết và thực hành giải bài tập", "Học thuộc lòng sách lý thuyết", "Chờ giáo viên chỉ dẫn", "Bỏ qua các bài toán khó"},
-					Correct: 0,
-				},
-			}
-
-			for _, dq := range defaultQuestions {
-				optsBytes, _ := json.Marshal(dq.Options)
-				question := &model.Question{
-					ID:            uuid.New(),
-					NodeID:        node.ID,
-					Content:       dq.Content,
-					OptionsJSON:   string(optsBytes),
-					CorrectOption: dq.Correct,
-					Difficulty:    "easy",
-					CreatedAt:     time.Now(),
-					UpdatedAt:     time.Now(),
-				}
-				if err := tx.Create(question).Error; err != nil {
-					tx.Rollback()
-					return err
-				}
-			}
 		}
 	}
 
@@ -1532,41 +1496,6 @@ func (s *tutorService) SaveTree(subject string, finalGraph ParsedGraph) error {
 				return err
 			}
 			nameToNode[name] = node
-
-			defaultQuestions := []struct {
-				Content string
-				Options []string
-				Correct int
-			}{
-				{
-					Content: fmt.Sprintf("Kiến thức cốt lõi của chủ đề '%s' là gì?", name),
-					Options: []string{"Là lý thuyết nền tảng", "Là các công thức tính toán nâng cao", "Là sự kết hợp thực hành và lý thuyết", "Cả 3 phương án trên đều đúng"},
-					Correct: 3,
-				},
-				{
-					Content: fmt.Sprintf("Để học tốt chủ đề '%s', chúng ta nên làm gì?", name),
-					Options: []string{"Đọc lý thuyết và thực hành giải bài tập", "Học thuộc lòng sách lý thuyết", "Chờ giáo viên chỉ dẫn", "Bỏ qua các bài toán khó"},
-					Correct: 0,
-				},
-			}
-
-			for _, dq := range defaultQuestions {
-				optsBytes, _ := json.Marshal(dq.Options)
-				question := &model.Question{
-					ID:            uuid.New(),
-					NodeID:        node.ID,
-					Content:       dq.Content,
-					OptionsJSON:   string(optsBytes),
-					CorrectOption: dq.Correct,
-					Difficulty:    "easy",
-					CreatedAt:     time.Now(),
-					UpdatedAt:     time.Now(),
-				}
-				if err := tx.Create(question).Error; err != nil {
-					tx.Rollback()
-					return err
-				}
-			}
 		}
 	}
 

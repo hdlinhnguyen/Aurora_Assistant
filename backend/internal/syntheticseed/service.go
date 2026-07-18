@@ -108,6 +108,25 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 	}
 
 	if len(userIDs) > 0 {
+		// Delete exam-related data created by these users
+		var examIDs []uuid.UUID
+		if err := tx.Model(&model.Exam{}).Where("created_by IN ?", userIDs).Pluck("id", &examIDs).Error; err != nil {
+			return err
+		}
+		if len(examIDs) > 0 {
+			var examQuestionIDs []uuid.UUID
+			if err := tx.Model(&model.ExamQuestion{}).Where("exam_id IN ?", examIDs).Pluck("id", &examQuestionIDs).Error; err != nil {
+				return err
+			}
+			if len(examQuestionIDs) > 0 {
+				tx.Where("exam_question_id IN ?", examQuestionIDs).Delete(&model.ExamRubricItem{})
+			}
+			for _, del := range []any{&model.ExamExport{}, &model.ExamAuditLog{}, &model.ExamInternalEvent{}, &model.ExamGradingProgress{}, &model.ExamSnapshot{}, &model.ExamQuestion{}} {
+				tx.Where("exam_id IN ?", examIDs).Delete(del)
+			}
+			tx.Unscoped().Where("id IN ?", examIDs).Delete(&model.Exam{})
+		}
+
 		var sessionIDs []uuid.UUID
 		if err := tx.Model(&model.ChatSession{}).Where("student_id IN ?", userIDs).Pluck("id", &sessionIDs).Error; err != nil {
 			return err
@@ -136,6 +155,10 @@ func resetSyntheticData(tx *gorm.DB, config Config) error {
 		if err := tx.Unscoped().Where("teacher_id IN ?", userIDs).Delete(&model.Topic{}).Error; err != nil {
 			return err
 		}
+		// Delete classrooms owned by synthetic teachers
+		if err := tx.Where("teacher_id IN ?", userIDs).Delete(&model.Classroom{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Unscoped().Where("id IN ?", userIDs).Delete(&model.User{}).Error; err != nil {
 			return err
 		}
@@ -149,9 +172,26 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 		return Result{}, err
 	}
 	students := make([]model.User, 0, len(config.Students))
+
+	// Create a default classroom for the synthetic teacher
+	classroom := model.Classroom{
+		ID:        uuid.New(),
+		Name:      "Lớp Demo",
+		TeacherID: teacher.ID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := tx.Create(&classroom).Error; err != nil {
+		return Result{}, fmt.Errorf("create synthetic classroom: %w", err)
+	}
+
 	for _, account := range config.Students {
 		student, err := createAccount(tx, account)
 		if err != nil {
+			return Result{}, err
+		}
+		// Assign student to the synthetic classroom
+		if err := tx.Model(&student).Update("classroom_id", classroom.ID).Error; err != nil {
 			return Result{}, err
 		}
 		students = append(students, student)

@@ -1,7 +1,27 @@
 "use client";
 
 import React from "react";
-import { Upload, FileJson, Pencil, Tags, Trash, Sparkles } from "lucide-react";
+import {
+  Upload,
+  FileJson,
+  Pencil,
+  Tags,
+  Trash,
+  Sparkles,
+  ChevronDown,
+  Plus,
+  Search,
+  Download,
+} from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { NodeItem, Question } from "../page";
 
@@ -102,20 +122,24 @@ export default function QuestionBankTab({
   return (
     <div className="flex-1 flex flex-col gap-5 overflow-hidden animate-[fadeIn_0.3s_ease-out]">
       {/* Search & Filters & Import excel row */}
-      <div className="bg-card border border-border rounded-3xl p-5 shadow-sm flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex flex-wrap gap-3 items-center flex-1">
-          <input
-            type="text"
-            placeholder="Tìm kiếm câu hỏi..."
-            value={qbSearchText}
-            onChange={(e) => setQbSearchText(e.target.value)}
-            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] w-full max-w-[240px] font-semibold bg-white"
-          />
+      {/* Search & Filters & Import excel row */}
+      <div className="bg-card border border-border rounded-3xl p-5 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+        <div className="flex flex-wrap gap-2.5 items-center flex-1">
+          <div className="relative flex-1 max-w-[240px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-3.5 w-3.5" />
+            <input
+              type="text"
+              placeholder="Tìm kiếm câu hỏi..."
+              value={qbSearchText}
+              onChange={(e) => setQbSearchText(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] w-full font-semibold bg-white"
+            />
+          </div>
           
           <select
             value={qbFilterNodeId}
             onChange={(e) => setQbFilterNodeId(e.target.value)}
-            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+            className="px-3.5 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white cursor-pointer hover:bg-muted/40 transition-colors"
           >
             <option value="">Tất cả chủ đề</option>
             {nodes.map(n => (
@@ -126,7 +150,7 @@ export default function QuestionBankTab({
           <select
             value={qbFilterDifficulty}
             onChange={(e) => setQbFilterDifficulty(e.target.value)}
-            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+            className="px-3.5 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white cursor-pointer hover:bg-muted/40 transition-colors"
           >
             <option value="">Tất cả độ khó</option>
             <option value="easy">Nhận biết</option>
@@ -138,7 +162,7 @@ export default function QuestionBankTab({
           <select
             value={questionTypeFilter}
             onChange={(e) => setQuestionTypeFilter(e.target.value)}
-            className="px-4 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white"
+            className="px-3.5 py-2 border border-border rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[var(--mint)] font-bold text-foreground bg-white cursor-pointer hover:bg-muted/40 transition-colors"
           >
             <option value="">Tất cả loại câu</option>
             <option value="multiple_choice">Trắc nghiệm</option>
@@ -146,53 +170,84 @@ export default function QuestionBankTab({
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={handleStartAddQuestion}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
           >
-            ➕ Thêm câu hỏi
+            <Plus size={14} /> Thêm câu hỏi
           </button>
 
-          <button
-            onClick={handleDownloadTemplate}
-            className="px-4 py-2 border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
-          >
-            Tải file mẫu Excel
-          </button>
-          
-          <label className="px-4 py-2 bg-[var(--mint)] hover:brightness-95 active:scale-95 text-foreground rounded-xl text-xs font-black transition-all shadow-[var(--shadow-card)] flex items-center gap-1.5 cursor-pointer">
-            <Upload size={14} /> Nhập từ Excel
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleExcelImport}
-              className="hidden"
-            />
-          </label>
+          {/* Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm border flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                  subjectQuestions.length === 0
+                    ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-pulse-glow"
+                    : "bg-white hover:bg-muted text-foreground border-border"
+                }`}
+              >
+                {subjectQuestions.length === 0 ? <Sparkles size={14} className="animate-spin" /> : <ChevronDown size={14} />}
+                Nhập & Nạp dữ liệu
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5 shadow-md border border-border bg-popover text-popover-foreground">
+              <DropdownMenuLabel className="text-[10px] font-black text-muted-foreground uppercase tracking-wider px-2.5 py-1.5">
+                Nguồn dữ liệu
+              </DropdownMenuLabel>
+              
+              <DropdownMenuItem
+                onClick={handleLoadDemoQuestions}
+                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-violet-750 hover:text-violet-850 transition-colors"
+              >
+                <Sparkles size={14} className="text-violet-600" />
+                Nạp câu hỏi mẫu
+              </DropdownMenuItem>
 
-          <label className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center gap-1.5 cursor-pointer">
-            <FileJson size={14} /> Import Master Bank
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleMasterBankImport}
-              className="hidden"
-            />
-          </label>
+              <DropdownMenuSeparator className="my-1 border-t border-border" />
 
-          <button
-            type="button"
-            onClick={handleLoadDemoQuestions}
-            className={`px-4 py-2 rounded-xl text-xs font-black active:scale-95 transition-all shadow-md flex items-center gap-1.5 cursor-pointer border ${
-              subjectQuestions.length === 0
-                ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-bounce"
-                : "bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
-            }`}
-            title="Nạp nhanh ngân hàng câu hỏi mẫu hoàn chỉnh để thử nghiệm"
-          >
-            <Sparkles size={14} className={subjectQuestions.length === 0 ? "text-white animate-spin" : "text-indigo-600"} /> Nạp Câu hỏi Mẫu
-          </button>
+              <DropdownMenuItem
+                onClick={() => document.getElementById("master-bank-file-input")?.click()}
+                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
+              >
+                <FileJson size={14} className="text-muted-foreground" />
+                Nhập Master Bank (.json)
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => document.getElementById("excel-file-input")?.click()}
+                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
+              >
+                <Upload size={14} className="text-muted-foreground" />
+                Nhập từ Excel (.xlsx)
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={handleDownloadTemplate}
+                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
+              >
+                <Download size={14} className="text-muted-foreground" />
+                Tải file mẫu Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Hidden inputs for imports */}
+          <input
+            id="excel-file-input"
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleExcelImport}
+            className="hidden"
+          />
+          <input
+            id="master-bank-file-input"
+            type="file"
+            accept=".json"
+            onChange={handleMasterBankImport}
+            className="hidden"
+          />
         </div>
       </div>
 

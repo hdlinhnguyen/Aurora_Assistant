@@ -87,6 +87,39 @@ func (h *StudentMgmtHandler) GetTeacherClassrooms(c fiber.Ctx) error {
 	return c.JSON(classrooms)
 }
 
+// CreateTeacherClassroom – POST /teacher/classrooms
+// Allows teacher to create their own classroom without admin intervention.
+func (h *StudentMgmtHandler) CreateTeacherClassroom(c fiber.Ctx) error {
+	teacherIDStr, ok := c.Locals("userID").(string)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	teacherID := uuid.MustParse(teacherIDStr)
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu không hợp lệ"})
+	}
+	if req.Name == "" {
+		req.Name = "Lớp học mặc định"
+	}
+
+	classroom := model.Classroom{
+		ID:        uuid.New(),
+		Name:      req.Name,
+		TeacherID: teacherID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := h.db.Create(&classroom).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tạo lớp học: " + err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(classroom)
+}
+
 func (h *StudentMgmtHandler) GetClassroomStudents(c fiber.Ctx) error {
 	teacherIDStr, ok := c.Locals("userID").(string)
 	if !ok {
