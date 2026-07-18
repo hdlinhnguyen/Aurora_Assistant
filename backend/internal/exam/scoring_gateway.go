@@ -15,12 +15,34 @@ import (
 // exam and report grading progress without making loopback HTTP calls.
 type ScoringGateway interface {
 	LockForScoring(actor, examID uuid.UUID, expectedVersion, totalSubmissions int, idempotencyKey string) (*model.ExamSnapshot, error)
+	GetLockedSnapshot(actor, examID uuid.UUID, expectedVersion int) (*model.ExamSnapshot, error)
 	RecordScoringProgress(examID uuid.UUID, gradedSubmissions, scoredSubmissions int, idempotencyKey string) error
 }
 
 type scoringGateway struct{ db *gorm.DB }
 
 func NewScoringGateway(db *gorm.DB) ScoringGateway { return &scoringGateway{db: db} }
+
+func (g *scoringGateway) GetLockedSnapshot(actor, examID uuid.UUID, expectedVersion int) (*model.ExamSnapshot, error) {
+	var exam model.Exam
+	if err := g.db.Where("id = ? AND created_by = ?", examID, actor).First(&exam).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, examNotFound()
+		}
+		return nil, err
+	}
+	if exam.Version != expectedVersion {
+		return nil, versionConflict(expectedVersion, exam.Version)
+	}
+	if exam.LockedSnapshotID == nil {
+		return nil, examNotFound()
+	}
+	var snapshot model.ExamSnapshot
+	if err := g.db.First(&snapshot, "id = ? AND exam_id = ? AND purpose = ?", *exam.LockedSnapshotID, examID, "grading_lock").Error; err != nil {
+		return nil, err
+	}
+	return &snapshot, nil
+}
 
 func (g *scoringGateway) LockForScoring(actor, examID uuid.UUID, expectedVersion, total int, key string) (*model.ExamSnapshot, error) {
 	var snapshot model.ExamSnapshot

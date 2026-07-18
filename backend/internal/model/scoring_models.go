@@ -21,8 +21,8 @@ const (
 
 type GradingBatch struct {
 	ID                  uuid.UUID  `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
-	ExamID              uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex" json:"examId"`
-	ExamSnapshotID      uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex" json:"examSnapshotId"`
+	ExamID              uuid.UUID  `gorm:"type:uuid;not null;index" json:"examId"`
+	ExamSnapshotID      uuid.UUID  `gorm:"type:uuid;not null;index" json:"examSnapshotId"`
 	CreatedBy           uuid.UUID  `gorm:"type:uuid;not null;index:idx_grading_batch_owner_status,priority:1" json:"createdBy"`
 	Status              string     `gorm:"type:varchar(20);not null;index:idx_grading_batch_owner_status,priority:2" json:"status"`
 	TotalSubmissions    int        `gorm:"not null;check:chk_batch_total,total_submissions > 0" json:"totalSubmissions"`
