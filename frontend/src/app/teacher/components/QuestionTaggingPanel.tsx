@@ -186,7 +186,7 @@ export default function QuestionTaggingPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex h-full w-full flex-col gap-0 p-0 sm:max-w-xl">
+      <SheetContent className="flex h-full w-full flex-col gap-0 p-0 sm:max-w-xl [&>button]:bg-emerald-600 [&>button]:text-white [&>button]:opacity-100 [&>button]:rounded-full [&>button]:p-1.5 [&>button]:hover:bg-emerald-700 [&>button]:hover:scale-105 [&>button]:transition-all [&>button]:focus:ring-emerald-500 [&>button]:border [&>button]:border-emerald-500/20 [&>button]:flex [&>button]:items-center [&>button]:justify-center [&>button>svg]:text-white [&>button>svg]:h-3.5 [&>button>svg]:w-3.5">
         <SheetHeader className="border-b border-border bg-slate-950 px-6 py-5 pr-12 text-left text-white">
           <div className="mb-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em] text-emerald-300">
             <Tags size={14} />
@@ -280,7 +280,7 @@ export default function QuestionTaggingPanel({
                     disabled={savingKey !== null}
                   >
                     {savingKey === "direct" ? <Loader2 className="animate-spin" /> : <Save />}
-                    Lưu cấp câu
+                    Lưu
                   </Button>
                 }
               />
@@ -361,11 +361,10 @@ function TopicGroup({
             return (
               <label
                 key={topic.id}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
-                  checked
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${checked
                     ? "border-emerald-200 bg-emerald-50"
                     : "border-transparent hover:border-border hover:bg-muted/50"
-                }`}
+                  }`}
               >
                 <Checkbox
                   checked={checked}
