@@ -224,9 +224,9 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 	}
 
 	nodeIDs := curriculumNodeIDs(curriculum)
-	targetNodeIDs := make([]uuid.UUID, 0, len(curriculum.Targets))
+	targetNodeIDs := make(map[string]uuid.UUID, len(curriculum.Targets))
 	for _, node := range curriculum.Targets {
-		targetNodeIDs = append(targetNodeIDs, node.ID)
+		targetNodeIDs[node.StableKey] = node.ID
 	}
 	exams, approvedCount, err := createHistoricalExamData(
 		tx, config, teacher, students, targetNodeIDs, time.Now().UTC().Truncate(time.Minute),

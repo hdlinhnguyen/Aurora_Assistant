@@ -2,6 +2,7 @@ package syntheticseed
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -37,20 +38,35 @@ func TestResetAndSeedCreatesApprovedHistoricalResultsForEveryStudent(t *testing.
 	service := setupSeedDatabase(t)
 	result, err := service.ResetAndSeed(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, 2, result.ExamCount)
-	require.Equal(t, 6, result.ApprovedSubmissionCount)
+	require.Equal(t, 10, result.ExamCount)
+	require.Equal(t, 30, result.ApprovedSubmissionCount)
 
 	var exams []model.Exam
 	require.NoError(t, service.db.Where("created_by = ?", result.Teacher.ID).Order("created_at").Find(&exams).Error)
-	require.Len(t, exams, 2)
+	require.Len(t, exams, 10)
 	require.Equal(t, model.ExamStatusPreparingExam, exams[0].Status)
 	require.NotNil(t, exams[0].LockedSnapshotID)
 	require.True(t, exams[0].CreatedAt.Before(time.Now().UTC().Add(-24*time.Hour)))
+	var targetNodes []model.Node
+	require.NoError(t, service.db.Where("subject = ? AND stable_key IN ?", result.Subject, grade7TargetKeys()).Find(&targetNodes).Error)
+	targetIDs := make(map[uuid.UUID]struct{}, len(targetNodes))
+	for _, node := range targetNodes {
+		targetIDs[node.ID] = struct{}{}
+	}
 	for _, exam := range exams {
+		require.Equal(t, "7", exam.GradeLevel)
 		var snapshot model.ExamSnapshot
 		require.NoError(t, service.db.First(&snapshot, "id = ?", *exam.LockedSnapshotID).Error)
 		_, err := scoring.ParseGradingSnapshot(snapshot)
 		require.NoError(t, err)
+		var questions []model.ExamQuestion
+		require.NoError(t, service.db.Where("exam_id = ?", exam.ID).Find(&questions).Error)
+		for _, question := range questions {
+			var topicIDs []uuid.UUID
+			require.NoError(t, json.Unmarshal([]byte(question.TopicNodeIDsJSON), &topicIDs))
+			require.Len(t, topicIDs, 1)
+			require.Contains(t, targetIDs, topicIDs[0])
+		}
 	}
 
 	studentTotals := make([]model.Score, len(result.Students))
@@ -61,7 +77,7 @@ func TestResetAndSeedCreatesApprovedHistoricalResultsForEveryStudent(t *testing.
 			Joins("JOIN grading_batches ON grading_batches.id = scoring_submissions.grading_batch_id").
 			Where("scoring_submissions.student_id = ? AND grading_batches.created_by = ?", student.ID, result.Teacher.ID).
 			Find(&submissions).Error)
-		require.Len(t, submissions, 2)
+		require.Len(t, submissions, 10)
 		for _, submission := range submissions {
 			require.Equal(t, model.ScoringSubmissionStatusApproved, submission.Status)
 			require.Equal(t, 1, submission.EffectiveApprovalVersion)
