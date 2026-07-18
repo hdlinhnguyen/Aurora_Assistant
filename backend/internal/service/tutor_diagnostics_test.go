@@ -132,3 +132,41 @@ func TestTutorServiceGetClassInterventionGroups(t *testing.T) {
 		t.Fatalf("group students = %#v", students)
 	}
 }
+
+func TestTutorServiceGetStudentStateInitializesNewStudent(t *testing.T) {
+	db := setupDiagnosticsDB(t)
+	svc := NewTutorService(db, nil)
+	studentID := uuid.New()
+
+	// Khởi tạo tài khoản học sinh
+	if err := db.Create(&model.User{
+		ID: studentID, Email: "new-student@example.test",
+		Password: "test", Name: "New Student", Role: "student",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// Gọi GetStudentState cho học sinh mới (chưa có state trong DB)
+	state, err := svc.GetStudentState(studentID, "Toan dai so")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Phải tự động tạo StudentState với NeedsDiagnostic = true
+	if state == nil {
+		t.Fatal("expected state to be initialized, got nil")
+	}
+	if !state.NeedsDiagnostic {
+		t.Fatal("expected NeedsDiagnostic to be true for new student")
+	}
+
+	// Kiểm tra xem đã lưu vào DB thực tế chưa
+	var dbState model.StudentState
+	if err := db.Where("student_id = ? AND subject = ?", studentID, "Toan dai so").First(&dbState).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !dbState.NeedsDiagnostic {
+		t.Fatal("expected NeedsDiagnostic to be saved as true in database")
+	}
+}
+

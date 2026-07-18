@@ -16,6 +16,50 @@ import (
 
 var DB *gorm.DB
 
+func migrationModels() []any {
+	return []any{
+		&model.User{},
+		&model.Classroom{},
+		&model.ChatSession{},
+		&model.Message{},
+		&model.Topic{},
+		&model.Node{},
+		&model.Edge{},
+		&model.Question{},
+		&model.QuestionRubricItem{},
+		&model.QuestionTopicMapping{},
+		&model.QuestionRubricItemTopicMapping{},
+		&model.QuestionTaggingState{},
+		&model.StudentState{},
+		&model.ActivityLog{},
+		&model.AICache{},
+		&model.LearningPath{},
+		&model.StudentTopicMastery{},
+		&model.StudentTopicMasteryHistory{},
+		&model.GuardrailEvent{},
+		&model.TelemetryEvent{},
+		&model.TelemetryOutbox{},
+		&model.QuestionAttemptFact{},
+		&model.Exam{},
+		&model.ExamQuestion{},
+		&model.ExamRubricItem{},
+		&model.ExamSnapshot{},
+		&model.ExamGradingProgress{},
+		&model.ExamInternalEvent{},
+		&model.ExamExport{},
+		&model.ExamAuditLog{},
+		&model.GradingBatch{},
+		&model.ScoringSubmission{},
+		&model.ScoringQuestionResult{},
+		&model.ScoringRubricResult{},
+		&model.ScoringApprovalSnapshot{},
+		&model.ScoringAuditLog{},
+		&model.ScoringInternalEvent{},
+		&model.Badge{},
+		&model.StudentBadge{},
+	}
+}
+
 func ExamExportDir() string {
 	dir := os.Getenv("EXAM_EXPORT_DIR")
 	if dir == "" {
@@ -71,42 +115,37 @@ func ConnectDB() {
 		log.Fatal("Failed to create extension uuid-ossp:", err)
 	}
 
-	err = db.AutoMigrate(
-		&model.User{},
-		&model.ChatSession{},
-		&model.Message{},
-		&model.Topic{},
-		&model.Node{},
-		&model.Edge{},
-		&model.Question{},
-		&model.QuestionRubricItem{},
-		&model.QuestionTopicMapping{},
-		&model.QuestionRubricItemTopicMapping{},
-		&model.QuestionTaggingState{},
-		&model.StudentState{},
-		&model.ActivityLog{},
-		&model.AICache{},
-		&model.LearningPath{},
-		&model.GuardrailEvent{},
-		&model.Exam{},
-		&model.ExamQuestion{},
-		&model.ExamRubricItem{},
-		&model.ExamSnapshot{},
-		&model.ExamGradingProgress{},
-		&model.ExamInternalEvent{},
-		&model.ExamExport{},
-		&model.ExamAuditLog{},
-		&model.GradingBatch{},
-		&model.ScoringSubmission{},
-		&model.ScoringQuestionResult{},
-		&model.ScoringRubricResult{},
-		&model.ScoringApprovalSnapshot{},
-		&model.ScoringAuditLog{},
-		&model.ScoringInternalEvent{},
-	)
+	err = db.AutoMigrate(migrationModels()...)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
+	// Individual grading sessions may share one exam snapshot; remove the
+	// legacy one-batch-per-exam unique index from earlier deployments.
+	if err := db.Exec(`DROP INDEX IF EXISTS uni_grading_batches_exam_id`).Error; err != nil {
+		log.Fatal("Failed to update grading session indexes:", err)
+	}
+	if err := db.Exec(`DROP INDEX IF EXISTS idx_grading_batches_exam_id`).Error; err != nil {
+		log.Fatal("Failed to update grading session indexes:", err)
+	}
+	if err := db.Exec(`DROP INDEX IF EXISTS uni_grading_batches_exam_snapshot_id`).Error; err != nil {
+		log.Fatal("Failed to update grading snapshot indexes:", err)
+	}
+	if err := db.Exec(`DROP INDEX IF EXISTS idx_grading_batches_exam_snapshot_id`).Error; err != nil {
+		log.Fatal("Failed to update grading snapshot indexes:", err)
+	}
+	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_grading_batches_exam_id ON grading_batches (exam_id)`).Error; err != nil {
+		log.Fatal("Failed to create grading session index:", err)
+	}
+	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_grading_batches_exam_snapshot_id ON grading_batches (exam_snapshot_id)`).Error; err != nil {
+		log.Fatal("Failed to create grading snapshot index:", err)
+	}
+
+	// Drop the unique index on questions.sig if it was previously created
+	// (empty-sig rows from legacy questions violate uniqueness)
+	db.Exec(`DROP INDEX IF EXISTS idx_questions_sig`)
+	db.Exec(`DROP INDEX IF EXISTS "idx_questions_sig"`)
+	// Create a regular (non-unique) index instead
+	db.Exec(`CREATE INDEX IF NOT EXISTS idx_questions_sig_lookup ON questions(sig) WHERE sig IS NOT NULL AND sig != ''`)
 
 	sqlDB, err := db.DB()
 	if err == nil {

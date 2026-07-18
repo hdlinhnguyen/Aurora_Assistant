@@ -43,6 +43,18 @@ Hệ thống gia sư thích ứng (Adaptive Tutoring System) kiên quyết nói 
 | AI Engine | Google Gemini API (giao thức tương thích OpenAI adapter) |
 | DevOps | Docker + GitHub Actions (Script tự động `run.ps1` / `run.sh`) |
 
+### Hồ sơ năng lực theo topic (BKT Mastery Profile)
+
+Hệ thống lưu trạng thái BKT hiện tại và lịch sử theo từng cặp học sinh-topic.
+Giảng viên chọn một học sinh trong danh sách lớp để xem badge `BKT %` trên cây
+kiến thức, bấm topic để xem confidence và biến động 30 ngày/90 ngày/toàn bộ.
+Học sinh chỉ đọc được hồ sơ của chính mình tại dashboard cá nhân.
+
+- Python: `POST /mastery/calculate` tính trạng thái BKT.
+- Go teacher: `GET /api/teacher/students/:studentId/mastery` và endpoint history.
+- Go student: `GET /api/student/mastery` và endpoint history tự lấy ID từ token.
+- PostgreSQL: `student_topic_masteries` lưu trạng thái mới nhất;
+  `student_topic_mastery_histories` lưu snapshot bất biến.
 ## Quick Start
 
 ### Yêu cầu trước khi cài đặt:
@@ -62,10 +74,14 @@ cd Aurora_Assistant
 
 # 3. Trải nghiệm
 # Mở trình duyệt truy cập: http://localhost:3000
-# - Tài khoản Học sinh Demo: student@aurora.edu.vn / demo123
-# - Tài khoản Giáo viên Demo: teacher@aurora.edu.vn / demo123
+# Đăng nhập nhanh bằng thẻ One-Click Login (tài khoản synthetic, seed khi backend khởi động):
+# - Giáo viên:   synthetic.teacher@aurora.local   / demo123
+# - Học sinh A:  synthetic.student.a@aurora.local / demo123
+# - Học sinh B:  synthetic.student.b@aurora.local / demo123
+# - Học sinh C:  synthetic.student.c@aurora.local / demo123
 ```
 
+> Synthetic data được reset về trạng thái mẫu mỗi lần backend khởi động; backend tạo answer events rồi gọi BKT service để tính mastery (frontend không chứa phần trăm mastery hardcode). Đặt `ENABLE_SYNTHETIC_DATA=false` để giữ nguyên database và bỏ qua bước reset/seed.
 ## Project Structure
 
 ```

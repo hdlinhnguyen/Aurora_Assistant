@@ -2,17 +2,19 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"log"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,16 +23,43 @@ import (
 	"github.com/google/uuid"
 
 	"backend/internal/config"
+	masteryprofile "backend/internal/mastery"
 	"backend/internal/model"
 	"backend/internal/service"
+	"backend/internal/telemetry"
 )
 
 type TutorHandler struct {
-	svc service.TutorService
+	svc           service.TutorService
+	telemetry     telemetry.ActorPublisher
+	masteryRecalc masteryRecalculator
 }
 
-func NewTutorHandler(svc service.TutorService) *TutorHandler {
-	return &TutorHandler{svc: svc}
+// masteryRecalculator tính lại BKT mastery cho 1 học sinh/môn (cập nhật ngay khi trả lời).
+type masteryRecalculator interface {
+	RecalculateStudent(context.Context, uuid.UUID, string) (masteryprofile.Profile, error)
+}
+
+type TutorHandlerOption func(*TutorHandler)
+
+func WithTutorTelemetry(publisher telemetry.ActorPublisher) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.telemetry = publisher
+	}
+}
+
+func WithMasteryRecalc(m masteryRecalculator) TutorHandlerOption {
+	return func(handler *TutorHandler) {
+		handler.masteryRecalc = m
+	}
+}
+
+func NewTutorHandler(svc service.TutorService, options ...TutorHandlerOption) *TutorHandler {
+	handler := &TutorHandler{svc: svc}
+	for _, option := range options {
+		option(handler)
+	}
+	return handler
 }
 
 type CreateSessionRequest struct {
@@ -472,6 +501,65 @@ func (h *TutorHandler) GetQuestions(c fiber.Ctx) error {
 	return c.JSON(questions)
 }
 
+// GetAdaptiveQuestions trả câu hỏi của nút, XẾP theo mastery của học sinh:
+// mastery thấp → câu dễ (NB) trước; mastery cao → câu khó (VD) trước, rồi tăng dần.
+func (h *TutorHandler) GetAdaptiveQuestions(c fiber.Ctx) error {
+	studentIDStr, _ := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(studentIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user id"})
+	}
+	nodeIdStr := c.Params("nodeId")
+	nodeID, err := uuid.Parse(nodeIdStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
+	}
+	questions, err := h.svc.GetQuestions(nodeID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Mastery nút này → tầng độ khó mục tiêu (0=NB, 1=TH, 2=VD).
+	prob := 0.30
+	var stm model.StudentTopicMastery
+	if config.DB.Where("student_id = ? AND topic_id = ?", studentID, nodeID).First(&stm).Error == nil {
+		prob = stm.MasteryProbability
+	}
+	target := 0
+	if prob >= 0.70 {
+		target = 2
+	} else if prob >= 0.40 {
+		target = 1
+	}
+
+	rank := func(d string) int {
+		switch strings.ToLower(strings.TrimSpace(d)) {
+		case "hard", "vd", "vdc", "vận dụng", "vận dụng cao":
+			return 2
+		case "medium", "th", "thông hiểu":
+			return 1
+		default:
+			return 0 // easy / nb / nhận biết
+		}
+	}
+	sort.SliceStable(questions, func(i, j int) bool {
+		ri, rj := rank(questions[i].Difficulty), rank(questions[j].Difficulty)
+		di := ri - target
+		if di < 0 {
+			di = -di
+		}
+		dj := rj - target
+		if dj < 0 {
+			dj = -dj
+		}
+		if di != dj {
+			return di < dj // gần tầng mục tiêu nhất trước
+		}
+		return ri < rj // rồi tăng dần độ khó
+	})
+	return c.JSON(questions)
+}
+
 func (h *TutorHandler) GetSubjectQuestions(c fiber.Ctx) error {
 	subjectRaw := c.Params("subject")
 	subject, err := url.PathUnescape(subjectRaw)
@@ -559,7 +647,7 @@ func (h *TutorHandler) UploadTheory(c fiber.Ctx) error {
 	}
 
 	theory := c.FormValue("theory")
-	
+
 	fileHeader, err := c.FormFile("file")
 	if err == nil && fileHeader != nil {
 		if extracted, err := extractTextFromFile(fileHeader); err == nil {
@@ -662,6 +750,18 @@ func (h *TutorHandler) SubmitAnswer(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	// Cập nhật mastery ngay (async) → lộ trình + hero tươi theo tiến bộ, không cần giáo viên.
+	if h.masteryRecalc != nil {
+		var node model.Node
+		if config.DB.Where("id = ?", nodeID).First(&node).Error == nil {
+			subject := node.Subject
+			sid := userID
+			go func() {
+				_, _ = h.masteryRecalc.RecalculateStudent(context.Background(), sid, subject)
+			}()
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"isCorrect": isCorrect,
 		"question":  question,
@@ -761,7 +861,6 @@ func (h *TutorHandler) GetClassInterventionGroups(c fiber.Ctx) error {
 	}
 	return c.JSON(groups)
 }
-
 
 func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	token, ok := c.Locals("user").(*jwt.Token)
@@ -1097,8 +1196,10 @@ func (h *TutorHandler) DeleteSubject(c fiber.Ctx) error {
 	if err != nil {
 		subject = subjectRaw
 	}
+	log.Printf("[DEBUG DeleteSubject Handler] raw=%q decoded=%q", subjectRaw, subject)
 
 	if err := h.svc.DeleteSubject(subject); err != nil {
+		log.Printf("[DEBUG DeleteSubject Handler] ERROR: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -1239,25 +1340,25 @@ func (h *TutorHandler) GetInternalGraph(c fiber.Ctx) error {
 }
 
 type CreatePathBodyRequest struct {
-	ClassID                       string    `json:"class_id"`
-	StudentIDs                    []string  `json:"student_ids"`
-	TargetTopicIDs                []string  `json:"target_topic_ids"`
-	TeacherID                     string    `json:"teacher_id"`
-	TargetMasteryThreshold        float64   `json:"target_mastery_threshold"`
-	MinimumConfidenceThreshold    float64   `json:"minimum_confidence_threshold"`
+	ClassID                    string   `json:"class_id"`
+	StudentIDs                 []string `json:"student_ids"`
+	TargetTopicIDs             []string `json:"target_topic_ids"`
+	TeacherID                  string   `json:"teacher_id"`
+	TargetMasteryThreshold     float64  `json:"target_mastery_threshold"`
+	MinimumConfidenceThreshold float64  `json:"minimum_confidence_threshold"`
 }
 
 type RawQuizEvidence struct {
-	EvidenceID    string    `json:"evidence_id"`
-	StudentID     string    `json:"student_id"`
-	SessionID     string    `json:"session_id"`
-	QuestionID    string    `json:"question_id"`
-	TopicID       string    `json:"topic_id"`
-	Score         float64   `json:"score"`
-	AttemptNumber int       `json:"attempt_number"`
-	HintsUsed     int       `json:"hints_used"`
-	GradingMethod string    `json:"grading_method"`
-	OccurredAt    string    `json:"occurred_at"`
+	EvidenceID    string  `json:"evidence_id"`
+	StudentID     string  `json:"student_id"`
+	SessionID     string  `json:"session_id"`
+	QuestionID    string  `json:"question_id"`
+	TopicID       string  `json:"topic_id"`
+	Score         float64 `json:"score"`
+	AttemptNumber int     `json:"attempt_number"`
+	HintsUsed     int     `json:"hints_used"`
+	GradingMethod string  `json:"grading_method"`
+	OccurredAt    string  `json:"occurred_at"`
 }
 
 type CreatePathFastAPIBody struct {
@@ -1269,7 +1370,7 @@ type CreatePathFastAPIBody struct {
 
 func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	teacherIDStr := c.Locals("userID").(string)
-	
+
 	var req struct {
 		ClassID        string   `json:"classId"`
 		StudentIDs     []string `json:"studentIds"`
@@ -1282,7 +1383,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	if req.ClassID == "" {
 		req.ClassID = "class-demo"
 	}
-	
+
 	if len(req.StudentIDs) == 0 {
 		var studentEmails = []string{"studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn", "student@aurora.edu.vn"}
 		var ids []string
@@ -1340,7 +1441,8 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := "http://127.0.0.1:8000/learning-path"
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
 	}
@@ -1360,7 +1462,132 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi giải mã JSON phản hồi"})
 	}
 
+	if teacherID, parseErr := uuid.Parse(teacherIDStr); parseErr == nil {
+		pathCount := 0
+		if paths, ok := result["paths"].(map[string]interface{}); ok {
+			pathCount = len(paths)
+		}
+		threadID, _ := result["thread_id"].(string)
+		h.publishLearningPathGenerated(teacherID, threadID, pathCount)
+	}
 	return c.JSON(result)
+}
+
+// GetStudentLearningPathLive sinh lộ trình cá nhân hóa LIVE cho chính học sinh,
+// không cần giáo viên duyệt. Tính lại BKT từ activity_logs tươi mỗi lần gọi.
+func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
+	studentIDStr, _ := c.Locals("userID").(string)
+	studentID, err := uuid.Parse(studentIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user id"})
+	}
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "thiếu subject"})
+	}
+
+	// Mục tiêu = mọi nút của môn (uuid) — planner sẽ tự lọc theo mastery của học sinh.
+	var nodeIDs []string
+	if err := config.DB.Model(&model.Node{}).Where("subject = ?", subject).Pluck("id", &nodeIDs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	if len(nodeIDs) == 0 {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+
+	// Evidence từ activity của chính học sinh (nhị phân ở P0; P1 thêm độ khó/hints/attempt).
+	var logs []model.ActivityLog
+	if err := config.DB.Where("student_id = ? AND subject = ?", studentID, subject).Find(&logs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+	rawQuiz := buildRawQuizFromLogs(logs)
+
+	fastAPIBody := CreatePathFastAPIBody{
+		Request: CreatePathBodyRequest{
+			ClassID:                    "live-" + studentIDStr,
+			StudentIDs:                 []string{studentIDStr},
+			TargetTopicIDs:             nodeIDs,
+			TeacherID:                  studentIDStr,
+			TargetMasteryThreshold:     0.80,
+			MinimumConfidenceThreshold: 0.40,
+		},
+		RawQuiz:  rawQuiz,
+		RawPaper: []interface{}{},
+		AsOf:     time.Now().Format(time.RFC3339),
+	}
+	jsonBytes, err := json.Marshal(fastAPIBody)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post("http://127.0.0.1:8000/learning-path/live", "application/json", bytes.NewBuffer(jsonBytes))
+	if err != nil {
+		// Không nối được service → trả rỗng, FE tự fallback thứ tự cây.
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	defer resp.Body.Close()
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &result); err != nil {
+		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+	}
+	if c.Query("debug") == "1" {
+		pathKeys := []string{}
+		if paths, ok := result["paths"].(map[string]interface{}); ok {
+			for k := range paths {
+				pathKeys = append(pathKeys, k)
+			}
+		}
+		return c.JSON(fiber.Map{
+			"nodeCount":     len(nodeIDs),
+			"evidenceCount": len(rawQuiz),
+			"studentId":     studentIDStr,
+			"pythonStatus":  result["status"],
+			"pathKeys":      pathKeys,
+			"raw":           result,
+		})
+	}
+	if paths, ok := result["paths"].(map[string]interface{}); ok {
+		if p, ok := paths[studentIDStr].(map[string]interface{}); ok {
+			if steps, ok := p["ordered_steps"]; ok {
+				return c.JSON(fiber.Map{"ordered_steps": steps})
+			}
+		}
+	}
+	return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
+}
+
+// buildRawQuizFromLogs chuyển ActivityLog answer_correct/incorrect thành RawQuizEvidence.
+func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
+	rawQuiz := []RawQuizEvidence{}
+	for _, lg := range logs {
+		score := 0.0
+		switch lg.Action {
+		case "answer_correct":
+			score = 1.0
+		case "answer_incorrect":
+			score = 0.0
+		default:
+			continue
+		}
+		rawQuiz = append(rawQuiz, RawQuizEvidence{
+			EvidenceID:    lg.ID.String(),
+			StudentID:     lg.StudentID.String(),
+			SessionID:     "live-session",
+			QuestionID:    "live-question",
+			TopicID:       lg.NodeID.String(),
+			Score:         score,
+			AttemptNumber: 1,
+			HintsUsed:     0,
+			GradingMethod: "auto",
+			OccurredAt:    lg.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return rawQuiz
 }
 
 func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
@@ -1378,6 +1605,8 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu yêu cầu không hợp lệ"})
 	}
 
+	teacherID, _ := uuid.Parse(c.Locals("userID").(string))
+
 	// We still notify FastAPI server of approval to update the thread status
 	reqToFastAPI := struct {
 		Approve bool   `json:"approve"`
@@ -1392,7 +1621,8 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := fmt.Sprintf("http://127.0.0.1:8000/learning-path/%s/approve", threadID)
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ tính toán lộ trình: " + err.Error()})
 	}
@@ -1446,6 +1676,7 @@ func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {
 		}
 		config.DB.Create(&newPath)
 	}
+	h.publishLearningPathApproved(teacherID, threadID, req.Approve, req.Note, len(pathsToSave))
 
 	return c.JSON(result)
 }
@@ -1508,7 +1739,8 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 	}
 
 	fastAPIURL := "http://127.0.0.1:8000/hints"
-	resp, err := http.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(fastAPIURL, "application/json", bytes.NewBuffer(jsonBytes))
 	if err != nil {
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không thể kết nối đến máy chủ gợi ý: " + err.Error()})
 	}
@@ -1541,9 +1773,56 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 			CreatedAt: time.Now(),
 		}
 		config.DB.Create(&newLog)
+		h.publishHintTelemetry(studentID, topicUUID, req.PressCount, string(bodyBytes))
 	}
 
 	return c.JSON(hintResult)
+}
+
+func (h *TutorHandler) publishHintTelemetry(studentID, topicID uuid.UUID, level int, _ string) {
+	if h.telemetry == nil {
+		return
+	}
+	now := time.Now().UTC()
+	for _, name := range []string{"hint_requested", "hint_rendered"} {
+		event := telemetry.Event{
+			EventID: uuid.NewString(), Name: name, SchemaVersion: telemetry.CurrentSchemaVersion,
+			OccurredAt: now, TopicID: topicID.String(), Source: "go_backend",
+			ConsentState: "required", RetentionClass: "interaction",
+			Properties: map[string]any{"hint_level": level},
+		}
+		if _, err := h.telemetry.PublishActor(context.Background(), studentID, "student", event); err != nil {
+			log.Printf("telemetry hint event failed: %v", err)
+		}
+	}
+}
+
+func (h *TutorHandler) publishLearningPathGenerated(teacherID uuid.UUID, threadID string, pathCount int) {
+	if h.telemetry == nil {
+		return
+	}
+	event := telemetry.Event{
+		EventID: uuid.NewString(), Name: "learning_path_generated", SchemaVersion: telemetry.CurrentSchemaVersion,
+		OccurredAt: time.Now().UTC(), Source: "go_backend", ConsentState: "required", RetentionClass: "decision",
+		Properties: map[string]any{"thread_id": threadID, "path_count": pathCount, "model_version": "learning-path-v1"},
+	}
+	if _, err := h.telemetry.PublishActor(context.Background(), teacherID, "teacher", event); err != nil {
+		log.Printf("telemetry learning path event failed: %v", err)
+	}
+}
+
+func (h *TutorHandler) publishLearningPathApproved(teacherID uuid.UUID, threadID string, approved bool, note string, pathCount int) {
+	if h.telemetry == nil {
+		return
+	}
+	event := telemetry.Event{
+		EventID: uuid.NewString(), Name: "learning_path_approved", SchemaVersion: telemetry.CurrentSchemaVersion,
+		OccurredAt: time.Now().UTC(), Source: "go_backend", ConsentState: "required", RetentionClass: "decision",
+		Properties: map[string]any{"thread_id": threadID, "approved": approved, "note_length": len(note), "path_count": pathCount},
+	}
+	if _, err := h.telemetry.PublishActor(context.Background(), teacherID, "teacher", event); err != nil {
+		log.Printf("telemetry learning path approval event failed: %v", err)
+	}
 }
 
 func (h *TutorHandler) RequestReDiagnostic(c fiber.Ctx) error {
@@ -1583,5 +1862,198 @@ func (h *TutorHandler) AdaptiveDowngrade(c fiber.Ctx) error {
 	return c.JSON(res)
 }
 
+// ──────────────────────────────────────────────
+// ImportMasterBank – POST /api/import/master-bank
+// Receives master_bank.json body, imports TN4 questions
+// with sig-based dedup and auto-node creation.
+// ──────────────────────────────────────────────
 
+type masterBankPayload struct {
+	Meta struct {
+		Mon string `json:"mon"`
+		Lop int    `json:"lop"`
+		Ky  string `json:"ky"`
+	} `json:"meta"`
+	Questions []masterBankQuestion `json:"questions"`
+}
 
+type masterBankQuestion struct {
+	ID        string            `json:"id"`
+	Sig       string            `json:"sig"`
+	LoaiCau   string            `json:"loaiCau"`
+	MucDo     string            `json:"mucDo"`
+	MucDoSo   int               `json:"mucDoSo"`
+	ChuDe     string            `json:"chuDe"`
+	NodeGraph *string           `json:"nodeGraph"` // nullable
+	DeBai     string            `json:"deBai"`
+	PhuongAn  map[string]string `json:"phuongAn"`
+	DapAn     string            `json:"dapAn"`
+}
+
+func (h *TutorHandler) ImportMasterBank(c fiber.Ctx) error {
+	var payload masterBankPayload
+	if err := c.Bind().JSON(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "JSON không hợp lệ: " + err.Error()})
+	}
+
+	if len(payload.Questions) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Không có câu hỏi nào trong file"})
+	}
+
+	// Determine subject name from meta
+	subject := fmt.Sprintf("%s Lớp %d", payload.Meta.Mon, payload.Meta.Lop)
+
+	// 1. Load all nodes for this subject, indexed by stableKey
+	var allNodes []model.Node
+	config.DB.Where("subject = ?", subject).Find(&allNodes)
+	nodeByKey := make(map[string]uuid.UUID)
+	for _, n := range allNodes {
+		if n.StableKey != "" {
+			nodeByKey[n.StableKey] = n.ID
+		}
+	}
+
+	// 2. Prepare a fallback node "Hình học tổng hợp" for null nodeGraph questions
+	var fallbackNodeID uuid.UUID
+	fallbackNeeded := false
+	for _, q := range payload.Questions {
+		if q.LoaiCau == "TN4" && (q.NodeGraph == nil || *q.NodeGraph == "") {
+			fallbackNeeded = true
+			break
+		}
+	}
+	if fallbackNeeded {
+		// Check if fallback node already exists
+		var existing model.Node
+		result := config.DB.Where("subject = ? AND name = ?", subject, "Hình học tổng hợp").First(&existing)
+		if result.Error == nil {
+			fallbackNodeID = existing.ID
+		} else {
+			// Create fallback node
+			fallbackNodeID = uuid.New()
+			fallbackNode := model.Node{
+				ID:         fallbackNodeID,
+				Subject:    subject,
+				Name:       "Hình học tổng hợp",
+				Theory:     "Node tổng hợp chứa các câu hỏi hình học chưa được phân loại vào node cụ thể.",
+				TopicGroup: "Hình học",
+				PosX:       600,
+				PosY:       400,
+				IsRoot:     false,
+				StableKey:  "l7-hinh-hoc-tong-hop",
+				Status:     "active",
+				CreatedAt:  time.Now(),
+				UpdatedAt:  time.Now(),
+			}
+			config.DB.Create(&fallbackNode)
+		}
+		nodeByKey["__fallback__"] = fallbackNodeID
+	}
+
+	// 3. Collect existing sigs in DB to skip duplicates
+	var existingSigs []string
+	config.DB.Model(&model.Question{}).Where("sig IS NOT NULL AND sig != ''").Pluck("sig", &existingSigs)
+	sigSet := make(map[string]bool)
+	for _, s := range existingSigs {
+		sigSet[s] = true
+	}
+
+	// 4. Process questions
+	imported := 0
+	skipped := 0
+	skippedNonTN4 := 0
+	skippedNoNode := 0
+	errors := []string{}
+
+	for _, q := range payload.Questions {
+		// Skip non-TN4
+		if q.LoaiCau != "TN4" {
+			skippedNonTN4++
+			continue
+		}
+
+		// Skip if sig already in DB
+		if q.Sig != "" && sigSet[q.Sig] {
+			skipped++
+			continue
+		}
+
+		// Find target node
+		var targetNodeID uuid.UUID
+		if q.NodeGraph != nil && *q.NodeGraph != "" {
+			if nid, ok := nodeByKey[*q.NodeGraph]; ok {
+				targetNodeID = nid
+			} else {
+				// stableKey not found in existing nodes — use fallback
+				targetNodeID = nodeByKey["__fallback__"]
+			}
+		} else {
+			// null nodeGraph → use fallback
+			if fid, ok := nodeByKey["__fallback__"]; ok {
+				targetNodeID = fid
+			} else {
+				skippedNoNode++
+				continue
+			}
+		}
+
+		// Map difficulty: mucDoSo 1→easy, 2→medium, 3→hard, 4→hard
+		difficulty := "medium"
+		switch q.MucDoSo {
+		case 1:
+			difficulty = "easy"
+		case 2:
+			difficulty = "medium"
+		case 3, 4:
+			difficulty = "hard"
+		}
+
+		// Build options JSON array and find correct index
+		if q.PhuongAn == nil || len(q.PhuongAn) == 0 {
+			skipped++
+			continue
+		}
+		keys := []string{"A", "B", "C", "D"}
+		options := make([]string, 0, 4)
+		correctIdx := 0
+		for i, k := range keys {
+			if v, ok := q.PhuongAn[k]; ok {
+				options = append(options, v)
+				if k == q.DapAn {
+					correctIdx = i
+				}
+			}
+		}
+
+		optionsBytes, _ := json.Marshal(options)
+
+		newQ := model.Question{
+			ID:            uuid.New(),
+			NodeID:        targetNodeID,
+			Content:       q.DeBai,
+			OptionsJSON:   string(optionsBytes),
+			CorrectOption: correctIdx,
+			Difficulty:    difficulty,
+			Sig:           q.Sig,
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+
+		if err := config.DB.Create(&newQ).Error; err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %s", q.ID, err.Error()))
+			continue
+		}
+		sigSet[q.Sig] = true
+		imported++
+	}
+
+	return c.JSON(fiber.Map{
+		"status":        "success",
+		"imported":      imported,
+		"skippedDedup":  skipped,
+		"skippedNonTN4": skippedNonTN4,
+		"skippedNoNode": skippedNoNode,
+		"errors":        errors,
+		"subject":       subject,
+	})
+}

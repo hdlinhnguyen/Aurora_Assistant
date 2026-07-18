@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"backend/internal/model"
+	"backend/internal/telemetry"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -16,22 +17,40 @@ type Service struct {
 	repository *Repository
 	exporter   Exporter
 	exportDir  string
+	publisher  telemetry.Publisher
 }
 
-func NewService(repository *Repository) *Service {
-	return &Service{repository: repository}
+type ServiceOption func(*Service)
+
+func WithTelemetryPublisher(publisher telemetry.Publisher) ServiceOption {
+	return func(service *Service) {
+		service.publisher = publisher
+	}
+}
+
+func NewService(repository *Repository, options ...ServiceOption) *Service {
+	service := &Service{repository: repository}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 func NewServiceWithExporter(
 	repository *Repository,
 	exporter Exporter,
 	exportDir string,
+	options ...ServiceOption,
 ) *Service {
-	return &Service{
+	service := &Service{
 		repository: repository,
 		exporter:   exporter,
 		exportDir:  exportDir,
 	}
+	for _, option := range options {
+		option(service)
+	}
+	return service
 }
 
 func (s *Service) Create(actor uuid.UUID, input CreateInput) (*Detail, error) {
@@ -76,6 +95,7 @@ func (s *Service) Create(actor uuid.UUID, input CreateInput) (*Detail, error) {
 }
 
 func (s *Service) List(actor uuid.UUID, filter ListFilter) ([]model.Exam, error) {
+	filter.Subject = strings.TrimSpace(filter.Subject)
 	filter.Status = strings.TrimSpace(filter.Status)
 	filter.Search = strings.TrimSpace(filter.Search)
 	if err := validateListFilter(filter); err != nil {

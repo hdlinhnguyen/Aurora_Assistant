@@ -52,8 +52,13 @@ func (s *authService) Register(email, password, name, role string) (*model.User,
 		return nil, ErrHashFailed
 	}
 
-	if role != "teacher" && role != "student" {
+	if role != "teacher" && role != "student" && role != "admin" {
 		role = "student"
+	}
+
+	status := "active"
+	if role == "teacher" {
+		status = "pending"
 	}
 
 	user := &model.User{
@@ -62,6 +67,7 @@ func (s *authService) Register(email, password, name, role string) (*model.User,
 		Password: string(hashedPassword),
 		Name:     name,
 		Role:     role,
+		Status:   status,
 	}
 
 	if err := s.db.Create(user).Error; err != nil {
@@ -75,6 +81,13 @@ func (s *authService) Login(email, password string) (*model.User, string, error)
 	var user model.User
 	if err := s.db.Where("email = ?", email).First(&user).Error; err != nil {
 		return nil, "", ErrInvalidCreds
+	}
+
+	if user.Status != "active" {
+		if user.Status == "pending" {
+			return nil, "", errors.New("tài khoản của bạn đang chờ quản trị viên phê duyệt")
+		}
+		return nil, "", errors.New("tài khoản của bạn đã bị khóa")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {

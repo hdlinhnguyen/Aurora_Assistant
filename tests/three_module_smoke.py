@@ -56,9 +56,10 @@ def main():
         )
 
         # The minimal teacher UI exposes both new workspaces.
-        page.get_by_role("button", name="Tạo đề kiểm tra").click()
-        page.get_by_placeholder("Tên đề").fill(exam_title)
-        page.get_by_role("button", name="Tạo đề nháp").click()
+        page.locator("button:has(svg.lucide-file-pen-line)").click()
+        workspace = page.get_by_test_id("exam-workspace")
+        workspace.locator("main input").first.fill(exam_title)
+        workspace.locator("main button:has(svg.lucide-sparkles)").click()
         page.get_by_text(exam_title).first.wait_for()
 
         exams = expect_ok(page.request.get(f"{API}/teacher/exams", headers=headers), "exam list")
@@ -157,9 +158,26 @@ def main():
             page.request.get(f"{API}/teacher/exams/{exam['id']}", headers=headers),
             "final exam",
         )
-        if final_exam["status"] != "done":
-            raise AssertionError(f"exam did not reach done: {final_exam}")
-        page.get_by_role("button", name="Chấm bài kiểm tra").click()
+        if final_exam["status"] != "preparing_exam":
+            raise AssertionError(f"individual approval unexpectedly closed exam: {final_exam}")
+        if len(students) > 1:
+            expect_ok(
+                page.request.post(
+                    f"{API}/teacher/grading-batches",
+                    headers={
+                        **headers,
+                        "Content-Type": "application/json",
+                        "Idempotency-Key": f"three-module-second-student-{run_id}",
+                    },
+                    data={
+                        "examId": exam["id"],
+                        "studentIds": [students[1]["id"]],
+                        "expectedExamVersion": final_exam["version"],
+                    },
+                ),
+                "second individual grading session",
+            )
+        page.locator("button:has(svg.lucide-clipboard-check)").first.click()
         page.get_by_text("Chấm bài kiểm tra").first.wait_for()
         print("Three-module frontend/backend smoke passed")
         browser.close()

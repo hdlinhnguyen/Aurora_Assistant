@@ -71,6 +71,12 @@ def test_create_returns_draft_awaiting_approval(client):
     assert body["thread_id"]
     assert body["paths"]["minh"]["status"] == "Draft"
     assert body["paths"]["minh"]["ordered_steps"][0]["topic_id"] == "b"
+    metadata = body["decision_metadata"]
+    assert metadata["event_name"] == "learning_path_generated"
+    assert metadata["model_version"]
+    assert metadata["path_count"] == 1
+    assert metadata["step_count"] == 2
+    assert "request" not in metadata
 
 
 def test_approve_finalizes_paths(client):

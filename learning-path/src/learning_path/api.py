@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 import uuid
 import json
+from time import perf_counter
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,11 @@ from pydantic import BaseModel, Field
 
 from learning_path.adapters import CurriculumGraph, load_chac_goc_graph
 from learning_path.hints import HintLadder
+from learning_path.mastery_api import (
+    MasteryCalculationBody,
+    MasteryCalculationResponse,
+    calculate_mastery,
+)
 from learning_path.schemas import (
     LearningPathRequest,
     RawPaperEvidence,
@@ -37,6 +43,7 @@ from learning_path.schemas import (
     Topic,
     PrerequisiteEdge,
 )
+from learning_path.telemetry import learning_path_metadata
 
 # parents[3] = repo root (api.py → learning_path → src → learning-path → root)
 DEFAULT_GRAPH_JSON = Path(__file__).resolve().parents[3] / "knowledge-graph" / "data" / "graph.json"
@@ -129,18 +136,20 @@ def create_app(
             "class_insight": insight.model_dump(mode="json") if insight else None,
         }
 
-    def _respond(thread_id: str, result: dict) -> dict:
+    def _respond(thread_id: str, result: dict, latency_ms: int = 0) -> dict:
         interrupts = result.get("__interrupt__", [])
         return {
             "thread_id": thread_id,
             "status": "awaiting_approval" if interrupts else "finalized",
             "interrupt": interrupts[0].value if interrupts else None,
+            "decision_metadata": learning_path_metadata(result.get("paths", {}), latency_ms),
             **_serialize(result),
         }
 
     @app.post("/learning-path")
     def create_learning_path(body: CreatePathBody) -> dict:
         thread_id = uuid.uuid4().hex
+        started = perf_counter()
         curr = get_curriculum()
         pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
         result = pipeline.invoke(
@@ -153,7 +162,40 @@ def create_app(
             },
             _config(thread_id),
         )
-        return _respond(thread_id, result)
+        return _respond(thread_id, result, round((perf_counter() - started) * 1000))
+
+    @app.post("/learning-path/live")
+    def create_learning_path_live(body: CreatePathBody) -> dict:
+        """Chế độ tự phục vụ cho học sinh: chạy pipeline rồi auto-duyệt qua interrupt
+        của giáo viên → trả path đã finalize ngay (không cần giáo viên can thiệp).
+        Dùng cho lộ trình LIVE: học sinh tự sinh path từ mastery tươi của chính mình."""
+        thread_id = uuid.uuid4().hex
+        started = perf_counter()
+        curr = get_curriculum()
+        pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
+        result = pipeline.invoke(
+            {
+                "request": body.request,
+                "raw_quiz": body.raw_quiz or [],
+                "raw_paper": body.raw_paper or [],
+                "as_of": body.as_of,
+                "path_version": 1,
+            },
+            _config(thread_id),
+        )
+        # auto-resume qua interrupt duyệt của giáo viên
+        if result.get("__interrupt__"):
+            result = pipeline.invoke(
+                Command(resume={"approve": True, "note": "self-serve"}), _config(thread_id)
+            )
+        return {
+            "thread_id": thread_id,
+            "status": "finalized",
+            "decision_metadata": learning_path_metadata(
+                result.get("paths", {}), round((perf_counter() - started) * 1000)
+            ),
+            **_serialize(result),
+        }
 
     @app.post("/learning-path/{thread_id}/approve")
     def approve_learning_path(thread_id: str, body: ApproveBody) -> dict:
@@ -167,7 +209,12 @@ def create_app(
         result = pipeline.invoke(
             Command(resume={"approve": body.approve, "note": body.note}), _config(thread_id)
         )
-        return {"thread_id": thread_id, "status": "finalized", **_serialize(result)}
+        return {
+            "thread_id": thread_id,
+            "status": "finalized",
+            "decision_metadata": learning_path_metadata(result.get("paths", {}), 0),
+            **_serialize(result),
+        }
 
     @app.post("/learning-path/{thread_id}/evidence")
     def submit_evidence(thread_id: str, body: EvidenceBody) -> dict:
@@ -208,6 +255,10 @@ def create_app(
             chosen_misconception=body.chosen_misconception,
         )
         return hint.model_dump(mode="json")
+
+    @app.post("/mastery/calculate", response_model=MasteryCalculationResponse)
+    def calculate_mastery_endpoint(body: MasteryCalculationBody) -> MasteryCalculationResponse:
+        return calculate_mastery(body)
 
     return app
 

@@ -8,14 +8,15 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
   buildRoadmap,
   chatTheory,
+  getAdaptiveQuestions,
   getBadges,
   getLearningPath,
   getLearningPathLive,
   getMastery,
-  getQuestions,
   getSubjects,
   getTree,
   mapQuestion,
@@ -29,12 +30,13 @@ import {
   type MasteryProfile,
   type RoadmapStep,
 } from "./api";
+import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
+import { useCharacter, characterMeta } from "../components/character-context";
 import Character, { type CharKind } from "../components/Character";
-import { characterMeta, useCharacter } from "../components/character-context";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
-// Nhân vật đồng hành lấy từ CharacterContext (mặc định Nấm); tên/emoji suy từ characterMeta().
+const COMPANION = { mascot: "/nova.png", name: "Nova" };
 
 interface ChatMsg {
   sender: "ai" | "student";
@@ -83,6 +85,7 @@ export default function TutorHubPage() {
   const [mastery, setMastery] = useState<MasteryProfile>({ topics: {} });
   const [roadmap, setRoadmap] = useState<RoadmapStep[]>([]);
   const [summary, setSummary] = useState<GameSummary | null>(null);
+  const router = useRouter();
   const [studentName, setStudentName] = useState("bạn");
   const [currentStepId, setCurrentStepId] = useState("");
   const [questions, setQuestions] = useState<HubQuestion[]>([]);
@@ -107,6 +110,8 @@ export default function TutorHubPage() {
   const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [chatSending, setChatSending] = useState(false);
+  const [chatMascotState, setChatMascotState] = useState<MascotState>("waving");
+  const [chatMascotSpeech, setChatMascotSpeech] = useState<string | undefined>();
   const inputRef = useRef<HTMLInputElement>(null);
   const char = useCharacter();
   const companion = characterMeta(char);
@@ -181,7 +186,7 @@ export default function TutorHubPage() {
   async function loadQuestions(nodeId: string) {
     setQLoading(true);
     try {
-      const raw = await getQuestions(nodeId);
+      const raw = await getAdaptiveQuestions(nodeId);
       setQuestions((raw ?? []).map(mapQuestion));
     } catch {
       setQuestions([]);
@@ -231,7 +236,10 @@ export default function TutorHubPage() {
   const chapterPct = Math.round((doneCount / totalSteps) * 100);
   const lessonIndex = Math.max(0, roadmap.findIndex((s) => s.id === currentStepId));
   const chapterName = currentNode?.topicGroup || subject || "Kiến thức";
-  const masteryPct = Math.round((mastery.topics?.[currentStepId]?.masteryProbability ?? 0) * 100);
+  const currentMastery = mastery.topics?.[currentStepId];
+  const masteryPct = currentMastery && currentMastery.masteryStatus !== "unknown"
+    ? Math.round(currentMastery.masteryProbability * 100)
+    : 0;
   const confidencePct = Math.round(
     Math.min(1, Math.max(0, mastery.topics?.[currentStepId]?.confidenceScore ?? 0)) * 100,
   );
@@ -346,11 +354,17 @@ export default function TutorHubPage() {
     const history = chat.map((m) => ({ sender: m.sender, content: m.text }));
     setChat((c) => [...c, { sender: "student", text: val }]);
     setChatSending(true);
+    setChatMascotState("thinking");
+    setChatMascotSpeech("Nova đang suy nghĩ và phân tích câu hỏi của em nha... 🤔💭");
     try {
       const res = await chatTheory(currentStepId, val, history);
       setChat((c) => [...c, { sender: "ai", text: res.reply }]);
+      setChatMascotState("review");
+      setChatMascotSpeech("Nova đã gợi ý xong! Em đọc kỹ và thử suy nghĩ xem sao nhé 💡");
     } catch {
       setChat((c) => [...c, { sender: "ai", text: "Mình đang bận chút xíu, em thử hỏi lại nhé! 😊" }]);
+      setChatMascotState("failed");
+      setChatMascotSpeech("Lỗi kết nối chút xíu, em thử nhắn lại câu hỏi giúp Nova nha 😅");
     } finally {
       setChatSending(false);
     }
@@ -447,22 +461,16 @@ export default function TutorHubPage() {
         >
           <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f2f4f7" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-              <div
+              <img
+                src="/icon.png"
+                alt="Aurora"
                 style={{
-                  ...POPPINS,
                   height: 38,
                   width: 38,
                   borderRadius: 12,
-                  background: "linear-gradient(135deg,#14D9C0,#7C46E8)",
-                  display: "grid",
-                  placeItems: "center",
-                  color: "#fff",
-                  fontWeight: 800,
-                  fontSize: 18,
+                  objectFit: "cover",
                 }}
-              >
-                A
-              </div>
+              />
               <div>
                 <div style={{ ...POPPINS, fontWeight: 800, fontSize: 16, lineHeight: 1 }}>Aurora</div>
                 <div style={{ fontSize: 11, color: "#9aa1b0", marginTop: 2 }}>Học thật, hiểu thật</div>
@@ -588,30 +596,57 @@ export default function TutorHubPage() {
             })}
           </div>
 
-          <div style={{ padding: 14, borderTop: "1px solid #f2f4f7", display: "flex", alignItems: "center", gap: 11 }}>
-            <div
+          <div style={{ padding: 14, borderTop: "1px solid #f2f4f7" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
+              <div
+                style={{
+                  ...POPPINS,
+                  height: 38,
+                  width: 38,
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg,#ffd76f,#ff9f43)",
+                  display: "grid",
+                  placeItems: "center",
+                  fontWeight: 800,
+                  color: "#7a4b00",
+                }}
+              >
+                {studentName.charAt(0).toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {studentName}
+                </div>
+                <div style={{ fontSize: 11, color: "#9aa1b0" }}>
+                  🔥 {streak} ngày · ⭐ {stars}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                router.push("/");
+              }}
               style={{
                 ...POPPINS,
-                height: 38,
-                width: 38,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg,#ffd76f,#ff9f43)",
-                display: "grid",
-                placeItems: "center",
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "9px 14px",
+                border: "1px solid #f8d3da",
+                borderRadius: 12,
+                background: "#fef3f5",
+                color: "#c23a54",
+                fontSize: 12.5,
                 fontWeight: 800,
-                color: "#7a4b00",
+                cursor: "pointer",
+                transition: "all .15s",
               }}
             >
-              {studentName.charAt(0).toUpperCase()}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {studentName}
-              </div>
-              <div style={{ fontSize: 11, color: "#9aa1b0" }}>
-                🔥 {streak} ngày · ⭐ {stars}
-              </div>
-            </div>
+              🚪 Đăng xuất
+            </button>
           </div>
         </aside>
 
@@ -735,7 +770,7 @@ export default function TutorHubPage() {
               <div style={{ width: 264, background: "linear-gradient(160deg,#faf7ff,#f2eefb)", border: "1px solid #ece5fb", borderRadius: 22, padding: 20, display: "flex", flexDirection: "column" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
                   <div style={{ height: 44, width: 44, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
-                    <Character char={char} mood="cheerful" size={40} face="right" />
+                    <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 36, height: 36, objectFit: "contain" }} />
                   </div>
                   <div>
                     <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14 }}>{companion.name}</div>
@@ -937,74 +972,92 @@ export default function TutorHubPage() {
 
           {/* ===== CHAT PANEL (+ companion rail) ===== */}
           {activeTab === "chat" && (
-            <div className="ah-panel" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-            <div
-              style={{ flex: 1, minWidth: 440, maxWidth: 760, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
-            >
-              <div style={{ padding: "15px 20px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", gap: 11 }}>
-                <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
-                  <Character char={char} mood="cheerful" size={34} face="right" />
+            <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap", width: "100%" }}>
+              <div
+                className="ah-panel"
+                style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flex: "1 1 480px", maxWidth: 760, minWidth: 320, display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
+              >
+                <div style={{ padding: "15px 20px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", gap: 11 }}>
+                  <div style={{ height: 38, width: 38, borderRadius: "50%", background: "linear-gradient(135deg,#FFE7A3,#FFC24D)", display: "grid", placeItems: "center", overflow: "hidden" }}>
+                    <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 30, height: 30, objectFit: "contain" }} />
+                  </div>
+                  <div>
+                    <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{COMPANION.name}</div>
+                    <div style={{ fontSize: 11, color: "#0FB9A6", fontWeight: 600 }}>● gợi mở, không cho đáp án sẵn</div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ ...POPPINS, fontWeight: 700, fontSize: 14.5 }}>{companion.name}</div>
-                  <div style={{ fontSize: 11, color: "#0FB9A6", fontWeight: 600 }}>● gợi mở, không cho đáp án sẵn</div>
-                </div>
-              </div>
-              <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-                {chat.map((m, i) =>
-                  m.sender === "ai" ? (
-                    <div key={i} style={{ display: "flex", maxWidth: "82%" }}>
-                      <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#3a3f4d", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                        {m.text}
+                <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+                  {chat.map((m, i) =>
+                    m.sender === "ai" ? (
+                      <div key={i} style={{ display: "flex", maxWidth: "82%" }}>
+                        <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#3a3f4d", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <div style={{ background: "#16161F", color: "#fff", borderRadius: 16, borderBottomRightRadius: 5, padding: "11px 15px", fontSize: 13.5, lineHeight: 1.55, maxWidth: "78%" }}>
+                          {m.text}
+                        </div>
+                      </div>
+                    ),
+                  )}
+                  {chatSending && (
+                    <div style={{ display: "flex", maxWidth: "82%" }}>
+                      <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#9aa1b0" }}>
+                        {COMPANION.name} đang soạn… ✍️
                       </div>
                     </div>
-                  ) : (
-                    <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
-                      <div style={{ background: "#16161F", color: "#fff", borderRadius: 16, borderBottomRightRadius: 5, padding: "11px 15px", fontSize: 13.5, lineHeight: 1.55, maxWidth: "78%" }}>
-                        {m.text}
-                      </div>
-                    </div>
-                  ),
-                )}
-                {chatSending && (
-                  <div style={{ display: "flex", maxWidth: "82%" }}>
-                    <div style={{ background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, borderBottomLeftRadius: 5, padding: "12px 15px", fontSize: 13.5, color: "#9aa1b0" }}>
-                      {companion.name} đang soạn… ✍️
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div style={{ padding: "12px 18px 16px", borderTop: "1px solid #f2f4f7" }}>
-                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                  <div
-                    onClick={() => sendMessage("Em chưa hiểu chỗ này ạ")}
-                    style={{ background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
-                  >
-                    🤔 Em chưa hiểu
-                  </div>
-                  <div
-                    onClick={() => sendMessage("Cho em một ví dụ khác")}
-                    style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#0FB9A6", cursor: "pointer" }}
-                  >
-                    💡 Cho em ví dụ
-                  </div>
+                  )}
                 </div>
-                <form onSubmit={onSubmitChat} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "7px 7px 7px 16px" }}>
-                  <input
-                    ref={inputRef}
-                    placeholder={`Nhắn cho ${companion.name}...`}
-                    style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#16161F" }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={chatSending}
-                    style={{ height: 40, width: 44, border: "none", borderRadius: 12, background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", fontSize: 16, cursor: "pointer", boxShadow: "0 8px 16px -6px rgba(15,185,166,.6)", opacity: chatSending ? 0.6 : 1 }}
-                  >
-                    ➤
-                  </button>
-                </form>
+                <div style={{ padding: "12px 18px 16px", borderTop: "1px solid #f2f4f7" }}>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                    <div
+                      onClick={() => {
+                        setChatMascotState("encourage");
+                        setChatMascotSpeech("Cố lên em! Nova ở đây giúp em từng bước nè 💪✨");
+                        sendMessage("Em chưa hiểu chỗ này ạ");
+                      }}
+                      style={{ background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#5b2fc0", cursor: "pointer" }}
+                    >
+                      🤔 Em chưa hiểu
+                    </div>
+                    <div
+                      onClick={() => {
+                        setChatMascotState("review");
+                        setChatMascotSpeech("Nova sẽ đưa ví dụ minh họa để em dễ hình dung nhé! 📖💡");
+                        sendMessage("Cho em một ví dụ khác");
+                      }}
+                      style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 999, padding: "7px 13px", fontSize: 12, fontWeight: 600, color: "#0FB9A6", cursor: "pointer" }}
+                    >
+                      💡 Cho em ví dụ
+                    </div>
+                  </div>
+                  <form onSubmit={onSubmitChat} style={{ display: "flex", alignItems: "center", gap: 10, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 16, padding: "7px 7px 7px 16px" }}>
+                    <input
+                      ref={inputRef}
+                      placeholder={`Nhắn cho ${COMPANION.name}...`}
+                      style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#16161F" }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={chatSending}
+                      style={{ height: 40, width: 44, border: "none", borderRadius: 12, background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", fontSize: 16, cursor: "pointer", boxShadow: "0 8px 16px -6px rgba(15,185,166,.6)", opacity: chatSending ? 0.6 : 1 }}
+                    >
+                      ➤
+                    </button>
+                  </form>
+                </div>
               </div>
-            </div>
+
+              {/* Mascot Companion Animated GIF outside Chat Frame */}
+              <div style={{ flexShrink: 0, marginTop: 4 }}>
+                <MascotCompanion
+                  state={chatMascotState}
+                  name={COMPANION.name}
+                  speechBubble={chatMascotSpeech}
+                />
+              </div>
             <RailChat
               char={char}
               buddy={buddy}
@@ -1039,7 +1092,7 @@ export default function TutorHubPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontSize: 13.5, color: "#5b6072", marginBottom: 22, lineHeight: 1.4 }}>
               <Character char={char} mood="jump" size={44} face="right" />
               <span>
-                <b>{companion.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
+                <b>{COMPANION.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
               </span>
             </div>
             <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>

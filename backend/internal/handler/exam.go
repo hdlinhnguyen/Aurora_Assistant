@@ -42,7 +42,7 @@ func (h *ExamHandler) List(c fiber.Ctx) error {
 		return writeExamError(c, err)
 	}
 	result, err := h.service.List(actor, exam.ListFilter{
-		Status: c.Query("status"), Search: c.Query("search"),
+		Subject: c.Query("subject"), Status: c.Query("status"), Search: c.Query("search"),
 	})
 	return writeExamResult(c, fiber.StatusOK, result, err)
 }

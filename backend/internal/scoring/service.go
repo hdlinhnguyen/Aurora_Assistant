@@ -31,6 +31,9 @@ func (s *Service) CreateBatch(actor uuid.UUID, input CreateBatchInput) (*BatchDe
 		strings.TrimSpace(input.IdempotencyKey) == "" || len(input.StudentIDs) == 0 {
 		return nil, requestError("A valid exam, students, version, and idempotency key are required.")
 	}
+	if len(input.StudentIDs) != 1 {
+		return nil, requestError("Chỉ được chấm một học sinh trong mỗi phiên cá nhân.")
+	}
 	seen := make(map[uuid.UUID]struct{}, len(input.StudentIDs))
 	for _, id := range input.StudentIDs {
 		if id == uuid.Nil {
@@ -67,10 +70,31 @@ func (s *Service) CreateBatch(actor uuid.UUID, input CreateBatchInput) (*BatchDe
 		if len(students) != len(input.StudentIDs) {
 			return studentError(ErrorCodeInvalidStudent, "Every selected user must be a student.")
 		}
-		sort.Slice(students, func(i, j int) bool { return students[i].ID.String() < students[j].ID.String() })
-		snapshotModel, err := s.gateway(tx.db).LockForScoring(actor, input.ExamID, input.ExpectedExamVersion, len(students), input.IdempotencyKey+":exam")
-		if err != nil {
+		var existing int64
+		if err := tx.db.Model(&model.ScoringSubmission{}).
+			Joins("JOIN grading_batches ON grading_batches.id = scoring_submissions.grading_batch_id").
+			Where("grading_batches.exam_id = ? AND scoring_submissions.student_id = ?", input.ExamID, input.StudentIDs[0]).
+			Count(&existing).Error; err != nil {
 			return err
+		}
+		if existing > 0 {
+			return studentError(ErrorCodeDuplicateStudent, "Học sinh này đã có phiên chấm cho đề.")
+		}
+		sort.Slice(students, func(i, j int) bool { return students[i].ID.String() < students[j].ID.String() })
+		gateway := s.gateway(tx.db)
+		var snapshotModel *model.ExamSnapshot
+		var snapshotErr error
+		var exam model.Exam
+		if err := tx.db.First(&exam, "id = ? AND created_by = ?", input.ExamID, actor).Error; err != nil {
+			return err
+		}
+		if exam.LockedSnapshotID != nil {
+			snapshotModel, snapshotErr = gateway.GetLockedSnapshot(actor, input.ExamID, input.ExpectedExamVersion)
+		} else {
+			snapshotModel, snapshotErr = gateway.LockForScoring(actor, input.ExamID, input.ExpectedExamVersion, 1, input.IdempotencyKey+":exam")
+		}
+		if snapshotErr != nil {
+			return snapshotErr
 		}
 		snapshot, err := ParseGradingSnapshot(*snapshotModel)
 		if err != nil {
