@@ -127,7 +127,8 @@ export default function TutorHubPage() {
   const [examAnswers, setExamAnswers] = useState<Record<string, string>>({}); // questionId -> choiceId
   const [examTimeRemaining, setExamTimeRemaining] = useState<number>(0);
   const [examTimerActive, setExamTimerActive] = useState<boolean>(false);
-  const [examFinishedScore, setExamFinishedScore] = useState<{ totalScore: string; maxScore: string } | null>(null);
+  const [examFinishedScore, setExamFinishedScore] = useState<{ totalScore: string; maxScore: string; summaries?: any[] } | null>(null);
+  const [diagnosticMastery, setDiagnosticMastery] = useState<MasteryProfile | null>(null);
   const [loadingExam, setLoadingExam] = useState<boolean>(false);
   const [submittingExam, setSubmittingExam] = useState<boolean>(false);
   const [customExamCode, setCustomExamCode] = useState<string>("");
@@ -367,7 +368,7 @@ export default function TutorHubPage() {
       const res = await submitAdaptiveAnswer(activeExam.id, currentQuestion.id, selectedAnswer);
       if (res.isFinished) {
         toast.success("Hoàn thành bài đánh giá chẩn đoán!");
-        setExamFinishedScore({ totalScore: "Hoàn thành", maxScore: "Chẩn đoán" });
+        setExamFinishedScore({ totalScore: "Hoàn thành", maxScore: "Chẩn đoán", summaries: res.summaries || [] });
       } else if (res.nextQuestion) {
         setExamQuestions((prev) => [...prev, res.nextQuestion]);
         setExamQIndex((idx) => idx + 1);
@@ -2013,51 +2014,19 @@ export default function TutorHubPage() {
                     alignItems: "stretch",
                   }}
                 >
-                  {/* Left: Question matrix (Ma trận câu đã làm) */}
-                  <div style={{ width: 220, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+                  {/* Left: Progress bar */}
+                  <div style={{ width: 180, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 20, padding: 18, display: "flex", flexDirection: "column", flexShrink: 0, justifyContent: "center" }}>
                     <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1px solid #ece5fb", paddingBottom: 10, marginBottom: 14, textAlign: "center" }}>
-                      Tiến trình Chẩn đoán
+                      Chẩn đoán thích ứng
                     </div>
-                    
-                    {/* Matrix Grid */}
-                    <div style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6, maxHeight: 200, overflowY: "auto", padding: "4px 2px" }}>
-                      {Array.from({ length: 25 }).map((_, idx) => {
-                        const isCurrent = examQIndex === idx;
-                        const isAnswered = idx < examQuestions.length - 1; // All previous questions are answered
-                        
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              ...POPPINS,
-                              height: 30,
-                              borderRadius: 8,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontWeight: 800,
-                              fontSize: 12,
-                              transition: "all .15s",
-                              ...(isCurrent
-                                ? { background: "#7C46E8", color: "#fff", boxShadow: "0 4px 8px rgba(124,70,232,.3)" }
-                                : isAnswered
-                                  ? { background: "#E2FDF8", border: "1px solid #14D9C0", color: "#0d7a6c" }
-                                  : { background: "#f1f3f7", color: "#9aa1b0" }),
-                            }}
-                          >
-                            {idx + 1}
-                          </div>
-                        );
-                      })}
+                    <div style={{ textAlign: "center", padding: "10px 0" }}>
+                      <div style={{ fontSize: 36, fontWeight: 850, color: "#16161F", ...POPPINS }}>
+                        {examQuestions.length} <span style={{ fontSize: 15, color: "#9aa1b0", fontWeight: 700 }}>/ 25</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#5b6072", marginTop: 4, fontWeight: 600 }}>câu hỏi đã làm</div>
                     </div>
-
-                    <div style={{ borderTop: "1px solid #ece5fb", paddingTop: 12, marginTop: 12, textAlign: "center" }}>
-                      <div style={{ fontSize: 11, color: "#5b6072", fontWeight: 700 }}>
-                        Đã hoàn thành: {examQuestions.length - 1} / 25
-                      </div>
-                      <div style={{ height: 5, background: "#eef1f4", borderRadius: 5, width: "100%", marginTop: 8 }}>
-                        <div style={{ height: 5, background: "#14D9C0", borderRadius: 5, width: `${Math.min(100, ((examQuestions.length - 1) / 25) * 100)}%` }} />
-                      </div>
+                    <div style={{ height: 6, background: "#eef1f4", borderRadius: 6, width: "100%", marginTop: 10 }}>
+                      <div style={{ height: 6, background: "#7C46E8", borderRadius: 6, width: `${Math.min(100, (examQuestions.length / 25) * 100)}%` }} />
                     </div>
                   </div>
 
@@ -2143,10 +2112,10 @@ export default function TutorHubPage() {
                       <div style={{ color: "#9aa1b0", textAlign: "center", padding: 20 }}>Không tìm thấy nội dung câu hỏi.</div>
                     )}
 
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, borderTop: "1px solid #f2f4f7", paddingTop: 16 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, borderTop: "1px solid #f2f4f7", paddingTop: 16, alignItems: "center" }}>
                       <button
                         onClick={() => {
-                          if (window.confirm("Bạn có chắc chắn muốn thoát bài thi không? Tiến trình bài thi chẩn đoán này sẽ bị hủy bỏ.")) {
+                          if (confirm("Em có chắc chắn muốn hủy bài thi chẩn đoán này không? Lần sau em vẫn sẽ phải làm lại để tiếp tục lộ trình.")) {
                             setActiveExam(null);
                             setExamQuestions([]);
                             setExamAnswers({});
@@ -2154,19 +2123,20 @@ export default function TutorHubPage() {
                         }}
                         style={{
                           ...POPPINS,
-                          border: "1px solid #f8d3da",
-                          borderRadius: 12,
-                          padding: "11px 20px",
-                          background: "#fef3f5",
-                          color: "#c23a54",
-                          fontWeight: 850,
+                          background: "none",
+                          border: "none",
+                          color: "#9aa1b0",
+                          fontWeight: 700,
                           fontSize: 13,
                           cursor: "pointer",
-                          transition: "all .15s",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
                         }}
                       >
-                        🚪 Thoát / Hủy thi
+                        🚪 Hủy/Thoát thi
                       </button>
+
                       <button
                         onClick={handleAdaptiveAnswer}
                         disabled={submittingExam}
@@ -2192,42 +2162,83 @@ export default function TutorHubPage() {
             })()
           ) : examFinishedScore ? (
             /* ================= Onboarding Complete Card ================= */
-            <div style={{ background: "#fff", borderRadius: 28, maxWidth: 500, width: "100%", padding: "34px 40px", textAlign: "center", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)", animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)" }}>
-              <div style={{ fontSize: 60, marginBottom: 12 }}>🎉</div>
-              <div style={{ ...BALOO, fontWeight: 800, fontSize: 24, marginBottom: 8 }}>Hoàn thành bài kiểm tra!</div>
-              <p style={{ fontSize: 13.5, color: "#5b6072", lineHeight: 1.6, marginBottom: 20 }}>
-                Chúc mừng em đã hoàn thành bài làm. Kết quả chi tiết đã được gửi đến hệ thống để ghi nhận.
-              </p>
-              <div style={{ background: "#F3FBF9", border: "1px solid #e2f3ef", borderRadius: 18, padding: 18, width: 260, margin: "0 auto 24px" }}>
-                <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>Trạng thái chẩn đoán</div>
-                <div style={{ ...POPPINS, fontWeight: 850, fontSize: 22, color: "#16161F" }}>
-                  Đã ghi nhận năng lực 🎉
+            (() => {
+              const summaries = examFinishedScore.summaries || [];
+              const masteredNodes = summaries.filter((s: any) => s.status === "mastered");
+              const weakNodes = summaries.filter((s: any) => s.status === "need_improvement");
+
+              return (
+                <div style={{ background: "#fff", borderRadius: 28, maxWidth: 640, width: "100%", padding: "34px 40px", textAlign: "center", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)", animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)" }}>
+                  <div style={{ fontSize: 60, marginBottom: 12 }}>📊</div>
+                  <div style={{ ...BALOO, fontWeight: 800, fontSize: 25, marginBottom: 6 }}>Kết quả Chẩn đoán năng lực sơ bộ</div>
+                  <p style={{ fontSize: 13.5, color: "#5b6072", lineHeight: 1.6, marginBottom: 20 }}>
+                    Hệ thống đã phân tích câu trả lời của em qua 25 câu hỏi chẩn đoán để xác định mức độ hiểu biết đối với từng chủ đề kiến thức.
+                  </p>
+
+                  <div style={{ display: "flex", gap: 16, textAlign: "left", marginBottom: 24 }}>
+                    {/* Strengths */}
+                    <div style={{ flex: 1, background: "#F3FBF9", border: "1px solid #d4f2ea", borderRadius: 20, padding: 16 }}>
+                      <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#0FB9A6", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>
+                        🟢 Kỹ năng vững vàng ({masteredNodes.length})
+                      </div>
+                      {masteredNodes.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 150, overflowY: "auto" }}>
+                          {masteredNodes.map((s: any, idx: number) => (
+                            <div key={idx} style={{ fontSize: 12.5, fontWeight: 700, color: "#16161F", padding: "6px 10px", background: "#fff", borderRadius: 10, border: "1px solid #eef1f4" }}>
+                              {s.nodeName}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: "#7c8194", fontStyle: "italic", textAlign: "center", marginTop: 20 }}>Chưa ghi nhận kỹ năng đạt yêu cầu</div>
+                      )}
+                    </div>
+
+                    {/* Weaknesses */}
+                    <div style={{ flex: 1, background: "#fef3f5", border: "1px solid #f9dae0", borderRadius: 20, padding: 16 }}>
+                      <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#c23a54", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10, display: "flex", alignItems: "center", gap: 4 }}>
+                        🔴 Cần cải thiện ({weakNodes.length})
+                      </div>
+                      {weakNodes.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 150, overflowY: "auto" }}>
+                          {weakNodes.map((s: any, idx: number) => (
+                            <div key={idx} style={{ fontSize: 12.5, fontWeight: 700, color: "#16161F", padding: "6px 10px", background: "#fff", borderRadius: 10, border: "1px solid #eef1f4" }}>
+                              {s.nodeName}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: "#7c8194", fontStyle: "italic", textAlign: "center", marginTop: 20 }}>Không ghi nhận lỗ hổng kiến thức lớn</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      setExamFinishedScore(null);
+                      setActiveExam(null);
+                      setExamQuestions([]);
+                      setExamAnswers({});
+                      loadAll();
+                    }}
+                    style={{
+                      ...POPPINS,
+                      border: "none",
+                      borderRadius: 14,
+                      padding: "13px 36px",
+                      background: "linear-gradient(135deg,#7C46E8,#5b2fc0)",
+                      color: "#fff",
+                      fontWeight: 800,
+                      fontSize: 14,
+                      cursor: "pointer",
+                      boxShadow: "0 8px 16px -6px rgba(124,70,232,.5)",
+                    }}
+                  >
+                    Vào giao diện chính & Học tập
+                  </button>
                 </div>
-              </div>
-              <button
-                onClick={async () => {
-                  setExamFinishedScore(null);
-                  setActiveExam(null);
-                  setExamQuestions([]);
-                  setExamAnswers({});
-                  loadAll();
-                }}
-                style={{
-                  ...POPPINS,
-                  border: "none",
-                  borderRadius: 14,
-                  padding: "13px 28px",
-                  background: "linear-gradient(135deg,#14D9C0,#0FB9A6)",
-                  color: "#fff",
-                  fontWeight: 800,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  boxShadow: "0 8px 16px -6px rgba(15,185,166,.5)",
-                }}
-              >
-                Tiếp tục học tập
-              </button>
-            </div>
+              );
+            })()
           ) : (
             /* ================= Onboarding Select Exam Panel ================= */
             <div

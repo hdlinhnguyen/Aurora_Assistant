@@ -491,9 +491,65 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 			studentState.UpdatedAt = time.Now()
 			h.db.Save(&studentState)
 		}
+
+		type NodeSummary struct {
+			NodeName string `json:"nodeName"`
+			Status   string `json:"status"` // "mastered" or "need_improvement"
+		}
+		var summaries []NodeSummary
+
+		var logs []model.ActivityLog
+		h.db.Where("student_id = ? AND subject = ? AND created_at >= ?", userID, exam.Subject, exam.CreatedAt).
+			Find(&logs)
+
+		if len(logs) > 0 {
+			nodeIDs := make([]uuid.UUID, 0)
+			nodeMap := make(map[uuid.UUID]bool)
+			for _, log := range logs {
+				if !nodeMap[log.NodeID] {
+					nodeMap[log.NodeID] = true
+					nodeIDs = append(nodeIDs, log.NodeID)
+				}
+			}
+
+			var nodes []model.Node
+			h.db.Where("id IN ?", nodeIDs).Find(&nodes)
+
+			nodeNames := make(map[uuid.UUID]string)
+			for _, n := range nodes {
+				nodeNames[n.ID] = n.Name
+			}
+
+			nodeCorrectCount := make(map[string]int)
+			nodeTotalCount := make(map[string]int)
+			for _, log := range logs {
+				name, ok := nodeNames[log.NodeID]
+				if !ok || name == "" {
+					continue
+				}
+				nodeTotalCount[name]++
+				if log.Action == "answer_correct" {
+					nodeCorrectCount[name]++
+				}
+			}
+
+			for name, total := range nodeTotalCount {
+				correct := nodeCorrectCount[name]
+				status := "need_improvement"
+				if float64(correct)/float64(total) >= 0.7 {
+					status = "mastered"
+				}
+				summaries = append(summaries, NodeSummary{
+					NodeName: name,
+					Status:   status,
+				})
+			}
+		}
+
 		return c.JSON(fiber.Map{
 			"isFinished": true,
 			"isCorrect":  isCorrect,
+			"summaries":  summaries,
 		})
 	}
 

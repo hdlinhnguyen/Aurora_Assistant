@@ -247,6 +247,7 @@ export const submitAdaptiveAnswer = (examId: string, questionId: string, selecte
     isFinished: boolean;
     isCorrect: boolean;
     nextQuestion?: any;
+    summaries?: any[];
   }>;
 
 export const submitCantDo = (nodeId: string) =>
