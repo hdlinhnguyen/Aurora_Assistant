@@ -19,3 +19,14 @@ func TestMigrationModelsIncludeTelemetryStorage(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrationModelsIncludeLearningPathStepProgress(t *testing.T) {
+	types := map[reflect.Type]bool{}
+	for _, migrationModel := range migrationModels() {
+		types[reflect.TypeOf(migrationModel)] = true
+	}
+
+	if !types[reflect.TypeOf(&model.LearningPathStepProgress{})] {
+		t.Fatal("missing migration model LearningPathStepProgress")
+	}
+}

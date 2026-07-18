@@ -34,6 +34,7 @@ func migrationModels() []any {
 		&model.ActivityLog{},
 		&model.AICache{},
 		&model.LearningPath{},
+		&model.LearningPathStepProgress{},
 		&model.StudentTopicMastery{},
 		&model.StudentTopicMasteryHistory{},
 		&model.GuardrailEvent{},
