@@ -83,6 +83,12 @@ export const getTree = (subject: string) =>
 export const getLearningPath = () =>
   apiFetch("/student/learning-path") as Promise<{ ordered_steps: OrderedStep[] }>;
 
+// Lộ trình LIVE: server tính lại theo mastery tươi của chính học sinh (không cần giáo viên duyệt).
+export const getLearningPathLive = (subject: string) =>
+  apiFetch(`/student/learning-path/live?subject=${encodeURIComponent(subject)}`) as Promise<{
+    ordered_steps: OrderedStep[];
+  }>;
+
 export const getMastery = (subject: string) =>
   apiFetch(`/student/mastery?subject=${encodeURIComponent(subject)}`) as Promise<MasteryProfile>;
 
@@ -112,6 +118,20 @@ export const requestHint = (topicId: string, pressCount: number) =>
   }) as Promise<{ content?: string }>;
 
 export const getBadges = () => apiFetch("/student/badges") as Promise<GameSummary>;
+
+// Sự kiện Feynman: học sinh giảng lại bài + điểm Clarity → nguồn cho "Chỉ số Feynman Clarity" ở dashboard GV.
+export interface FeynmanEventPayload {
+  nodeId: string;
+  explanation: string;
+  clarityScore: number;
+  subScores: Record<string, number>;
+  vagueSpots: string[];
+}
+export const postFeynmanEvent = (payload: FeynmanEventPayload) =>
+  apiFetch("/events/feynman", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }) as Promise<{ ok: boolean }>;
 
 // ---------- Mapper ----------
 export type DiffTag = "Nhận biết" | "Thông hiểu" | "Vận dụng";
