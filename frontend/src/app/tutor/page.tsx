@@ -451,7 +451,7 @@ export default function StudentTutorPage() {
       // Load logs safely
       let progressData: any = null;
       try {
-        progressData = await apiFetch(`/teacher/students/${JSON.parse(localStorage.getItem("aurora_user")!).id}/progress/${encodeURIComponent(selectedSubject)}`);
+        progressData = await apiFetch(`/student/progress/${encodeURIComponent(selectedSubject)}`);
         setActivityLogs(progressData?.logs || []);
       } catch (e) {
         console.warn("Could not load student progress logs:", e);

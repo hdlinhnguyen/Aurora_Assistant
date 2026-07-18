@@ -209,6 +209,7 @@ func main() {
 	teacherExams.Post("/students/:studentId/mastery/recalculate", masteryHandler.RecalculateTeacherProfile)
 	studentMastery.Get("/mastery", masteryHandler.GetStudentProfile)
 	studentMastery.Get("/mastery/:topicId/history", masteryHandler.GetStudentHistory)
+	studentMastery.Get("/progress/:subject", tutorHandler.GetStudentSubjectProgress)
 	studentMastery.Get("/badges", gamificationHandler.GetStudentBadges)
 	studentMastery.Get("/exams", studentExamHandler.GetStudentExams)
 	studentMastery.Get("/exams/:examId", studentExamHandler.GetStudentExam)
