@@ -37,11 +37,13 @@ frontend_backup/
 .antigravity/
 antigravity_collaboration_log.md
 scratch/
+tmp/
 
 # Document files uploaded for testing
 *.doc
 *.docx
 *.pdf
+backend/data/exam-exports/
 
 # Python scratch logs & scripts
 generate_log.py

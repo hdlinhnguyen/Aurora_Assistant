@@ -26,6 +26,8 @@ import MonitoringTab from "./components/MonitoringTab";
 import LearningPathTab from "./components/LearningPathTab";
 import StudentsProgressTab from "./components/StudentsProgressTab";
 import StudentMasteryMatrix from "./components/StudentMasteryMatrix";
+import StudentMasteryProfile from "./components/StudentMasteryProfile";
+import StudentActivityFeed from "./components/StudentActivityFeed";
 import ExamBuilderTab from "./components/ExamBuilderTab";
 import ExamScoringTab from "./components/ExamScoringTab";
 import {
@@ -1338,7 +1340,7 @@ export default function TeacherDashboard() {
       onConfirm: async () => {
         setLoading(true);
         try {
-          await apiFetch(`/questions/${qId}`, {
+          await apiFetch(`/teacher/question-bank/questions/${qId}`, {
             method: "DELETE",
           });
           toast.success("Xóa câu hỏi thành công!");
@@ -1720,74 +1722,36 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            {/* Split layout: Tree/Matrix + Activity logs */}
-            <div className="flex-1 flex gap-5 overflow-hidden">
-              {/* Main Workspace (Tree or Matrix) */}
-              <div className="flex-1 relative rounded-3xl overflow-hidden flex flex-col">
-                {studentViewMode === "tree" ? (
-                  <div className="flex-1 relative bg-card shadow-sm border border-border rounded-3xl overflow-hidden">
-                    {nodes.length > 0 ? (
-                      <KnowledgeTree
-                        subject={selectedStudent.subject}
-                        nodes={nodes}
-                        edges={edges}
-                        mode="view-only"
-                        studentNodeStatus={studentNodeStatus}
-                        nodeAccuracy={studentDetail?.nodeAccuracy}
-                        initialNodeId={studentDetail?.state?.initialLevelNodeId}
-                        currentNodeId={studentDetail?.state?.currentLevelNodeId}
-                      />
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Đang tải sơ đồ...
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <StudentMasteryMatrix
-                    nodes={nodes}
-                    studentDetail={studentDetail}
-                    subject={selectedStudent.subject}
-                  />
-                )}
-              </div>
-
-              {/* Student Logs */}
-              <div className="w-[380px] bg-card border border-border rounded-3xl p-5 flex flex-col overflow-hidden shadow-sm">
-                <h3 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3.5">Log Chi Tiết Hoạt Động</h3>
-                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                  {studentDetail && studentDetail.logs && studentDetail.logs.length > 0 ? (
-                    studentDetail.logs.map((log) => {
-                      const isCorrect = log.action === "answer_correct";
-                      const isIncorrect = log.action === "answer_incorrect";
-                      const isCantDo = log.action === "click_cant_do";
-
-                      return (
-                        <div key={log.id} className="p-3 bg-muted border border-border rounded-2xl text-[11px] leading-relaxed space-y-1 shadow-sm">
-                          <div className="flex justify-between items-start">
-                            <span className="font-black text-foreground">{log.nodeName}</span>
-                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${isCorrect
-                                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                                : isIncorrect || isCantDo
-                                  ? "bg-rose-50 text-rose-600 border border-rose-200"
-                                  : "bg-blue-50 text-blue-600 border border-blue-200"
-                              }`}>
-                              {log.action}
-                            </span>
-                          </div>
-                          <p className="text-muted-foreground font-medium">{log.detail}</p>
-                          <div className="text-[9px] text-muted-foreground font-semibold">{new Date(log.createdAt).toLocaleString("vi-VN")}</div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-12 text-muted-foreground text-xs font-bold border border-dashed border-border rounded-2xl">
-                      Chưa ghi nhận hoạt động nào của học sinh.
-                    </div>
-                  )}
+            {studentViewMode === "tree" ? (
+              nodes.length > 0 ? (
+                <StudentMasteryProfile
+                  studentId={selectedStudent.studentId}
+                  subject={selectedStudent.subject}
+                  nodes={nodes}
+                  edges={edges}
+                  studentNodeStatus={studentNodeStatus}
+                  nodeAccuracy={studentDetail?.nodeAccuracy}
+                  initialNodeId={studentDetail?.state?.initialLevelNodeId}
+                  currentNodeId={studentDetail?.state?.currentLevelNodeId}
+                  activityContent={<StudentActivityFeed logs={studentDetail?.logs || []} />}
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center rounded-3xl border border-border bg-card text-muted-foreground">
+                  Đang tải sơ đồ...
+                </div>
+              )
+            ) : (
+              <div className="flex-1 flex gap-5 overflow-hidden">
+                <StudentMasteryMatrix
+                  nodes={nodes}
+                  studentDetail={studentDetail}
+                  subject={selectedStudent.subject}
+                />
+                <div className="w-[380px] bg-card border border-border rounded-3xl p-5 overflow-hidden shadow-sm">
+                  <StudentActivityFeed logs={studentDetail?.logs || []} />
                 </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           // Tabs Content
@@ -1806,7 +1770,11 @@ export default function TeacherDashboard() {
                 )}
                 <div>
                   <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground uppercase tracking-tight">
-                    {activeTab === "students"
+                    {activeTab === "exam-builder"
+                      ? "Tạo đề kiểm tra"
+                      : activeTab === "exam-scoring"
+                        ? "Chấm bài kiểm tra"
+                        : activeTab === "students"
                       ? "Báo cáo tiến độ học tập"
                       : activeTab === "graph-designer"
                         ? "Thiết kế & Biên soạn sơ đồ cây"
@@ -1817,7 +1785,11 @@ export default function TeacherDashboard() {
                             : "Giám sát & Đánh giá lớp học"}
                   </h1>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {activeTab === "students"
+                    {activeTab === "exam-builder"
+                      ? "Biên soạn câu hỏi, cân đối điểm và chuẩn bị đề trong một workspace"
+                      : activeTab === "exam-scoring"
+                        ? "Chấm từng bài, lưu tự động, duyệt điểm và theo dõi lịch sử"
+                        : activeTab === "students"
                       ? "Theo dõi hành trình học tập và kết quả của từng học sinh"
                       : activeTab === "graph-designer"
                         ? "Biên soạn các nút lý thuyết, liên kết mối quan hệ tiên quyết"

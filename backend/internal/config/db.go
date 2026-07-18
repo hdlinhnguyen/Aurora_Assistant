@@ -87,6 +87,8 @@ func ConnectDB() {
 		&model.ActivityLog{},
 		&model.AICache{},
 		&model.LearningPath{},
+		&model.StudentTopicMastery{},
+		&model.StudentTopicMasteryHistory{},
 		&model.GuardrailEvent{},
 		&model.Exam{},
 		&model.ExamQuestion{},
@@ -106,6 +108,26 @@ func ConnectDB() {
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
+	}
+	// Individual grading sessions may share one exam snapshot; remove the
+	// legacy one-batch-per-exam unique index from earlier deployments.
+	if err := db.Exec(`DROP INDEX IF EXISTS uni_grading_batches_exam_id`).Error; err != nil {
+		log.Fatal("Failed to update grading session indexes:", err)
+	}
+	if err := db.Exec(`DROP INDEX IF EXISTS idx_grading_batches_exam_id`).Error; err != nil {
+		log.Fatal("Failed to update grading session indexes:", err)
+	}
+	if err := db.Exec(`DROP INDEX IF EXISTS uni_grading_batches_exam_snapshot_id`).Error; err != nil {
+		log.Fatal("Failed to update grading snapshot indexes:", err)
+	}
+	if err := db.Exec(`DROP INDEX IF EXISTS idx_grading_batches_exam_snapshot_id`).Error; err != nil {
+		log.Fatal("Failed to update grading snapshot indexes:", err)
+	}
+	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_grading_batches_exam_id ON grading_batches (exam_id)`).Error; err != nil {
+		log.Fatal("Failed to create grading session index:", err)
+	}
+	if err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_grading_batches_exam_snapshot_id ON grading_batches (exam_snapshot_id)`).Error; err != nil {
+		log.Fatal("Failed to create grading snapshot index:", err)
 	}
 
 	sqlDB, err := db.DB()

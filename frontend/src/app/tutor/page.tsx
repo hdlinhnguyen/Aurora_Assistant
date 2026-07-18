@@ -6,6 +6,8 @@ import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { BookOpen, History, Map, Sparkles, ArrowLeft, MessageSquare, Send, Check, CornerDownRight, ChevronLeft, ChevronRight, Compass, HelpCircle, Award, ListTodo, AlertCircle, PlayCircle, Key, Lock, X, Zap, Target, Clock, RefreshCw } from "lucide-react";
 import KnowledgeTree from "../components/KnowledgeTree";
+import StudentMasteryDashboard from "./components/StudentMasteryDashboard";
+import { TopicMastery } from "@/lib/mastery";
 
 
 interface NodeItem {
@@ -109,6 +111,7 @@ export default function StudentTutorPage() {
   const [edges, setEdges] = useState<EdgeItem[]>([]);
   const [studentState, setStudentState] = useState<StudentState | null>(null);
   const [nodeStatus, setNodeStatus] = useState<Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">>({});
+  const [masteryByTopic, setMasteryByTopic] = useState<Record<string, TopicMastery>>({});
 
   // Active Node Drawer
   const [selectedNode, setSelectedNode] = useState<NodeItem | null>(null);
@@ -236,6 +239,9 @@ export default function StudentTutorPage() {
       loadTreeData();
       loadStudentState();
       loadLearningPath();
+      apiFetch(`/student/mastery?subject=${encodeURIComponent(selectedSubject)}`)
+        .then((profile) => setMasteryByTopic(profile?.topics || {}))
+        .catch(() => setMasteryByTopic({}));
       
       const savedNodeStr = localStorage.getItem("aurora_student_selected_node");
       if (savedNodeStr) {
@@ -516,19 +522,11 @@ export default function StudentTutorPage() {
   };
 
   const getBktScoreForNode = (nodeId: string) => {
-    if (nodeStatus[nodeId] === "mastered") return { mastery: 0.94, confidence: 0.88 };
-    if (learningPath && learningPath.ordered_steps) {
-      const step = learningPath.ordered_steps.find((s: any) => s.topic_id === nodeId);
-      if (step) {
-        return {
-          mastery: step.current_mastery || 0.15,
-          confidence: step.target_mastery ? Math.min(step.target_mastery * 0.9, 0.85) : 0.65
-        };
-      }
-    }
-    if (nodeStatus[nodeId] === "struggle") return { mastery: 0.28, confidence: 0.72 };
-    if (nodeStatus[nodeId] === "learning") return { mastery: 0.45, confidence: 0.68 };
-    return { mastery: 0.15, confidence: 0.50 };
+    const state = masteryByTopic[nodeId];
+    return {
+      mastery: state?.masteryProbability ?? 0,
+      confidence: state?.confidenceScore ?? 0,
+    };
   };
 
   const loadQuestions = async (nodeId: string) => {
@@ -1291,6 +1289,7 @@ export default function StudentTutorPage() {
                     subject={selectedSubject}
                     nodes={nodes}
                     edges={edges}
+                    masteryByTopic={masteryByTopic}
                     mode="student"
                     studentNodeStatus={nodeStatus}
                     initialNodeId={studentState?.initialLevelNodeId}
@@ -1561,6 +1560,15 @@ export default function StudentTutorPage() {
                       </div>
                     );
                   })()
+                )}
+
+                {quizMode !== "diagnostic" && selectedNode && (
+                  <StudentMasteryDashboard
+                    subject={selectedSubject}
+                    selectedTopic={selectedNode}
+                    masteryByTopic={masteryByTopic}
+                    onProfileChange={setMasteryByTopic}
+                  />
                 )}
 
                 {/* 2. Practice Questions & Actions */}
