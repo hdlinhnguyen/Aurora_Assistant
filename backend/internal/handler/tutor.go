@@ -1535,6 +1535,22 @@ func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
 		return c.JSON(fiber.Map{"ordered_steps": []interface{}{}})
 	}
+	if c.Query("debug") == "1" {
+		pathKeys := []string{}
+		if paths, ok := result["paths"].(map[string]interface{}); ok {
+			for k := range paths {
+				pathKeys = append(pathKeys, k)
+			}
+		}
+		return c.JSON(fiber.Map{
+			"nodeCount":     len(nodeIDs),
+			"evidenceCount": len(rawQuiz),
+			"studentId":     studentIDStr,
+			"pythonStatus":  result["status"],
+			"pathKeys":      pathKeys,
+			"raw":           result,
+		})
+	}
 	if paths, ok := result["paths"].(map[string]interface{}); ok {
 		if p, ok := paths[studentIDStr].(map[string]interface{}); ok {
 			if steps, ok := p["ordered_steps"]; ok {

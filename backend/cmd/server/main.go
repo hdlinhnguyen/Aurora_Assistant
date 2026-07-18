@@ -248,6 +248,7 @@ func main() {
 	api.Get("/student/learning-path", tutorHandler.GetStudentLearningPath)
 	api.Get("/student/learning-path/live", tutorHandler.GetStudentLearningPathLive)
 	api.Post("/student/hints", tutorHandler.RequestHint)
+	api.Post("/events/feynman", tutorHandler.SubmitFeynmanEvent)
 	api.Post("/nodes/:nodeId/chat-theory", tutorHandler.ChatNodeTheory)
 
 	// Admin Routes (Admin only)

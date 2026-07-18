@@ -123,6 +123,20 @@ export const requestHint = (topicId: string, pressCount: number) =>
 
 export const getBadges = () => apiFetch("/student/badges") as Promise<GameSummary>;
 
+// Sự kiện Feynman: học sinh giảng lại bài + điểm Clarity → nguồn cho "Chỉ số Feynman Clarity" ở dashboard GV.
+export interface FeynmanEventPayload {
+  nodeId: string;
+  explanation: string;
+  clarityScore: number;
+  subScores: Record<string, number>;
+  vagueSpots: string[];
+}
+export const postFeynmanEvent = (payload: FeynmanEventPayload) =>
+  apiFetch("/events/feynman", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }) as Promise<{ ok: boolean }>;
+
 // ---------- Mapper ----------
 export type DiffTag = "Nhận biết" | "Thông hiểu" | "Vận dụng";
 export interface HubQuestion {
