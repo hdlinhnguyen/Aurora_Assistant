@@ -65,8 +65,8 @@ func ParseGradingSnapshot(snapshot model.ExamSnapshot) (*GradingSnapshot, error)
 			return nil, invalidSnapshot("duplicate question ID %s", rawQuestion.ID)
 		}
 		questionIDs[rawQuestion.ID] = struct{}{}
-		if rawQuestion.Position < 1 {
-			return nil, invalidSnapshot("question position must be positive")
+		if rawQuestion.Position < 0 {
+			return nil, invalidSnapshot("question position cannot be negative")
 		}
 		if !positiveScore(rawQuestion.Points) {
 			return nil, invalidSnapshot("question %s points must be positive", rawQuestion.ID)
@@ -105,8 +105,8 @@ func ParseGradingSnapshot(snapshot model.ExamSnapshot) (*GradingSnapshot, error)
 				return nil, invalidSnapshot("duplicate rubric ID %s", rawRubric.ID)
 			}
 			rubricIDs[rawRubric.ID] = struct{}{}
-			if rawRubric.Position < 1 {
-				return nil, invalidSnapshot("rubric position must be positive")
+			if rawRubric.Position < 0 {
+				return nil, invalidSnapshot("rubric position cannot be negative")
 			}
 			if !positiveScore(rawRubric.Points) {
 				return nil, invalidSnapshot("rubric %s points must be positive", rawRubric.ID)
