@@ -20,6 +20,13 @@ def main():
         exam_workspace.wait_for()
         assert exam_workspace.locator("aside").count() == 2
         assert exam_workspace.locator("main").count() == 1
+        action = exam_workspace.locator("button:not(:disabled)").first
+        assert action.evaluate("element => getComputedStyle(element).cursor") == "pointer"
+        before = action.evaluate("element => getComputedStyle(element).transform")
+        action.hover()
+        page.wait_for_timeout(180)
+        after = action.evaluate("element => getComputedStyle(element).transform")
+        assert before != after
         exam_workspace.locator("aside").first.locator("button").nth(1).click()
         page.wait_for_timeout(700)
         assert exam_workspace.locator("aside").nth(1).locator("button").count() > 0
