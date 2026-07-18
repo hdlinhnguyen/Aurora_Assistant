@@ -1703,7 +1703,11 @@ export default function TeacherDashboard() {
                 )}
                 <div>
                   <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground uppercase tracking-tight">
-                    {activeTab === "students"
+                    {activeTab === "exam-builder"
+                      ? "Tạo đề kiểm tra"
+                      : activeTab === "exam-scoring"
+                        ? "Chấm bài kiểm tra"
+                        : activeTab === "students"
                       ? "Báo cáo tiến độ học tập"
                       : activeTab === "graph-designer"
                         ? "Thiết kế & Biên soạn sơ đồ cây"
@@ -1714,7 +1718,11 @@ export default function TeacherDashboard() {
                             : "Giám sát & Đánh giá lớp học"}
                   </h1>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {activeTab === "students"
+                    {activeTab === "exam-builder"
+                      ? "Biên soạn câu hỏi, cân đối điểm và chuẩn bị đề trong một workspace"
+                      : activeTab === "exam-scoring"
+                        ? "Chấm từng bài, lưu tự động, duyệt điểm và theo dõi lịch sử"
+                        : activeTab === "students"
                       ? "Theo dõi hành trình học tập và kết quả của từng học sinh"
                       : activeTab === "graph-designer"
                         ? "Biên soạn các nút lý thuyết, liên kết mối quan hệ tiên quyết"

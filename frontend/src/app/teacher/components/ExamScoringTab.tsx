@@ -1,79 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Check, CheckCircle2, ChevronRight, ClipboardCheck, History, Loader2, RotateCcw, Search, UserRound, Users, X } from "lucide-react";
+
+const resultOptions = [{ value: "correct", label: "Đúng", icon: Check }, { value: "incorrect", label: "Sai", icon: X }, { value: "unanswered", label: "Không làm", icon: RotateCcw }];
 
 export default function ExamScoringTab() {
   const [batches, setBatches] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
+  const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [submission, setSubmission] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
   const [examId, setExamId] = useState("");
   const [studentIds, setStudentIds] = useState<string[]>([]);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState("");
+  const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch("/teacher/grading-batches"),
-      apiFetch("/teacher/scoring/students"),
-      apiFetch("/teacher/exams?status=preparing_exam"),
-    ])
-      .then(([batchData, studentData, examData]) => {
-        setBatches(Array.isArray(batchData) ? batchData : batchData?.items || []);
-        setStudents(Array.isArray(studentData) ? studentData : studentData?.items || []);
-        setExams(Array.isArray(examData) ? examData : examData?.items || []);
-      })
-      .catch((error) => setMessage(error.message));
-  }, []);
-
-  const createBatch = async () => {
-    const exam = exams.find((item) => item.id === examId);
-    if (!exam || studentIds.length === 0) {
-      setMessage("Chọn một đề đã prepare và ít nhất một học sinh.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const batch = await apiFetch("/teacher/grading-batches", {
-        method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({
-          examId,
-          studentIds,
-          expectedExamVersion: exam.version,
-        }),
-      });
-      setBatches((current) => [batch, ...current]);
-      setMessage("Đã tạo batch chấm bài.");
-    } catch (error: any) {
-      setMessage(error.message);
-    } finally {
-      setBusy(false);
-    }
+  const load = async () => {
+    const [batchData, studentData, examData] = await Promise.all([apiFetch("/teacher/grading-batches"), apiFetch("/teacher/scoring/students"), apiFetch("/teacher/exams?status=preparing_exam")]);
+    setBatches(batchData); setStudents(studentData); setExams(examData);
   };
+  useEffect(() => { load().catch(e => setNotice(e.message)); }, []);
+  const filteredStudents = useMemo(() => students.filter(s => `${s.name} ${s.email}`.toLowerCase().includes(search.toLowerCase())), [students, search]);
 
-  return (
-    <div className="flex-1 overflow-auto space-y-5">
-      <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="text-lg font-black">Chấm bài kiểm tra</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Chọn một batch đã tạo để mở submission và chấm thủ công. Điểm luôn được tính ở backend.</p>
-        {message && <p className="mt-3 text-xs font-bold text-destructive">{message}</p>}
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl bg-muted p-4">
-            <h3 className="text-xs font-black uppercase">Batch chấm bài</h3>
-            <div className="mt-3 space-y-2">{batches.map((batch) => <div key={batch.id} className="rounded-xl border border-border bg-card p-3 text-xs"><b>{batch.examTitle || batch.examId}</b><span className="ml-2 text-muted-foreground">{batch.status} · {batch.approvedSubmissions ?? 0}/{batch.totalSubmissions ?? 0}</span></div>)}{!batches.length && <p className="text-xs text-muted-foreground">Chưa có batch.</p>}</div>
-          </div>
-          <div className="rounded-2xl bg-muted p-4">
-            <h3 className="text-xs font-black uppercase">Tạo batch</h3>
-            <select value={examId} onChange={(event) => setExamId(event.target.value)} className="mt-3 w-full rounded-xl border border-border bg-card p-3 text-xs">
-              <option value="">Chọn đề đã prepare</option>
-              {exams.map((exam) => <option key={exam.id} value={exam.id}>{exam.title}</option>)}
-            </select>
-            <div className="mt-3 max-h-52 space-y-2 overflow-auto">{students.map((student) => <label key={student.id} className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 text-xs"><input type="checkbox" checked={studentIds.includes(student.id)} onChange={() => setStudentIds((current) => current.includes(student.id) ? current.filter((id) => id !== student.id) : [...current, student.id])} />{student.name || student.email}</label>)}{!students.length && <p className="text-xs text-muted-foreground">Chưa tải được danh sách.</p>}</div>
-          </div>
-        </div>
-        <button disabled={busy} onClick={createBatch} className="mt-5 rounded-xl bg-foreground px-4 py-2 text-xs font-black text-background">Tạo batch chấm bài</button>
-      </section>
-    </div>
-  );
+  const openBatch = async (id: string) => { setBusy("batch"); try { setSelectedBatch(await apiFetch(`/teacher/grading-batches/${id}`)); setSubmission(null); } finally { setBusy(""); } };
+  const openSubmission = async (id: string) => { setBusy("submission"); try { setSubmission(await apiFetch(`/teacher/scoring-submissions/${id}`)); setHistory([]); } finally { setBusy(""); } };
+  const createBatch = async () => {
+    const exam = exams.find(e => e.id === examId); if (!exam || !studentIds.length) return setNotice("Chọn đề và ít nhất một học sinh.");
+    setBusy("create"); try { const batch = await apiFetch("/teacher/grading-batches", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ examId, studentIds, expectedExamVersion: exam.version }) }); await load(); await openBatch(batch.id); setNotice("Đã tạo đợt chấm. Danh sách học sinh được khóa tại thời điểm này."); } catch(e:any){setNotice(e.message)} finally{setBusy("")}
+  };
+  const saveResult = async (kind: "questions"|"rubrics", id: string, status: string) => {
+    if (!submission) return; setBusy(id);
+    try { setSubmission(await apiFetch(`/teacher/scoring-submissions/${submission.id}/${kind}/${id}`, { method: "PUT", body: JSON.stringify({ status, expectedVersion: submission.version }) })); setNotice("Đã lưu kết quả."); }
+    catch(e:any){setNotice(e.message); await openSubmission(submission.id)} finally{setBusy("")}
+  };
+  const approve = async () => { if (!submission) return; setBusy("approve"); try { const next=await apiFetch(`/teacher/scoring-submissions/${submission.id}/approve`, { method:"POST", headers:{"Idempotency-Key":crypto.randomUUID()}, body:JSON.stringify({expectedVersion:submission.version})}); setSubmission(next); if(selectedBatch) await openBatch(selectedBatch.id); setNotice("Đã duyệt kết quả và cập nhật tiến độ đề."); } catch(e:any){setNotice(e.message)} finally{setBusy("")} };
+  const revision = async () => { if (!submission) return; setBusy("revision"); try { setSubmission(await apiFetch(`/teacher/scoring-submissions/${submission.id}/revisions`, { method:"POST", headers:{"Idempotency-Key":crypto.randomUUID()}, body:JSON.stringify({expectedVersion:submission.version})})); setNotice("Đã mở phiên chỉnh sửa mới."); } catch(e:any){setNotice(e.message)} finally{setBusy("")} };
+  const loadHistory = async () => submission && setHistory(await apiFetch(`/teacher/scoring-submissions/${submission.id}/history`));
+  const reviewed = submission ? [...(submission.questions||[]), ...(submission.rubrics||[])].filter(r=>r.reviewed).length : 0;
+  const total = submission ? (submission.questions?.length||0)+(submission.rubrics?.length||0) : 0;
+
+  return <div data-testid="scoring-workspace" className="flex-1 min-h-0 grid gap-4 xl:grid-cols-[250px_300px_minmax(0,1fr)] animate-[fadeIn_0.3s_ease-out]">
+    <aside className="rounded-3xl border bg-card shadow-sm min-h-0 flex flex-col overflow-hidden"><div className="p-4 border-b bg-gradient-to-br from-indigo-50 to-white"><p className="text-[9px] font-black uppercase tracking-[.2em] text-indigo-600">Phòng chấm</p><h2 className="font-black">Đợt chấm bài</h2></div><div className="p-3 overflow-auto space-y-2">{batches.map(b=><button key={b.id} onClick={()=>openBatch(b.id)} className={`w-full rounded-2xl p-3 border text-left ${selectedBatch?.id===b.id?"border-indigo-300 bg-indigo-50":"border-transparent hover:bg-muted"}`}><div className="flex justify-between"><ClipboardCheck size={16}/><span className={`text-[9px] font-black rounded-full px-2 py-1 ${b.status==="completed"?"bg-emerald-100 text-emerald-700":"bg-amber-100 text-amber-700"}`}>{b.status==="completed"?"Hoàn tất":"Đang chấm"}</span></div><p className="mt-2 text-xs font-black truncate">{b.examTitle||`Đề ${b.examId?.slice(0,8)}`}</p><p className="mt-1 text-[10px] text-muted-foreground">{b.approvedSubmissions||0}/{b.totalSubmissions} đã duyệt</p><div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-indigo-500" style={{width:`${(b.approvedSubmissions||0)/b.totalSubmissions*100}%`}}/></div></button>)}<div className="mt-4 rounded-2xl border border-dashed p-3"><h3 className="text-xs font-black">Tạo đợt chấm</h3><select value={examId} onChange={e=>setExamId(e.target.value)} className="mt-2 w-full rounded-xl border p-2 text-xs"><option value="">Chọn đề sẵn sàng</option>{exams.map(e=><option key={e.id} value={e.id}>{e.title}</option>)}</select><div className="mt-2 relative"><Search size={13} className="absolute left-2.5 top-2.5"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Tìm học sinh" className="w-full rounded-xl border pl-8 p-2 text-xs"/></div><div className="mt-2 max-h-40 overflow-auto space-y-1">{filteredStudents.map(s=><label key={s.id} className="flex gap-2 items-center rounded-lg p-2 hover:bg-muted text-xs"><input type="checkbox" checked={studentIds.includes(s.id)} onChange={()=>setStudentIds(v=>v.includes(s.id)?v.filter(id=>id!==s.id):[...v,s.id])}/><span className="truncate">{s.name}</span></label>)}</div><button onClick={createBatch} disabled={busy==="create"} className="mt-2 w-full rounded-xl bg-foreground text-background py-2.5 text-xs font-black">{busy==="create"?"Đang tạo...":"Tạo đợt chấm"}</button></div></div></aside>
+
+    <section className="rounded-3xl border bg-card shadow-sm min-h-0 flex flex-col overflow-hidden"><div className="p-4 border-b"><div className="flex items-center gap-2"><Users size={16}/><h2 className="font-black text-sm">Danh sách bài nộp</h2></div><p className="text-[10px] text-muted-foreground mt-1">Chọn học sinh để bắt đầu hoặc tiếp tục chấm.</p></div><div className="p-3 overflow-auto space-y-2">{selectedBatch?.submissions?.map((s:any,index:number)=><button key={s.id} onClick={()=>openSubmission(s.id)} className={`w-full rounded-2xl border p-3 text-left flex gap-3 items-center ${submission?.id===s.id?"border-emerald-300 bg-emerald-50":"hover:bg-muted"}`}><div className="h-9 w-9 rounded-xl bg-slate-950 text-white grid place-items-center text-xs font-black">{index+1}</div><div className="min-w-0 flex-1"><p className="text-xs font-black truncate">{students.find(st=>st.id===s.studentId)?.name||`Học sinh ${s.studentId?.slice(0,6)}`}</p><p className="text-[10px] text-muted-foreground">{s.awardedPoints} điểm · {s.status}</p></div><ChevronRight size={14}/></button>)}{!selectedBatch&&<div className="py-20 text-center"><Users className="mx-auto text-muted-foreground"/><p className="mt-3 text-sm font-black">Chọn một đợt chấm</p></div>}</div></section>
+
+    <main className="rounded-3xl border bg-card shadow-sm min-h-0 overflow-auto">{submission?<><div className="sticky top-0 z-10 p-5 border-b bg-card/95 backdrop-blur"><div className="flex flex-wrap justify-between gap-4"><div><div className="flex gap-2"><span className={`rounded-full px-2.5 py-1 text-[9px] font-black ${submission.status==="approved"?"bg-emerald-100 text-emerald-700":"bg-amber-100 text-amber-700"}`}>{submission.status==="approved"?"Đã duyệt":"Đang chấm"}</span><span className="text-[10px] text-muted-foreground">v{submission.version}</span></div><h2 className="mt-2 text-lg font-black">Phiếu chấm học sinh</h2><p className="text-xs text-muted-foreground">Đã xem {reviewed}/{total} mục · {submission.awardedPoints} điểm</p></div><div className="flex gap-2">{submission.status==="approved"?<><button onClick={revision} className="rounded-xl border px-3 py-2 text-xs font-black flex gap-1"><RotateCcw size={14}/>Chỉnh sửa lại</button><button onClick={loadHistory} className="rounded-xl bg-muted px-3 py-2 text-xs font-black flex gap-1"><History size={14}/>Lịch sử</button></>:<button onClick={approve} disabled={reviewed<total||busy==="approve"} className="rounded-xl bg-foreground text-background px-4 py-2 text-xs font-black disabled:opacity-40 flex gap-1"><CheckCircle2 size={14}/>Duyệt kết quả</button>}</div></div><div className="mt-4 h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-[var(--mint)] transition-all" style={{width:`${total?reviewed/total*100:0}%`}}/></div></div>
+      <div className="p-5 space-y-4">{(submission.questions||[]).map((q:any,index:number)=><ResultCard key={q.examQuestionId} title={`Câu ${index+1}`} subtitle={`Mã ${q.examQuestionId.slice(0,8)}`} result={q} disabled={submission.status==="approved"} busy={busy===q.examQuestionId} onChange={(status)=>saveResult("questions",q.examQuestionId,status)}/>)}{(submission.rubrics||[]).map((r:any,index:number)=><ResultCard key={r.examRubricItemId} title={`Ý barem ${index+1}`} subtitle={`Mã ${r.examRubricItemId.slice(0,8)}`} result={r} disabled={submission.status==="approved"} busy={busy===r.examRubricItemId} onChange={(status)=>saveResult("rubrics",r.examRubricItemId,status)}/>)}{history.length>0&&<div className="rounded-2xl border bg-slate-950 text-white p-4"><h3 className="text-xs font-black">Lịch sử duyệt</h3>{history.map(h=><div key={h.id} className="mt-2 flex justify-between text-xs text-white/70"><span>Phiên bản {h.approvalVersion}</span><b>{h.totalPoints} điểm</b></div>)}</div>}</div></>:<div className="h-full grid place-items-center text-center p-8"><div><UserRound size={36} className="mx-auto text-muted-foreground"/><h2 className="mt-3 font-black">Chọn một bài nộp</h2><p className="text-xs text-muted-foreground max-w-xs">Kết quả từng câu, barem và thao tác duyệt sẽ hiển thị ở đây.</p></div></div>}{notice&&<div className="fixed bottom-6 right-6 max-w-sm rounded-2xl bg-slate-950 text-white px-4 py-3 text-xs font-bold shadow-xl">{notice}</div>}</main>
+  </div>;
+}
+
+function ResultCard({title,subtitle,result,disabled,busy,onChange}:{title:string;subtitle:string;result:any;disabled:boolean;busy:boolean;onChange:(s:string)=>void}){
+  return <article className={`rounded-2xl border p-4 ${result.reviewed?"border-emerald-200 bg-emerald-50/30":"border-border"}`}><div className="flex justify-between"><div><h3 className="text-sm font-black">{title}</h3><p className="text-[10px] text-muted-foreground">{subtitle}</p></div><div className="text-right"><b className="text-sm">{result.awardedPoints}đ</b><p className="text-[9px] text-muted-foreground">{result.reviewed?"Đã xem":"Chưa xem"}</p></div></div><div className="mt-4 grid grid-cols-3 gap-2">{resultOptions.map(option=>{const Icon=option.icon;return <button key={option.value} disabled={disabled||busy} onClick={()=>onChange(option.value)} className={`rounded-xl border px-3 py-2.5 text-xs font-black flex justify-center gap-1.5 transition-all ${result.status===option.value&&result.reviewed?option.value==="correct"?"bg-emerald-500 border-emerald-500 text-white":option.value==="incorrect"?"bg-rose-500 border-rose-500 text-white":"bg-slate-700 border-slate-700 text-white":"hover:bg-muted"}`}>{busy?<Loader2 size={14} className="animate-spin"/>:<Icon size={14}/>} {option.label}</button>})}</div></article>
 }
