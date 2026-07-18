@@ -62,17 +62,20 @@ type Topic struct {
 }
 
 type Node struct {
-	ID         uuid.UUID      `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
-	Subject    string         `gorm:"type:varchar(255);not null;index" json:"subject"`
-	Name       string         `gorm:"type:varchar(255);not null" json:"name"`
-	Theory     string         `gorm:"type:text" json:"theory"`
-	TopicGroup string         `gorm:"type:varchar(255);default:'Chủ đề chung'" json:"topicGroup"`
-	PosX       float64        `gorm:"type:double precision;default:0" json:"posX"`
-	PosY       float64        `gorm:"type:double precision;default:0" json:"posY"`
-	IsRoot     bool           `gorm:"type:boolean;default:false" json:"isRoot"`
-	CreatedAt  time.Time      `json:"createdAt"`
-	UpdatedAt  time.Time      `json:"updatedAt"`
-	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
+	ID            uuid.UUID      `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	Subject       string         `gorm:"type:varchar(255);not null;index" json:"subject"`
+	Name          string         `gorm:"type:varchar(255);not null" json:"name"`
+	Theory        string         `gorm:"type:text" json:"theory"`
+	TopicGroup    string         `gorm:"type:varchar(255);default:'Chủ đề chung'" json:"topicGroup"`
+	PosX          float64        `gorm:"type:double precision;default:0" json:"posX"`
+	PosY          float64        `gorm:"type:double precision;default:0" json:"posY"`
+	IsRoot        bool           `gorm:"type:boolean;default:false" json:"isRoot"`
+	StableKey     string         `gorm:"type:varchar(255);index" json:"stableKey"`
+	SourceItemIDs string         `gorm:"type:text" json:"sourceItemIds"` // Comma-separated or JSON list of raw source records
+	Status        string         `gorm:"type:varchar(50);default:'active'" json:"status"` // "active", "draft"
+	CreatedAt     time.Time      `json:"createdAt"`
+	UpdatedAt     time.Time      `json:"updatedAt"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type Edge struct {
@@ -80,19 +83,22 @@ type Edge struct {
 	Subject   string    `gorm:"type:varchar(255);not null;index" json:"subject"`
 	SourceID  uuid.UUID `gorm:"type:uuid;not null;index" json:"sourceId"`
 	TargetID  uuid.UUID `gorm:"type:uuid;not null;index" json:"targetId"`
+	Status    string    `gorm:"type:varchar(50);default:'active'" json:"status"` // "active", "draft"
+	SourceType string   `gorm:"type:varchar(50);default:'human'" json:"sourceType"` // "human", "rule", "llm"
 	CreatedAt time.Time `json:"createdAt"`
 }
 
 type Question struct {
-	ID            uuid.UUID      `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
-	NodeID        uuid.UUID      `gorm:"type:uuid;not null;index" json:"nodeId"`
-	Content       string         `gorm:"type:text;not null" json:"content"`
-	OptionsJSON   string         `gorm:"type:text;not null" json:"optionsJson"` // JSON array, e.g. ["A", "B"]
-	CorrectOption int            `gorm:"type:integer;not null" json:"correctOption"`
-	Difficulty    string         `gorm:"type:varchar(20);default:'medium'" json:"difficulty"` // "easy", "medium", "hard"
-	CreatedAt     time.Time      `json:"createdAt"`
-	UpdatedAt     time.Time      `json:"updatedAt"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                 uuid.UUID      `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	NodeID             uuid.UUID      `gorm:"type:uuid;not null;index" json:"nodeId"`
+	Content            string         `gorm:"type:text;not null" json:"content"`
+	OptionsJSON        string         `gorm:"type:text;not null" json:"optionsJson"` // JSON array, e.g. ["A", "B"]
+	CorrectOption      int            `gorm:"type:integer;not null" json:"correctOption"`
+	Difficulty         string         `gorm:"type:varchar(20);default:'medium'" json:"difficulty"` // "easy", "medium", "hard"
+	DistractorMappings string         `gorm:"type:text" json:"distractorMappings"` // JSON map, e.g. {"option_b": "node-uuid"}
+	CreatedAt          time.Time      `json:"createdAt"`
+	UpdatedAt          time.Time      `json:"updatedAt"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 type StudentState struct {
