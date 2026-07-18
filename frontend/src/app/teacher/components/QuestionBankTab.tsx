@@ -38,14 +38,12 @@ interface QuestionBankTabProps {
   handleStartAddQuestion: () => void;
   handleDownloadTemplate: () => void;
   handleExcelImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleMasterBankImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleStartEditQuestion: (q: Question) => void;
   handleDeleteQuestion: (qId: string) => void;
   handleDeleteQuestionsBulk: (qIds: string[]) => void;
   handleTagQuestion: (q: Question) => void;
   setEditingNode: (node: NodeItem | null) => void;
   formatDate: (dateStr?: string) => string;
-  handleLoadDemoQuestions: () => void;
 }
 
 export default function QuestionBankTab({
@@ -61,14 +59,12 @@ export default function QuestionBankTab({
   handleStartAddQuestion,
   handleDownloadTemplate,
   handleExcelImport,
-  handleMasterBankImport,
   handleStartEditQuestion,
   handleDeleteQuestion,
   handleDeleteQuestionsBulk,
   handleTagQuestion,
   setEditingNode,
   formatDate,
-  handleLoadDemoQuestions,
 }: QuestionBankTabProps) {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [questionTypeFilter, setQuestionTypeFilter] = React.useState("");
@@ -181,74 +177,32 @@ export default function QuestionBankTab({
             <Plus size={14} /> Thêm câu hỏi
           </button>
 
-          {/* Actions Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm border flex items-center gap-1.5 cursor-pointer active:scale-95 ${
-                  subjectQuestions.length === 0
-                    ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-pulse-glow"
-                    : "bg-white hover:bg-muted text-foreground border-border"
-                }`}
-              >
-                {subjectQuestions.length === 0 ? <Sparkles size={14} className="animate-spin" /> : <ChevronDown size={14} />}
-                Nhập & Nạp dữ liệu
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5 shadow-md border border-border bg-popover text-popover-foreground">
-              <DropdownMenuLabel className="text-[10px] font-black text-muted-foreground uppercase tracking-wider px-2.5 py-1.5">
-                Nguồn dữ liệu
-              </DropdownMenuLabel>
-              
-              <DropdownMenuItem
-                onClick={handleLoadDemoQuestions}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-violet-750 hover:text-violet-850 transition-colors"
-              >
-                <Sparkles size={14} className="text-violet-600" />
-                Nạp câu hỏi mẫu
-              </DropdownMenuItem>
+          <button
+            onClick={() => document.getElementById("excel-file-input")?.click()}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm border flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+              subjectQuestions.length === 0
+                ? "bg-violet-600 hover:bg-violet-700 text-white border-violet-500 shadow-violet-200 animate-pulse-glow"
+                : "bg-white hover:bg-muted text-foreground border-border"
+            }`}
+          >
+            <Upload size={14} className={subjectQuestions.length === 0 ? "text-white" : "text-muted-foreground"} />
+            Nhập từ Excel (.xlsx)
+          </button>
 
-              <DropdownMenuSeparator className="my-1 border-t border-border" />
+          <button
+            onClick={handleDownloadTemplate}
+            className="px-4 py-2 bg-white hover:bg-muted text-foreground border border-border text-xs font-black rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95"
+          >
+            <Download size={14} className="text-muted-foreground" />
+            Tải file mẫu Excel
+          </button>
 
-              <DropdownMenuItem
-                onClick={() => document.getElementById("master-bank-file-input")?.click()}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
-              >
-                <FileJson size={14} className="text-muted-foreground" />
-                Nhập Master Bank (.json)
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onClick={() => document.getElementById("excel-file-input")?.click()}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
-              >
-                <Upload size={14} className="text-muted-foreground" />
-                Nhập từ Excel (.xlsx)
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onClick={handleDownloadTemplate}
-                className="flex items-center gap-2 px-2.5 py-2 text-xs font-bold rounded-xl cursor-pointer hover:bg-muted text-foreground transition-colors"
-              >
-                <Download size={14} className="text-muted-foreground" />
-                Tải file mẫu Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Hidden inputs for imports */}
+          {/* Hidden input for Excel import */}
           <input
             id="excel-file-input"
             type="file"
             accept=".xlsx,.xls"
             onChange={handleExcelImport}
-            className="hidden"
-          />
-          <input
-            id="master-bank-file-input"
-            type="file"
-            accept=".json"
-            onChange={handleMasterBankImport}
             className="hidden"
           />
         </div>
