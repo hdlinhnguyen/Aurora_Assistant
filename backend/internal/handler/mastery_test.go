@@ -13,10 +13,12 @@ import (
 )
 
 type fakeMasteryService struct {
-	profile     mastery.Profile
-	serviceErr  error
-	authorized  error
-	requestedID uuid.UUID
+	profile        mastery.Profile
+	serviceErr     error
+	authorized     error
+	requestedID    uuid.UUID
+	subject        string
+	recalculations int
 }
 
 func (f *fakeMasteryService) BuildReviewPath(context.Context, uuid.UUID, string, int) ([]mastery.ReviewItem, error) {
@@ -32,7 +34,10 @@ func (f *fakeMasteryService) GetHistory(context.Context, uuid.UUID, uuid.UUID, s
 	return nil, f.serviceErr
 }
 
-func (f *fakeMasteryService) RecalculateStudent(context.Context, uuid.UUID, string) (mastery.Profile, error) {
+func (f *fakeMasteryService) RecalculateStudent(_ context.Context, studentID uuid.UUID, subject string) (mastery.Profile, error) {
+	f.requestedID = studentID
+	f.subject = subject
+	f.recalculations++
 	return f.profile, f.serviceErr
 }
 
@@ -55,6 +60,29 @@ func TestMasteryHandlerStudentProfileUsesAuthenticatedUserID(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, fiber.StatusOK, response.StatusCode)
 	require.Equal(t, studentID, service.requestedID)
+}
+
+func TestMasteryHandlerLetsStudentRecoverPersistedDiagnosticEvidence(t *testing.T) {
+	studentID := uuid.New()
+	service := &fakeMasteryService{}
+	h := NewMasteryHandler(service)
+	app := fiber.New()
+	app.Post("/student/mastery/recalculate", func(c fiber.Ctx) error {
+		c.Locals("userID", studentID.String())
+		return h.RecalculateStudentProfile(c)
+	})
+
+	response, err := app.Test(httptest.NewRequest(
+		"POST",
+		"/student/mastery/recalculate?subject=Logic%20%26%20Tap%20hop",
+		nil,
+	))
+
+	require.NoError(t, err)
+	require.Equal(t, fiber.StatusOK, response.StatusCode)
+	require.Equal(t, studentID, service.requestedID)
+	require.Equal(t, "Logic & Tap hop", service.subject)
+	require.Equal(t, 1, service.recalculations)
 }
 
 func TestMasteryHandlerTeacherReturnsForbiddenWhenOutOfScope(t *testing.T) {

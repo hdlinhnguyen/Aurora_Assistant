@@ -35,6 +35,19 @@ func (h *MasteryHandler) GetStudentProfile(c fiber.Ctx) error {
 	return masteryResult(c, profile, err)
 }
 
+func (h *MasteryHandler) RecalculateStudentProfile(c fiber.Ctx) error {
+	studentID, err := authenticatedID(c)
+	if err != nil {
+		return err
+	}
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "subject is required"})
+	}
+	profile, err := h.service.RecalculateStudent(c.Context(), studentID, subject)
+	return masteryResult(c, profile, err)
+}
+
 func (h *MasteryHandler) GetTeacherProfile(c fiber.Ctx) error {
 	teacherID, err := authenticatedID(c)
 	if err != nil {

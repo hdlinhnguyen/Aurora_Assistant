@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
+import { BookOpen, PenTool, ArrowLeft } from "lucide-react";
 import {
   buildRoadmap,
   getLearningPathLive,
@@ -137,6 +138,14 @@ function FeynmanInner() {
   const [result, setResult] = useState<Analysis | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const getGifPath = () => {
+    if (scoring) return "/gif/thinking.gif";
+    if (!submitted) return "/gif/waving.gif";
+    if (result?.tier === "high") return "/gif/celebrate.gif";
+    if (result?.tier === "mid") return "/gif/thinking.gif";
+    return "/gif/failed.gif";
+  };
+
   // Không có đủ query param (mở trực tiếp) → tự tìm bài đang học như Hub.
   useEffect(() => {
     if (topic.name) return;
@@ -245,7 +254,7 @@ function FeynmanInner() {
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "20px 34px 6px" }}>
         <Link
-          href="/tutor/hub"
+          href="/tutor"
           style={{
             background: "#fff",
             border: "1px solid #eef1f4",
@@ -256,12 +265,17 @@ function FeynmanInner() {
             color: "#5b6072",
             cursor: "pointer",
             textDecoration: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
           }}
         >
-          ← Bài học
+          <ArrowLeft size={16} /> Bài học
         </Link>
         <div>
-          <div style={{ ...BALOO, fontWeight: 800, fontSize: 24 }}>📓 Tập Vở Feynman</div>
+          <div style={{ ...BALOO, fontWeight: 800, fontSize: 24, display: "flex", alignItems: "center", gap: 8 }}>
+            <BookOpen size={24} style={{ color: "#7C46E8" }} /> Tập Vở Feynman
+          </div>
           <div style={{ fontSize: 13, color: "#6b7180" }}>
             Giảng lại bài cho {buddyName} nghe — hiểu thật thì mới giảng cho người khác hiểu được!
           </div>
@@ -294,7 +308,16 @@ function FeynmanInner() {
               gap: 10,
             }}
           >
-            <Character char={char} mood={buddyMood} size={118} face="right" />
+            <img
+              src={getGifPath()}
+              alt={buddyName}
+              style={{
+                width: 118,
+                height: 118,
+                objectFit: "contain",
+                borderRadius: 16,
+              }}
+            />
             <div
               style={{
                 background: "#fff",
@@ -320,7 +343,9 @@ function FeynmanInner() {
           {/* notebook */}
           <div style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: "22px 24px", boxShadow: "0 14px 34px -26px rgba(0,0,0,.28)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ ...POPPINS, fontWeight: 800, fontSize: 15 }}>✍️ Lời giảng của em</div>
+              <div style={{ ...POPPINS, fontWeight: 800, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
+                <PenTool size={16} style={{ color: "#7C46E8" }} /> Lời giảng của em
+              </div>
               <div style={{ fontSize: 12, color: "#9aa1b0" }}>{words} từ</div>
             </div>
             <div
