@@ -16,7 +16,7 @@ def data():
 
 
 def test_loads_all_38_topics_keyed_by_id(data):
-    assert len(data.topics) == 38
+    assert len(data.topics) == 39
     assert all(tid == t.topic_id for tid, t in data.topics.items())
 
 
@@ -29,7 +29,7 @@ def test_topic_fields_follow_spec(data):
 
 
 def test_loads_all_64_edges_and_endpoints_resolve(data):
-    assert len(data.edges) == 64
+    assert len(data.edges) == 66
     for e in data.edges:
         assert e.prerequisite_topic_id in data.topics
         assert e.dependent_topic_id in data.topics
@@ -48,4 +48,4 @@ def test_demo_chain_l7_to_l5_is_in_prerequisite_closure(data):
 
 def test_dim_nodes_map_to_content_unavailable(data):
     available = [t for t in data.topics.values() if t.content_available]
-    assert len(available) == 24  # 24 node thật, 14 node mờ (mo=true)
+    assert len(available) == 25  # 25 node thật, 14 node mờ (mo=true)

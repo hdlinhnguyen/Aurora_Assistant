@@ -241,7 +241,10 @@ export default function TutorHubPage() {
   const chapterPct = Math.round((doneCount / totalSteps) * 100);
   const lessonIndex = Math.max(0, roadmap.findIndex((s) => s.id === currentStepId));
   const chapterName = currentNode?.topicGroup || subject || "Kiến thức";
-  const masteryPct = Math.round((mastery.topics?.[currentStepId]?.masteryProbability ?? 0) * 100);
+  const currentMastery = mastery.topics?.[currentStepId];
+  const masteryPct = currentMastery && currentMastery.masteryStatus !== "unknown"
+    ? Math.round(currentMastery.masteryProbability * 100)
+    : 0;
   const confidencePct = Math.round(
     Math.min(1, Math.max(0, mastery.topics?.[currentStepId]?.confidenceScore ?? 0)) * 100,
   );
@@ -1181,7 +1184,7 @@ export default function TutorHubPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontSize: 13.5, color: "#5b6072", marginBottom: 22, lineHeight: 1.4 }}>
               <Character char={char} mood="jump" size={44} face="right" />
               <span>
-                <b>{companion.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
+                <b>{COMPANION.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
               </span>
             </div>
             <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>

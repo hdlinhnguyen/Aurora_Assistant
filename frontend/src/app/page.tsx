@@ -6,7 +6,6 @@ import { API_BASE_URL } from "@/lib/api";
 import dynamic from "next/dynamic";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
-import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -28,7 +27,11 @@ export default function LandingPage() {
     { sender: "student", content: "Dạ bằng 2/5 đúng không ạ?" },
     { sender: "ai", content: "Ồ! Bi thử nghĩ xem, nếu ta cắt 1 cái bánh làm 2 phần, và 1 cái bánh làm 3 phần. Khi cộng lại ta có cộng trực tiếp các mẫu số (2 + 3 = 5) được không? Hay ta cần đưa chúng về 'cùng kích cỡ' (mẫu số chung) nhỉ?" },
     { sender: "student", content: "À! Phải quy đồng mẫu số chung là 6 ạ!" },
-    { sender: "ai", content: "Chính xác luôn! Giỏi quá. Vậy 1/2 quy đồng thành bao nhiêu phần 6, và 1/3 quy đồng thành bao nhiêu phần 6 nào?" }
+    { sender: "ai", content: "Chính xác luôn! Giỏi quá. Vậy 1/2 quy đồng thành bao nhiêu phần 6, và 1/3 quy đồng thành bao nhiêu phần 6 nào?" },
+    { sender: "student", content: "Dạ 1/2 là 3/6, còn 1/3 là 2/6 ạ." },
+    { sender: "ai", content: "Chuẩn luôn! Vậy giờ Bi cộng 3/6 và 2/6 lại thì kết quả là bao nhiêu phần 6 nào?" },
+    { sender: "student", content: "Dạ là 5/6 cái bánh ạ!" },
+    { sender: "ai", content: "Rất xuất sắc! Bi đã tự mình giải quyết xong bài toán bằng cách chia bánh thành các phần bằng nhau (quy đồng) rồi đó. Bài học rút ra là luôn phải đưa về cùng mẫu số trước khi cộng nhé!" }
   ];
 
   return (
@@ -40,8 +43,8 @@ export default function LandingPage() {
       {/* Navigation Header */}
       <nav className="relative z-10 max-w-6xl mx-auto px-6 py-5 flex justify-between items-center border-b border-border bg-card/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)]">
-            <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300 cursor-pointer">
+            <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
@@ -54,7 +57,7 @@ export default function LandingPage() {
             onClick={() => router.push("/login?role=teacher")}
             className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
           >
-            Dành cho Giáo viên
+            Hướng dẫn sử dụng
           </button>
           <button
             onClick={() => router.push("/login")}
@@ -69,11 +72,11 @@ export default function LandingPage() {
       <header className="relative z-10 max-w-6xl mx-auto px-6 pt-16 pb-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
         {/* Left Column: Heading */}
         <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[var(--mint)]/15 text-xs font-bold text-[var(--mint)] border border-[var(--mint)]/25 tracking-wide uppercase">
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-[var(--mint)]/15 to-[var(--purple)]/15 text-xs font-bold text-foreground border border-[var(--mint)]/30 tracking-wide uppercase shadow-sm">
+            <svg className="h-3.5 w-3.5 text-[var(--purple)] animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Học thật - Hiểu thật với Trí Tuệ Nhân Tạo
+            <span>Học thật - Hiểu thật với Trí Tuệ Nhân Tạo</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-[var(--font-display)] font-extrabold leading-[1.05] tracking-tight text-foreground">
             Gia sư phản biện <br />
@@ -144,14 +147,14 @@ export default function LandingPage() {
 
       {/* Interactive Socratic Demo Section */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch">
           {/* Left Column: Explanation */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--purple)]/15 text-xs font-bold text-[var(--purple)] border border-[var(--purple)]/25 uppercase">
+          <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--purple)]/15 text-xs font-bold text-[var(--purple)] border border-[var(--purple)]/25 uppercase w-fit shadow-md shadow-[var(--purple)]/30 hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/50 transition-all duration-300 cursor-default">
               Phương Pháp Khác Biệt
             </div>
             <h2 className="text-3xl md:text-4xl font-[var(--font-display)] font-extrabold text-foreground leading-tight">
-              Trải nghiệm lớp học gợi mở Socratic
+              Trải nghiệm lớp học <br className="hidden md:block" /> gợi mở Socratic
             </h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Phương pháp Socratic không cung cấp lời giải trực tiếp. Thay vào đó, AI đóng vai trò là một người dẫn dắt thông thái, đặt ra các câu hỏi gợi mở theo từng bước để giúp học sinh tự tìm ra bản chất của vấn đề và ghi nhớ sâu sắc hơn.
@@ -190,12 +193,12 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Right Column: Chat Widget & Mascot Companion */}
-          <div className="lg:col-span-7 flex flex-col sm:flex-row gap-6 items-center justify-center">
-            <div className="relative w-full max-w-lg flex-1">
+          {/* Right Column: Chat Widget */}
+          <div className="lg:col-span-7 flex justify-center items-stretch py-4 lg:py-0">
+            <div className="relative w-full max-w-lg flex flex-col">
               <div className="absolute -inset-6 rounded-[3rem] bg-gradient-to-br from-[var(--purple)]/20 to-[var(--mint)]/25 blur-2xl pointer-events-none" />
-              <div className="relative w-full rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] space-y-4">
-                <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="relative w-full h-full flex flex-col rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)] space-y-4">
+                <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
                   <div className="flex items-center gap-2">
                     <div className="h-2.5 w-2.5 rounded-full bg-[var(--mint)] animate-pulse" />
                     <span className="text-xs font-bold text-muted-foreground">Gia sư Socratic (Mô phỏng)</span>
@@ -209,7 +212,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Simulated Chat Messages */}
-                <div className="h-64 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin min-h-[300px]">
                   {mockMessages.slice(0, mockStep + 1).map((msg, idx) => (
                     <div
                       key={idx}
@@ -243,24 +246,6 @@ export default function LandingPage() {
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Mascot Companion adjacent outside chat */}
-            <div className="flex-shrink-0">
-              <MascotCompanion
-                compact
-                state={
-                  mockStep === 0
-                    ? "waving"
-                    : mockStep === 1
-                    ? "waiting"
-                    : mockStep === 2
-                    ? "thinking"
-                    : mockStep === 3
-                    ? "celebrate"
-                    : "review"
-                }
-              />
             </div>
           </div>
         </div>

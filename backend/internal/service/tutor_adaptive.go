@@ -20,7 +20,21 @@ func (s *tutorService) GetStudentState(studentID uuid.UUID, subject string) (*mo
 	err := s.db.Where("student_id = ? AND subject = ?", studentID, subject).First(&state).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+			// Khởi tạo trạng thái mặc định cho học sinh mới, yêu cầu làm bài khảo sát/chẩn đoán
+			state = model.StudentState{
+				ID:                 uuid.New(),
+				StudentID:          studentID,
+				Subject:            subject,
+				NeedsDiagnostic:    true,
+				InitialLevelNodeID: uuid.Nil,
+				CurrentLevelNodeID: uuid.Nil,
+				CreatedAt:          time.Now(),
+				UpdatedAt:          time.Now(),
+			}
+			if err := s.db.Create(&state).Error; err != nil {
+				return nil, err
+			}
+			return &state, nil
 		}
 		return nil, err
 	}
