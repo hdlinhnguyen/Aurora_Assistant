@@ -79,13 +79,17 @@ DEFAULT_MINUTES_BY_CAP = {"TH": 25, "THCS": 35, "THPT": 45}
 def fetch_dynamic_graph() -> CurriculumGraph:
     url = os.environ.get("GO_BACKEND_GRAPH_URL", "http://localhost:8081/api/internal/graph")
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        headers = {"User-Agent": "Aurora-Learning-Path/1.0"}
+        internal_token = os.environ.get("INTERNAL_SERVICE_TOKEN", "").strip()
+        if internal_token:
+            headers["X-Internal-Token"] = internal_token
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=5) as response:
             raw = json.loads(response.read().decode('utf-8'))
             
         topics: dict[str, Topic] = {}
         edges: list[PrerequisiteEdge] = []
-        for node in raw["nodes"]:
+        for node in raw.get("nodes") or []:
             topics[node["id"]] = Topic(
                 topic_id=node["id"],
                 subject_id="toan",
@@ -93,9 +97,9 @@ def fetch_dynamic_graph() -> CurriculumGraph:
                 name=node["ten"],
                 estimated_learning_time=DEFAULT_MINUTES_BY_CAP.get(node["cap"], 30),
                 content_available=not node["mo"],
-                learning_outcomes=node.get("yccd", []),
+                learning_outcomes=node.get("yccd") or [],
             )
-            for prereq_id in node["tienQuyet"]:
+            for prereq_id in node.get("tienQuyet") or []:
                 edges.append(
                     PrerequisiteEdge(prerequisite_topic_id=prereq_id, dependent_topic_id=node["id"])
                 )
@@ -118,6 +122,10 @@ def create_app(
 
     app = FastAPI(title="learning-path", version="0.1.1")
     checkpointer_to_use = checkpointer or InMemorySaver()
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "service": "learning-path"}
 
     def get_curriculum() -> CurriculumGraph:
         if initial_curriculum is not None:

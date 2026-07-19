@@ -826,7 +826,7 @@ export default function TutorHubPage() {
     cursor: "pointer",
     transition: "all .15s",
   };
-  const tabOn: CSSProperties = { ...tabBase, background: "#16161F", color: "#fff" };
+  const tabOn: CSSProperties = { ...tabBase, background: "#16161F", color: "#fff", border: "none" };
   const tabOff: CSSProperties = { ...tabBase, background: "#fff", color: "#5b6072", border: "1px solid #eef1f4" };
   const isLastAnswered = answered && qIndex >= qTotal - 1;
 
@@ -2027,13 +2027,17 @@ export default function TutorHubPage() {
                               {options.map((opt, oIdx) => {
                                 const isSel = examAnswers[currentQuestion.id] === String(oIdx);
                                 return (
-                                  <div
+                                  <button
                                     key={oIdx}
+                                    type="button"
+                                    className="ah-focusable"
                                     onClick={() => setExamAnswers((prev) => ({ ...prev, [currentQuestion.id]: String(oIdx) }))}
                                     style={{
                                       display: "flex",
                                       alignItems: "center",
                                       gap: 12,
+                                      width: "100%",
+                                      textAlign: "left",
                                       border: isSel ? "2px solid #7C46E8" : "1px solid #eef1f4",
                                       background: isSel ? "#faf7ff" : "#fff",
                                       color: isSel ? "#5b2fc0" : "#4b5060",
@@ -2060,7 +2064,7 @@ export default function TutorHubPage() {
                                       {["A", "B", "C", "D", "E"][oIdx] ?? oIdx}
                                     </span>
                                     <SafeHtml as="span" text={opt} style={{ flex: 1 }} />
-                                  </div>
+                                  </button>
                                 );
                               })}
                             </div>
@@ -2367,18 +2371,22 @@ export default function TutorHubPage() {
               })}
             </div>
             <div style={{ display: "flex", gap: 11 }}>
-              <div
+              <button
+                type="button"
+                className="ah-focusable"
                 onClick={restart}
-                style={{ ...POPPINS, flex: 1, background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", borderRadius: 15, padding: 15, fontWeight: 800, fontSize: 15, cursor: "pointer", boxShadow: "0 12px 24px -8px rgba(15,185,166,.55)" }}
+                style={{ ...POPPINS, flex: 1, border: "none", background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", color: "#fff", borderRadius: 15, padding: 15, fontWeight: 800, fontSize: 15, cursor: "pointer", boxShadow: "0 12px 24px -8px rgba(15,185,166,.55)" }}
               >
                 Học tiếp →
-              </div>
-              <div
+              </button>
+              <button
+                type="button"
+                className="ah-focusable"
                 onClick={restart}
                 style={{ background: "#fff", border: "1px solid #eef1f4", color: "#5b6072", borderRadius: 15, padding: "15px 22px", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
               >
                 Đóng
-              </div>
+              </button>
           </div>
         </div>
       </div>
@@ -2488,13 +2496,17 @@ export default function TutorHubPage() {
                           {options.map((opt, oIdx) => {
                             const isSel = examAnswers[currentQuestion.id] === String(oIdx);
                             return (
-                              <div
+                              <button
                                 key={oIdx}
+                                type="button"
+                                className="ah-focusable"
                                 onClick={() => setExamAnswers((prev) => ({ ...prev, [currentQuestion.id]: String(oIdx) }))}
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
                                   gap: 12,
+                                  width: "100%",
+                                  textAlign: "left",
                                   border: isSel ? "2px solid #7C46E8" : "1px solid #eef1f4",
                                   background: isSel ? "#faf7ff" : "#fff",
                                   color: isSel ? "#5b2fc0" : "#4b5060",
@@ -2521,7 +2533,7 @@ export default function TutorHubPage() {
                                   {["A", "B", "C", "D", "E"][oIdx] ?? oIdx}
                                 </span>
                                 <SafeHtml as="span" text={opt} style={{ flex: 1 }} />
-                              </div>
+                              </button>
                             );
                           })}
                         </div>
@@ -2687,10 +2699,13 @@ export default function TutorHubPage() {
                 {/* Cách 1: Đề thi được giao sẵn */}
                 {examsList.length > 0 ? (
                   <div>
-                    <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
-                      Đề thi được giao cho em:
+                    <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>
+                      Đề thi được giao cho em
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 180, overflowY: "auto", paddingRight: 4 }}>
+                    <div style={{ fontSize: 12, color: "#5b6072", marginBottom: 10, lineHeight: 1.5 }}>
+                      Em chỉ cần hoàn thành <b>1 đề bất kỳ</b> trong danh sách dưới đây để mở khóa lộ trình học nhé!
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 320, overflowY: "auto", paddingRight: 4 }}>
                       {examsList.map((ex) => (
                         <div
                           key={ex.id}
@@ -2730,12 +2745,12 @@ export default function TutorHubPage() {
                 {/* Cách 2: Nhập mã đề thi tự do */}
                 <div style={{ borderTop: "1px solid #f2f4f7", paddingTop: 18, marginTop: 4 }}>
                   <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#9aa1b0", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>
-                    Hoặc nhập mã đề thi (Exam ID) khác:
+                    Hoặc nhập mã đề thi thầy/cô gửi riêng cho em:
                   </div>
                   <div style={{ display: "flex", gap: 10 }}>
                     <input
                       type="text"
-                      placeholder="Nhập mã đề thi (UUID)..."
+                      placeholder="Dán mã đề thi vào đây..."
                       value={customExamCode}
                       onChange={(e) => setCustomExamCode(e.target.value)}
                       style={{ flex: 1, background: "#f7f9fb", border: "1px solid #eef1f4", borderRadius: 14, padding: "12px 14px", fontSize: 13, fontWeight: 650, color: "#16161F", outline: "none" }}
@@ -2748,20 +2763,25 @@ export default function TutorHubPage() {
                         border: "none",
                         borderRadius: 14,
                         padding: "12px 20px",
-                        background: "#16161F",
+                        background: "linear-gradient(135deg,#7C46E8,#6D28D9)",
                         color: "#fff",
                         fontWeight: 800,
                         fontSize: 13,
                         cursor: "pointer",
+                        boxShadow: "0 6px 12px -4px rgba(109,40,217,.4)",
+                        opacity: loadingExam ? 0.6 : 1,
                       }}
                     >
-                      {loadingExam ? "Tải..." : "Bắt đầu"}
+                      {loadingExam ? "Đang tải..." : "Vào thi"}
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 32, borderTop: "1px solid #f2f4f7", paddingTop: 20 }}>
+              <div style={{ textAlign: "center", marginTop: 32, borderTop: "1px solid #f2f4f7", paddingTop: 20 }}>
+                <div style={{ fontSize: 12, color: "#9aa1b0", marginBottom: 12, lineHeight: 1.5 }}>
+                  Chưa sẵn sàng làm bài? Không sao, em có thể đăng xuất và quay lại làm sau nhé.
+                </div>
                 <button
                   onClick={() => {
                     localStorage.clear();
@@ -2769,20 +2789,20 @@ export default function TutorHubPage() {
                   }}
                   style={{
                     ...POPPINS,
-                    border: "1px solid #f8d3da",
+                    border: "1px solid #eef1f4",
                     borderRadius: 14,
                     padding: "11px 24px",
-                    background: "#fef3f5",
-                    color: "#c23a54",
-                    fontWeight: 800,
+                    background: "#fff",
+                    color: "#5b6072",
+                    fontWeight: 700,
                     fontSize: 13,
                     cursor: "pointer",
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
                   }}
                 >
-                  🚪 Đăng xuất tài khoản
+                  🚪 Đăng xuất, làm sau
                 </button>
               </div>
             </div>

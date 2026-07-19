@@ -310,6 +310,16 @@
 }
 .ah-panel { animation: ah-fade 0.28s ease-out; }
 
+/* Focus ring for the tutor hub's button-ized interactive elements (inline-styled page) */
+.ah-focusable {
+  font: inherit;
+  text-align: inherit;
+}
+.ah-focusable:focus-visible {
+  outline: 3px solid #7C46E8;
+  outline-offset: 2px;
+}
+
 /* ===== Character sprite animation ===== */
 @keyframes spr-slide {
   to { transform: translateX(var(--spr-end)); }
