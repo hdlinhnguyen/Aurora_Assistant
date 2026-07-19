@@ -332,39 +332,11 @@ export default function TeacherDashboard() {
     const savedViewMode = localStorage.getItem("aurora_teacher_view_mode") as "tree" | "matrix" | null;
 
     const isTourActive = localStorage.getItem("aurora_tour_active") === "true";
-    const savedStepIdxStr = localStorage.getItem("aurora_tour_step");
-    let initialTab = normalizeTeacherTab(savedTab);
-
-    if (isTourActive && savedStepIdxStr) {
-      const stepIdx = parseInt(savedStepIdxStr, 10);
-      const tourMode = localStorage.getItem("aurora_tour_mode") || "both";
-
-      const tourSteps = [
-        { id: "welcome" },
-        { id: "socratic-chat" },
-        { id: "feynman-notebook" },
-        { id: "role-switcher" },
-        { id: "concept-gaps" },
-        { id: "inspect-drawer" },
-        { id: "finish" }
-      ];
-
-      const activeSteps = tourSteps.filter((step, idx) => {
-        if (idx === 0 || idx === tourSteps.length - 1) return true;
-        if (tourMode === "student") return step.id === "socratic-chat" || step.id === "role-switcher";
-        if (tourMode === "teacher") return step.id === "concept-gaps" || step.id === "inspect-drawer" || step.id === "role-switcher";
-        return true;
-      });
-
-      const currentStep = activeSteps[stepIdx];
-      if (currentStep) {
-        if (currentStep.id === "concept-gaps") {
-          initialTab = "monitoring";
-        } else if (currentStep.id === "inspect-drawer") {
-          initialTab = "students";
-        }
-      }
-    }
+    // Teacher tours start from the class-management workspace; each tour step
+    // then switches tabs through the GuidedTour custom event.
+    const initialTab = isTourActive && localStorage.getItem("aurora_tour_mode") === "teacher"
+      ? "student-mgmt"
+      : normalizeTeacherTab(savedTab);
 
     setActiveTab(initialTab);
     if (savedStudent) {
@@ -758,14 +730,17 @@ export default function TeacherDashboard() {
     try {
       const data = await apiFetch("/subjects");
       let finalSubjects = data || [];
-      const tourActive = localStorage.getItem("aurora_tour_active") === "true";
-      if (tourActive) {
-        if (!finalSubjects.includes("Môn học Trải nghiệm (Demo)")) {
-          finalSubjects = ["Môn học Trải nghiệm (Demo)", ...finalSubjects];
-        }
-      }
+      const isTeacherTour =
+        localStorage.getItem("aurora_tour_active") === "true" &&
+        localStorage.getItem("aurora_tour_mode") === "teacher" &&
+        localStorage.getItem("aurora_tour_demo_session") === "true";
+      const tourSubjectName = "Số và Đại số";
+      const seededTourSubject = finalSubjects.find((subject: string) =>
+        subject.localeCompare(tourSubjectName, "vi", { sensitivity: "base" }) === 0,
+      );
+      const requestedSubject = selectSubjectName || (isTeacherTour ? seededTourSubject : undefined);
       setSubjects(finalSubjects);
-      setSelectedSubject(resolveTeacherSubject(finalSubjects, selectSubjectName));
+      setSelectedSubject(resolveTeacherSubject(finalSubjects, requestedSubject));
     } catch (err) {
       console.error("Failed to load subjects:", err);
     }
@@ -1044,6 +1019,7 @@ export default function TeacherDashboard() {
         method: "POST",
         body: JSON.stringify({
           classId: "class-demo",
+          subject: selectedSubject,
           targetTopicIds: selectedTargetTopics,
         }),
       });
@@ -2072,7 +2048,10 @@ export default function TeacherDashboard() {
       </aside>
 
       {/* Main Panel Workspace */}
-      <main className="flex-1 flex flex-col p-6 overflow-hidden bg-background relative">
+      <main
+        className="flex-1 flex flex-col p-6 overflow-hidden bg-background relative"
+        data-tour={`teacher-tab-${activeTab}`}
+      >
         {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" ? (
           // Subject Selection Screen Dashboard
           <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">

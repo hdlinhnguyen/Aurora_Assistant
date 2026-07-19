@@ -76,7 +76,7 @@ export default function QuickRoleSwitcher() {
   };
 
   return (
-    <div className="relative inline-block text-left quick-role-switcher-dropdown z-50">
+    <div data-tour="role-switcher" className="relative inline-block text-left quick-role-switcher-dropdown z-50">
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}

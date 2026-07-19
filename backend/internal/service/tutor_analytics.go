@@ -12,11 +12,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func (s *tutorService) GetTeacherDashboardData() ([]GapStat, []StudentNeedHelp, []FeynmanStudentStat, error) {
+func (s *tutorService) GetTeacherDashboardData(teacherID uuid.UUID) ([]GapStat, []StudentNeedHelp, []FeynmanStudentStat, error) {
 	var gapStats []GapStat
-	err := s.db.Model(&model.Message{}).
-		Select("detected_gap as gap, count(*) as count").
-		Where("detected_gap <> ''").
+	err := s.db.Table("messages").
+		Select("messages.detected_gap as gap, count(*) as count").
+		Joins("JOIN chat_sessions ON chat_sessions.id = messages.session_id").
+		Joins("JOIN users ON users.id = chat_sessions.student_id").
+		Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+		Where("classrooms.teacher_id = ? AND messages.detected_gap <> ''", teacherID).
 		Group("detected_gap").
 		Order("count desc").
 		Scan(&gapStats).Error
@@ -29,7 +32,8 @@ func (s *tutorService) GetTeacherDashboardData() ([]GapStat, []StudentNeedHelp, 
 		Select("users.name as name, users.email as email, count(messages.id) as incorrect_steps, chat_sessions.id as session_id").
 		Joins("join chat_sessions on messages.session_id = chat_sessions.id").
 		Joins("join users on chat_sessions.student_id = users.id").
-		Where("messages.is_correct_step = ?", false).
+		Joins("join classrooms on classrooms.id = users.classroom_id").
+		Where("classrooms.teacher_id = ? AND messages.is_correct_step = ?", teacherID, false).
 		Group("users.id, users.name, users.email, chat_sessions.id").
 		Order("incorrect_steps desc").
 		Limit(5).
@@ -43,7 +47,8 @@ func (s *tutorService) GetTeacherDashboardData() ([]GapStat, []StudentNeedHelp, 
 		Select("users.name as name, users.email as email, avg(messages.feynman_score) as average_score, chat_sessions.id as session_id").
 		Joins("join chat_sessions on messages.session_id = chat_sessions.id").
 		Joins("join users on chat_sessions.student_id = users.id").
-		Where("chat_sessions.mode = ? AND messages.feynman_score > 0", "feynman").
+		Joins("join classrooms on classrooms.id = users.classroom_id").
+		Where("classrooms.teacher_id = ? AND chat_sessions.mode = ? AND messages.feynman_score > 0", teacherID, "feynman").
 		Group("users.id, users.name, users.email, chat_sessions.id").
 		Order("average_score desc").
 		Scan(&feynmanStats).Error
@@ -51,7 +56,7 @@ func (s *tutorService) GetTeacherDashboardData() ([]GapStat, []StudentNeedHelp, 
 	return gapStats, studentsNeedHelp, feynmanStats, err
 }
 
-func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
+func (s *tutorService) GetStudentsProgress(teacherID uuid.UUID) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 
 	// 1. Get all unique subjects
@@ -65,7 +70,9 @@ func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 
 	// 2. Get all users with student role
 	var students []model.User
-	if err := s.db.Where("role = ?", "student").Order("name asc").Find(&students).Error; err != nil {
+	if err := s.db.Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+		Where("users.role = ? AND classrooms.teacher_id = ?", "student", teacherID).
+		Order("users.name asc").Find(&students).Error; err != nil {
 		return nil, err
 	}
 
@@ -90,13 +97,20 @@ func (s *tutorService) GetStudentsProgress() ([]map[string]interface{}, error) {
 		LastActiveAt   time.Time `gorm:"column:last_active_at"`
 	}
 	var logAggs []logAgg
-	s.db.Table("activity_logs").
-		Select(`student_id, subject,
+	studentIDs := make([]uuid.UUID, 0, len(students))
+	for _, student := range students {
+		studentIDs = append(studentIDs, student.ID)
+	}
+	if len(studentIDs) > 0 {
+		s.db.Table("activity_logs").
+			Select(`student_id, subject,
 			COUNT(CASE WHEN action IN ('answer_correct','answer_incorrect') THEN 1 END) as total_answers,
 			COUNT(CASE WHEN action = 'answer_correct' THEN 1 END) as correct_answers,
 			MAX(created_at) as last_active_at`).
-		Group("student_id, subject").
-		Find(&logAggs)
+			Where("student_id IN ?", studentIDs).
+			Group("student_id, subject").
+			Find(&logAggs)
+	}
 
 	// Build lookup map: studentID:subject -> logAgg
 	logAggMap := map[string]logAgg{}
@@ -308,9 +322,11 @@ func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject st
 	}, nil
 }
 
-func (s *tutorService) GetMonitoringData(subject string) ([]StudentStat, error) {
+func (s *tutorService) GetMonitoringData(teacherID uuid.UUID, subject string) ([]StudentStat, error) {
 	var students []model.User
-	if err := s.db.Where("role = ?", "student").Order("name asc").Find(&students).Error; err != nil {
+	if err := s.db.Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+		Where("users.role = ? AND classrooms.teacher_id = ?", "student", teacherID).
+		Order("users.name asc").Find(&students).Error; err != nil {
 		return nil, err
 	}
 
@@ -371,7 +387,7 @@ func (s *tutorService) GetMonitoringData(subject string) ([]StudentStat, error) 
 	return stats, nil
 }
 
-func (s *tutorService) GetClassInterventionGroups(subject string) (map[string]interface{}, error) {
+func (s *tutorService) GetClassInterventionGroups(teacherID uuid.UUID, subject string) (map[string]interface{}, error) {
 	var nodes []model.Node
 	if err := s.db.Where("subject = ?", subject).Find(&nodes).Error; err != nil {
 		return nil, err
@@ -382,7 +398,9 @@ func (s *tutorService) GetClassInterventionGroups(subject string) (map[string]in
 	}
 
 	var students []model.User
-	if err := s.db.Where("role = ?", "student").Find(&students).Error; err != nil {
+	if err := s.db.Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+		Where("users.role = ? AND classrooms.teacher_id = ?", "student", teacherID).
+		Find(&students).Error; err != nil {
 		return nil, err
 	}
 	studentNameMap := make(map[uuid.UUID]string)
@@ -391,8 +409,14 @@ func (s *tutorService) GetClassInterventionGroups(subject string) (map[string]in
 	}
 
 	var logs []model.ActivityLog
-	if err := s.db.Where("subject = ?", subject).Order("created_at asc").Find(&logs).Error; err != nil {
-		return nil, err
+	studentIDs := make([]uuid.UUID, 0, len(students))
+	for _, student := range students {
+		studentIDs = append(studentIDs, student.ID)
+	}
+	if len(studentIDs) > 0 {
+		if err := s.db.Where("subject = ? AND student_id IN ?", subject, studentIDs).Order("created_at asc").Find(&logs).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	studentNodeStates := make(map[uuid.UUID]map[uuid.UUID]bool)
@@ -469,3 +493,11 @@ func (s *tutorService) GetClassInterventionGroups(subject string) (map[string]in
 	}, nil
 }
 
+func (s *tutorService) TeacherOwnsStudent(teacherID, studentID uuid.UUID) (bool, error) {
+	var count int64
+	err := s.db.Model(&model.User{}).
+		Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+		Where("users.id = ? AND users.role = ? AND classrooms.teacher_id = ?", studentID, "student", teacherID).
+		Count(&count).Error
+	return count == 1, err
+}

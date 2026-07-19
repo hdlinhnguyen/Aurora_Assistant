@@ -132,7 +132,11 @@ func (h *TutorHandler) GetMessages(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID phiên học không hợp lệ"})
 	}
 
-	messages, err := h.svc.GetSessionMessages(sessionID)
+	userID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	messages, err := h.svc.GetSessionMessages(sessionID, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải tin nhắn"})
 	}
@@ -186,7 +190,11 @@ func (h *TutorHandler) SaveAxioms(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	if err := h.svc.SaveSessionAxioms(sessionID, req.AxiomsJSON); err != nil {
+	userID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	if err := h.svc.SaveSessionAxioms(sessionID, userID, req.AxiomsJSON); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể lưu sơ đồ nguyên lý gốc"})
 	}
 
@@ -200,7 +208,11 @@ func (h *TutorHandler) GetAxioms(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID phiên học không hợp lệ"})
 	}
 
-	axiomsJSON, err := h.svc.GetSessionAxioms(sessionID)
+	userID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	axiomsJSON, err := h.svc.GetSessionAxioms(sessionID, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải sơ đồ nguyên lý gốc"})
 	}
@@ -225,7 +237,11 @@ func (h *TutorHandler) GetDashboard(c fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Bạn không có quyền truy cập bảng thông tin Giáo viên"})
 	}
 
-	gapStats, studentsNeedHelp, feynmanStats, err := h.svc.GetTeacherDashboardData()
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	gapStats, studentsNeedHelp, feynmanStats, err := h.svc.GetTeacherDashboardData(teacherID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi tải báo cáo"})
 	}
@@ -811,7 +827,11 @@ func (h *TutorHandler) GetStudentsProgress(c fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem tiến trình"})
 	}
 
-	progress, err := h.svc.GetStudentsProgress()
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	progress, err := h.svc.GetStudentsProgress(teacherID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -863,7 +883,11 @@ func (h *TutorHandler) GetMonitoringData(c fiber.Ctx) error {
 		subject = subjectRaw
 	}
 
-	stats, err := h.svc.GetMonitoringData(subject)
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	stats, err := h.svc.GetMonitoringData(teacherID, subject)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -890,7 +914,11 @@ func (h *TutorHandler) GetClassInterventionGroups(c fiber.Ctx) error {
 		subject = subjectRaw
 	}
 
-	groups, err := h.svc.GetClassInterventionGroups(subject)
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	groups, err := h.svc.GetClassInterventionGroups(teacherID, subject)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -918,6 +946,17 @@ func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	studentID, err := uuid.Parse(studentIdStr)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	owns, err := h.svc.TeacherOwnsStudent(teacherID, studentID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể xác minh quyền truy cập"})
+	}
+	if !owns {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Bạn không có quyền xem học sinh này"})
 	}
 	subjectRaw := c.Params("subject")
 	subject, err := url.PathUnescape(subjectRaw)
@@ -1281,18 +1320,36 @@ func (h *TutorHandler) RenameSubject(c fiber.Ctx) error {
 }
 
 func (h *TutorHandler) GetInternalGraph(c fiber.Ctx) error {
+	subject := strings.TrimSpace(c.Query("subject"))
+
 	var dbNodes []model.Node
-	if err := config.DB.Find(&dbNodes).Error; err != nil {
+	nodesQuery := config.DB.Model(&model.Node{})
+	if subject != "" {
+		nodesQuery = nodesQuery.Where("subject = ?", subject)
+	}
+	if err := nodesQuery.Find(&dbNodes).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	nodeIDs := make(map[uuid.UUID]bool, len(dbNodes))
+	for _, node := range dbNodes {
+		nodeIDs[node.ID] = true
+	}
+
 	var dbEdges []model.Edge
-	if err := config.DB.Find(&dbEdges).Error; err != nil {
+	edgesQuery := config.DB.Model(&model.Edge{})
+	if subject != "" {
+		edgesQuery = edgesQuery.Where("subject = ?", subject)
+	}
+	if err := edgesQuery.Find(&dbEdges).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	prereqsMap := make(map[uuid.UUID][]string)
 	for _, edge := range dbEdges {
+		if subject != "" && (!nodeIDs[edge.SourceID] || !nodeIDs[edge.TargetID]) {
+			continue
+		}
 		prereqsMap[edge.TargetID] = append(prereqsMap[edge.TargetID], edge.SourceID.String())
 	}
 
@@ -1398,6 +1455,7 @@ type RawQuizEvidence struct {
 }
 
 type CreatePathFastAPIBody struct {
+	Subject  string                `json:"subject,omitempty"`
 	Request  CreatePathBodyRequest `json:"request"`
 	RawQuiz  []RawQuizEvidence     `json:"raw_quiz"`
 	RawPaper []interface{}         `json:"raw_paper"`
@@ -1409,6 +1467,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 
 	var req struct {
 		ClassID        string   `json:"classId"`
+		Subject        string   `json:"subject"`
 		StudentIDs     []string `json:"studentIds"`
 		TargetTopicIDs []string `json:"targetTopicIds"`
 	}
@@ -1419,6 +1478,22 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	if req.ClassID == "" {
 		req.ClassID = "class-demo"
 	}
+	req.Subject = strings.TrimSpace(req.Subject)
+	if req.Subject == "" && len(req.TargetTopicIDs) > 0 {
+		var subjects []string
+		if err := config.DB.Model(&model.Node{}).
+			Distinct("subject").
+			Where("id IN ?", req.TargetTopicIDs).
+			Pluck("subject", &subjects).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể xác định môn học từ cây kiến thức"})
+		}
+		if len(subjects) == 1 {
+			req.Subject = subjects[0]
+		}
+	}
+	if req.Subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Thiếu môn học khi lập lộ trình"})
+	}
 
 	if len(req.StudentIDs) == 0 {
 		var studentEmails = []string{"studentA@aurora.edu.vn", "studentB@aurora.edu.vn", "studentC@aurora.edu.vn", "student@aurora.edu.vn"}
@@ -1428,7 +1503,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	}
 
 	var logs []model.ActivityLog
-	if err := config.DB.Where("student_id IN (?)", req.StudentIDs).Find(&logs).Error; err != nil {
+	if err := config.DB.Where("student_id IN (?) AND subject = ?", req.StudentIDs, req.Subject).Find(&logs).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn lịch sử học tập"})
 	}
 
@@ -1458,6 +1533,7 @@ func (h *TutorHandler) CreateLearningPath(c fiber.Ctx) error {
 	}
 
 	fastAPIBody := CreatePathFastAPIBody{
+		Subject: req.Subject,
 		Request: CreatePathBodyRequest{
 			ClassID:                    req.ClassID,
 			StudentIDs:                 req.StudentIDs,
@@ -1539,6 +1615,7 @@ func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
 	rawQuiz := buildRawQuizFromLogs(logs)
 
 	fastAPIBody := CreatePathFastAPIBody{
+		Subject: subject,
 		Request: CreatePathBodyRequest{
 			ClassID:                    "live-" + studentIDStr,
 			StudentIDs:                 []string{studentIDStr},

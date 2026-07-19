@@ -99,12 +99,20 @@ func TestTutorServiceGetClassInterventionGroups(t *testing.T) {
 	db := setupDiagnosticsDB(t)
 	svc := NewTutorService(db, nil)
 	subject := "Toan dai so"
+	teacher := model.User{ID: uuid.New(), Email: "teacher@example.test", Name: "Teacher", Role: "teacher"}
+	if err := db.Create(&teacher).Error; err != nil {
+		t.Fatal(err)
+	}
+	classroom := model.Classroom{ID: uuid.New(), Name: "Class 1", TeacherID: teacher.ID}
+	if err := db.Create(&classroom).Error; err != nil {
+		t.Fatal(err)
+	}
 	node := model.Node{ID: uuid.New(), Subject: subject, Name: "Cong phan so", StableKey: "gap", Status: "active"}
 	if err := db.Create(&node).Error; err != nil {
 		t.Fatal(err)
 	}
-	st1 := model.User{ID: uuid.New(), Email: "student-one@example.test", Name: "Student One", Role: "student"}
-	st2 := model.User{ID: uuid.New(), Email: "student-two@example.test", Name: "Student Two", Role: "student"}
+	st1 := model.User{ID: uuid.New(), Email: "student-one@example.test", Name: "Student One", Role: "student", ClassroomID: &classroom.ID}
+	st2 := model.User{ID: uuid.New(), Email: "student-two@example.test", Name: "Student Two", Role: "student", ClassroomID: &classroom.ID}
 	if err := db.Create(&[]model.User{st1, st2}).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +123,7 @@ func TestTutorServiceGetClassInterventionGroups(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := svc.GetClassInterventionGroups(subject)
+	result, err := svc.GetClassInterventionGroups(teacher.ID, subject)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,4 +177,3 @@ func TestTutorServiceGetStudentStateInitializesNewStudent(t *testing.T) {
 		t.Fatal("expected NeedsDiagnostic to be saved as true in database")
 	}
 }
-

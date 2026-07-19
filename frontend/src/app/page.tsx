@@ -7,8 +7,18 @@ import dynamic from "next/dynamic";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
+const DEMO_TOURS = {
+  student: { email: "student@aurora.edu.vn", route: "/tutor", label: "Học sinh" },
+  teacher: { email: "teacher@aurora.edu.vn", route: "/teacher", label: "Giáo viên" },
+} as const;
+
+type DemoTourRole = keyof typeof DEMO_TOURS;
+
 export default function LandingPage() {
   const router = useRouter();
+  const [showTourRolePicker, setShowTourRolePicker] = useState(false);
+  const [tourLoading, setTourLoading] = useState<DemoTourRole | null>(null);
+  const [tourError, setTourError] = useState("");
   
   // Lottie animation state
   const [animationData, setAnimationData] = useState<any>(null);
@@ -19,6 +29,38 @@ export default function LandingPage() {
       .then((data) => setAnimationData(data))
       .catch((err) => console.error("Error loading animation:", err));
   }, []);
+
+  const startDemoTour = async (role: DemoTourRole) => {
+    const demo = DEMO_TOURS[role];
+    setTourLoading(role);
+    setTourError("");
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: demo.email, password: "demo123" }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Không thể mở tài khoản ${demo.label.toLowerCase()} demo. Vui lòng thử lại.`);
+      }
+
+      const data = await res.json();
+      localStorage.setItem("aurora_token", data.token);
+      localStorage.setItem("aurora_user", JSON.stringify(data.user));
+      localStorage.setItem("aurora_tour_demo_session", "true");
+      localStorage.setItem("aurora_tour_active", "true");
+      localStorage.setItem("aurora_tour_mode", role);
+      localStorage.setItem("aurora_tour_step", "1");
+      localStorage.removeItem("aurora_tour_completed");
+      router.push(demo.route);
+    } catch (error) {
+      setTourError(error instanceof Error ? error.message : "Không thể bắt đầu tour demo.");
+    } finally {
+      setTourLoading(null);
+    }
+  };
 
   // Interactive mock chat state to showcase Socratic learning
   const [mockStep, setMockStep] = useState(0);
@@ -99,22 +141,9 @@ export default function LandingPage() {
               </svg>
             </button>
             <button
-              onClick={async () => {
-                try {
-                  const res = await fetch(`${API_BASE_URL}/auth/login`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: "student@aurora.edu.vn", password: "demo123" }),
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    localStorage.setItem("aurora_token", data.token);
-                    localStorage.setItem("aurora_user", JSON.stringify(data.user));
-                  }
-                } catch (e) {}
-                localStorage.setItem("aurora_tour_active", "true");
-                localStorage.setItem("aurora_tour_step", "0");
-                router.push("/tutor");
+              onClick={() => {
+                setTourError("");
+                setShowTourRolePicker(true);
               }}
               className="bg-gradient-to-r from-[var(--purple)] to-indigo-600 hover:brightness-110 text-white px-8 py-4 rounded-full font-bold shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
             >
@@ -340,6 +369,81 @@ export default function LandingPage() {
           <p>&copy; 2026 Bản quyền thuộc về dự án Aurora Assistant. Phát triển bám sát GDPT 2018.</p>
         </div>
       </footer>
+
+      {showTourRolePicker && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm"
+          onClick={() => !tourLoading && setShowTourRolePicker(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tour-role-title"
+            onClick={(event) => event.stopPropagation()}
+            className="relative w-full max-w-lg rounded-[28px] border border-white/70 bg-white p-7 shadow-[0_28px_80px_rgba(15,23,42,.32)]"
+          >
+            <button
+              type="button"
+              aria-label="Đóng chọn vai trò"
+              onClick={() => setShowTourRolePicker(false)}
+              disabled={Boolean(tourLoading)}
+              className="absolute right-5 top-4 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+            >
+              X
+            </button>
+
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--purple)]">Tour demo 2 phút</p>
+            <h2 id="tour-role-title" className="mt-2 text-2xl font-extrabold text-slate-950">
+              Bạn muốn trải nghiệm vai trò nào?
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              Hệ thống sẽ đăng nhập một tài khoản demo tạm thời và tự đăng xuất khi hướng dẫn kết thúc.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                aria-label="Bắt đầu tour Học sinh"
+                onClick={() => startDemoTour("student")}
+                disabled={Boolean(tourLoading)}
+                className="group rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-lg disabled:pointer-events-none disabled:opacity-60"
+              >
+                <span className="text-3xl">🎓</span>
+                <span className="mt-3 block text-base font-extrabold text-slate-950">Học sinh</span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                  Chọn bài, học lý thuyết, luyện tập, hỏi AI và làm kiểm tra.
+                </span>
+                <span className="mt-4 block text-xs font-black text-emerald-700">
+                  {tourLoading === "student" ? "Đang đăng nhập..." : "Bắt đầu tour học sinh →"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                aria-label="Bắt đầu tour Giáo viên"
+                onClick={() => startDemoTour("teacher")}
+                disabled={Boolean(tourLoading)}
+                className="group rounded-2xl border border-violet-200 bg-violet-50 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-violet-400 hover:shadow-lg disabled:pointer-events-none disabled:opacity-60"
+              >
+                <span className="text-3xl">🧑‍🏫</span>
+                <span className="mt-3 block text-base font-extrabold text-slate-950">Giáo viên</span>
+                <span className="mt-1 block text-xs leading-relaxed text-slate-600">
+                  Khám phá dashboard lớp, lỗ hổng kiến thức và công cụ theo dõi học sinh.
+                </span>
+                <span className="mt-4 block text-xs font-black text-violet-700">
+                  {tourLoading === "teacher" ? "Đang đăng nhập..." : "Bắt đầu tour giáo viên →"}
+                </span>
+              </button>
+            </div>
+
+            {tourError && (
+              <p className="mt-4 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700" role="alert">
+                {tourError}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
