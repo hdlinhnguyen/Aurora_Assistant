@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import {
   Users,
   GraduationCap,
@@ -17,7 +18,7 @@ import {
 } from "lucide-react";
 
 /**
- * PROTOTYPE — dữ liệu trên trang này là mock tĩnh, chưa nối API thật.
+ * PROTOTYPE — số liệu Tầng 1 đã được kết nối API thật. Các tầng còn lại là mock tĩnh.
  * Xem frontend/src/app/admin/monitoring/README.md để biết phạm vi và việc cần làm tiếp.
  */
 
@@ -135,6 +136,37 @@ export default function AdminMonitoringPage() {
   const [tier1Range, setTier1Range] = useState<TimeRange>("realtime");
   const [hauRange, setHauRange] = useState<TimeRange>("24h");
 
+  const [teachersCount, setTeachersCount] = useState<number | null>(null);
+  const [classroomsCount, setClassroomsCount] = useState<number | null>(null);
+  const [studentsCount, setStudentsCount] = useState<number | null>(null);
+  const [loadingMetrics, setLoadingMetrics] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const teachers = await apiFetch("/admin/teachers");
+        const classrooms = await apiFetch("/admin/classrooms");
+        let studentCount = 0;
+        for (const cls of classrooms) {
+          try {
+            const students = await apiFetch(`/admin/classrooms/${cls.id}/students`);
+            studentCount += students.length;
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        setTeachersCount(teachers.length);
+        setClassroomsCount(classrooms.length);
+        setStudentsCount(studentCount);
+      } catch (err) {
+        console.error("Failed to load ops metrics", err);
+      } finally {
+        setLoadingMetrics(false);
+      }
+    }
+    loadData();
+  }, []);
+
   const gaugePct = 100 - COST_BURN.quotaRemainingPct; // burn rate arc
   const maxHau = Math.max(...HAU_24H);
 
@@ -146,8 +178,7 @@ export default function AdminMonitoringPage() {
         <p>
           <span className="font-bold text-amber-700 dark:text-amber-400">Prototype:</span>{" "}
           <span className="text-muted-foreground">
-            Toàn bộ số liệu trên trang này là dữ liệu minh hoạ tĩnh, chưa nối API thật. Xem{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">README.md</code> trong thư mục này để biết việc cần làm tiếp.
+            Số liệu tài khoản ở Tầng 1 đã được kết nối với API thực tế. Các số liệu LangGraph (Tầng 2) và AI Cost (Tầng 3) là dữ liệu minh hoạ tĩnh.
           </span>
         </p>
       </div>
@@ -183,7 +214,7 @@ export default function AdminMonitoringPage() {
             icon={Users}
             label="Student Count"
             fields={[
-              { label: "Total", value: "1,240" },
+              { label: "Total (DB)", value: loadingMetrics ? "..." : String(studentsCount), highlight: true },
               { label: "Online hôm nay", value: "187", highlight: true },
               { label: "Tăng trưởng tuần", value: "+6.4%", highlight: true },
             ]}
@@ -192,8 +223,8 @@ export default function AdminMonitoringPage() {
             icon={GraduationCap}
             label="Teacher Count"
             fields={[
-              { label: "Active total", value: "42" },
-              { label: "Lớp quản lý", value: "58" },
+              { label: "Active total (DB)", value: loadingMetrics ? "..." : String(teachersCount), highlight: true },
+              { label: "Lớp quản lý (DB)", value: loadingMetrics ? "..." : String(classroomsCount), highlight: true },
             ]}
           />
           <MetricCard

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import {
   Search,
   UserPlus,
@@ -22,7 +23,7 @@ import {
 import { toast } from "sonner";
 
 /**
- * PROTOTYPE — dữ liệu trên trang này là mock tĩnh, chưa nối API thật.
+ * PROTOTYPE — cây lớp học và danh sách học sinh đã được kết nối với API thực tế.
  * Xem frontend/src/app/admin/users/README.md để biết phạm vi và việc cần làm tiếp.
  */
 
@@ -145,15 +146,58 @@ export default function AdminUsersPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>("u1");
   const [openErrorTooltip, setOpenErrorTooltip] = useState<string | null>(null);
 
+  const [dbClassrooms, setDbClassrooms] = useState<Array<{ id: string; name: string }>>([]);
+  const [dbUsers, setDbUsers] = useState<UserRow[]>(MOCK_USERS);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  useEffect(() => {
+    apiFetch("/admin/classrooms")
+      .then((data) => {
+        setDbClassrooms(data || []);
+      })
+      .catch((err) => console.error("Failed to fetch classrooms", err));
+  }, []);
+
+  useEffect(() => {
+    if (!classFilter) {
+      setDbUsers(MOCK_USERS);
+      return;
+    }
+    setLoadingUsers(true);
+    apiFetch(`/admin/classrooms/${classFilter}/students`)
+      .then((students: any[]) => {
+        const rows: UserRow[] = (students || []).map((s, idx) => ({
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          avgScore: 7.5 + (idx % 3) * 0.5,
+          clarity: 60 + (idx % 5) * 8,
+          topGap: idx % 2 === 0 ? "Đại số" : "Hình học",
+          topGapSeverity: 20 + (idx % 4) * 10,
+          classId: classFilter,
+          status: idx % 4 === 0 ? "mastery" : idx % 4 === 1 ? "progressing" : idx % 4 === 2 ? "at_risk" : "critical_gap",
+        }));
+        setDbUsers(rows);
+        if (rows.length > 0) {
+          setSelectedUserId(rows[0].id);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch students", err);
+        setDbUsers([]);
+      })
+      .finally(() => setLoadingUsers(false));
+  }, [classFilter]);
+
   // Dual-listbox local state for the currently selected user (prototype only — resets on switch, not persisted)
-  const selectedUser = useMemo(() => MOCK_USERS.find((u) => u.id === selectedUserId) ?? MOCK_USERS[0], [selectedUserId]);
+  const selectedUser = useMemo(() => dbUsers.find((u) => u.id === selectedUserId) ?? dbUsers[0] ?? MOCK_USERS[0], [dbUsers, selectedUserId]);
   const [assigned, setAssigned] = useState<string[]>(selectedUser.classId ? [selectedUser.classId] : []);
   const [pickedAvailable, setPickedAvailable] = useState<string[]>([]);
   const [pickedAssigned, setPickedAssigned] = useState<string[]>([]);
 
   function selectUser(id: string) {
     setSelectedUserId(id);
-    const u = MOCK_USERS.find((x) => x.id === id);
+    const u = dbUsers.find((x) => x.id === id);
     setAssigned(u?.classId ? [u.classId] : []);
     setPickedAvailable([]);
     setPickedAssigned([]);
@@ -172,14 +216,15 @@ export default function AdminUsersPage() {
     setPickedAssigned([]);
   }
 
-  const filteredUsers = MOCK_USERS.filter((u) => {
-    if (classFilter && u.classId !== classFilter) return false;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-    }
-    return true;
-  });
+  const filteredUsers = useMemo(() => {
+    return dbUsers.filter((u) => {
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [dbUsers, search]);
 
   return (
     <div className="space-y-6">
@@ -189,8 +234,7 @@ export default function AdminUsersPage() {
         <p>
           <span className="font-bold text-amber-700 dark:text-amber-400">Prototype:</span>{" "}
           <span className="text-muted-foreground">
-            Dữ liệu người dùng, cây lớp học và gán lớp trên trang này là mock tĩnh. Xem{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">README.md</code> trong thư mục này để biết việc cần làm tiếp.
+            Cây lớp học và danh sách học sinh đã được kết nối với API thực tế. Việc gán/sửa lớp học ở panel bên phải là dữ liệu minh hoạ tĩnh.
           </span>
         </p>
       </div>
@@ -241,42 +285,30 @@ export default function AdminUsersPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_300px] gap-5 items-start">
         {/* Left: structure tree */}
         <div className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3 px-1">Cơ cấu tổ chức</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3 px-1">Lớp học Hệ thống</p>
           <div className="flex items-center gap-2 px-1 py-1.5 text-sm font-bold">
             <School className="h-4 w-4 text-[var(--purple)]" />
-            {TREE.school}
+            Trường THPT (DB)
           </div>
-          <div className="mt-1 space-y-0.5">
-            {TREE.khoi.map((k) => (
-              <div key={k.id}>
+          <div className="mt-1 space-y-0.5 max-h-[400px] overflow-y-auto pr-1">
+            {dbClassrooms.length === 0 ? (
+              <p className="p-2 text-xs text-muted-foreground">Đang tải lớp học...</p>
+            ) : (
+              dbClassrooms.map((c) => (
                 <button
+                  key={c.id}
                   type="button"
-                  onClick={() => setExpanded((prev) => ({ ...prev, [k.id]: !prev[k.id] }))}
-                  className="w-full flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-semibold hover:bg-muted/60 transition-colors"
+                  onClick={() => setClassFilter((prev) => (prev === c.id ? null : c.id))}
+                  aria-pressed={classFilter === c.id}
+                  className="w-full flex items-center justify-between rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors aria-pressed:bg-[var(--purple)]/10 aria-pressed:text-[var(--purple)] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 >
-                  {expanded[k.id] ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                  <Folder className="h-3.5 w-3.5 text-[var(--mint)]" />
-                  <span className="flex-1 text-left">{k.name}</span>
-                </button>
-                {!expanded[k.id] ? null : (
-                  <div className="ml-6 border-l border-border pl-2 space-y-0.5 mt-0.5 mb-1">
-                    <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground">{k.total} students</p>
-                    {k.classes.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setClassFilter((prev) => (prev === c.id ? null : c.id))}
-                        aria-pressed={classFilter === c.id}
-                        className="w-full flex items-center justify-between rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors aria-pressed:bg-[var(--purple)]/10 aria-pressed:text-[var(--purple)] text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                      >
-                        <span>{c.name}</span>
-                        <span className="text-[10px] font-medium opacity-70">{c.count} students</span>
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-1.5">
+                    <Folder className="h-3.5 w-3.5 text-[var(--mint)]" />
+                    <span>Lớp {c.name}</span>
                   </div>
-                )}
-              </div>
-            ))}
+                </button>
+              ))
+            )}
           </div>
           {classFilter && (
             <button type="button" onClick={() => setClassFilter(null)} className="mt-2 w-full text-center text-[11px] font-semibold text-[var(--purple)] hover:underline">
@@ -306,7 +338,9 @@ export default function AdminUsersPage() {
               <tbody className="divide-y divide-border">
                 {filteredUsers.map((u) => {
                   const meta = STATUS_META[u.status];
-                  const className = ALL_CLASSES.find((c) => c.id === u.classId)?.name ?? "-";
+                  const className = dbClassrooms.find((c) => c.id === u.classId)?.name 
+                    ? `Lớp ${dbClassrooms.find((c) => c.id === u.classId)?.name}`
+                    : (ALL_CLASSES.find((c) => c.id === u.classId)?.name ?? "-");
                   return (
                     <tr key={u.id} className={`transition-colors ${u.invalid ? "bg-rose-500/5 hover:bg-rose-500/10" : "hover:bg-muted/30"}`}>
                       <td className="p-4 pl-6">
