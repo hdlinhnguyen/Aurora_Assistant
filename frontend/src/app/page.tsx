@@ -395,12 +395,14 @@ export default function LandingPage() {
                 Chế độ làm bài Offline giúp học tập mọi lúc, mọi nơi ngay cả khi mạng yếu.
               </li>
             </ul>
-            <button
-              onClick={() => router.push("/login?role=student")}
-              className="inline-block text-sm font-bold text-[var(--mint)] hover:underline"
-            >
-              Bắt đầu Học thử ngay &rarr;
-            </button>
+            <div className="text-center pt-2">
+              <button
+                onClick={() => router.push("/login?role=student")}
+                className="inline-block text-sm font-bold text-[var(--mint)] hover:underline"
+              >
+                Bắt đầu Học thử ngay &rarr;
+              </button>
+            </div>
           </div>
 
           {/* Path 2: Teachers */}
@@ -433,12 +435,14 @@ export default function LandingPage() {
                 Tiết kiệm hàng giờ chấm bài và soạn câu hỏi phản lý thuyết thủ công.
               </li>
             </ul>
-            <button
-              onClick={() => router.push("/login?role=teacher")}
-              className="inline-block text-sm font-bold text-[var(--purple)] hover:underline"
-            >
-              Truy cập Dashboard Giáo viên &rarr;
-            </button>
+            <div className="text-center pt-2">
+              <button
+                onClick={() => router.push("/login?role=teacher")}
+                className="inline-block text-sm font-bold text-[var(--purple)] hover:underline"
+              >
+                Truy cập Dashboard Giáo viên &rarr;
+              </button>
+            </div>
           </div>
         </div>
       </section>
