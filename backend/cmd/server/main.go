@@ -273,6 +273,7 @@ func main() {
 	adminGroup.Put("/classrooms/:id", adminHandler.UpdateClassroom)
 	adminGroup.Delete("/classrooms/:id", adminHandler.DeleteClassroom)
 	adminGroup.Get("/telemetry-dashboard", adminMetricsHandler.GetTelemetryDashboard)
+	adminGroup.Get("/monitoring/ai-cost", adminHandler.GetMonitoringAICost)
 
 	// Teacher Routes (Teacher & Admin only)
 	teacherGroup := api.Group("/teacher", middleware.RequireRole("teacher", "admin"))

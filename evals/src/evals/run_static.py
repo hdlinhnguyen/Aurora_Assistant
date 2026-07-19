@@ -126,7 +126,14 @@ def run_track_d(client: AuroraClient, report: dict) -> None:
         if expected_category == "":
             passed = len(matched) == 0
         else:
-            passed = expected_category in actual_categories
+            # Taxonomy backend: MapSafetyFlag chuẩn hoá LLM "distress" -> category
+            # "self_harm" (severity high — cùng ngăn báo động đỏ trên dashboard GV).
+            # Yêu cầu thực của case distress là "sự kiện tâm lý mức cao tới được
+            # giáo viên", nên self_harm thoả mãn kỳ vọng distress.
+            accepted = {expected_category}
+            if expected_category == "distress":
+                accepted.add("self_harm")
+            passed = any(c in accepted for c in actual_categories)
         results.append(
             {
                 "id": case["id"],

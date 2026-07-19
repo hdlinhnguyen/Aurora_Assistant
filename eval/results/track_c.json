@@ -1,0 +1,82 @@
+{
+  "track_c_correct_step": {
+    "cases": [
+      {
+        "case_id": "frac-add-wrong-denominator-confident",
+        "passed": false,
+        "expected_is_correct": false,
+        "actual_is_correct": true,
+        "expected_gap_contains": "quy đồng",
+        "actual_gap": "không hiểu cách cộng phân số khác mẫu số",
+        "gap_ok": false
+      },
+      {
+        "case_id": "frac-add-correct-hesitant",
+        "passed": true,
+        "expected_is_correct": true,
+        "actual_is_correct": true,
+        "expected_gap_contains": null,
+        "actual_gap": "",
+        "gap_ok": true
+      },
+      {
+        "case_id": "subtraction-borrow-forgotten",
+        "passed": false,
+        "expected_is_correct": false,
+        "actual_is_correct": true,
+        "expected_gap_contains": "nhớ",
+        "actual_gap": "",
+        "gap_ok": false
+      },
+      {
+        "case_id": "fraction-compare-numerator-only",
+        "passed": false,
+        "expected_is_correct": false,
+        "actual_is_correct": true,
+        "expected_gap_contains": "quy đồng",
+        "actual_gap": "",
+        "gap_ok": false
+      },
+      {
+        "case_id": "multiplication-table-wrong",
+        "passed": false,
+        "expected_is_correct": false,
+        "actual_is_correct": true,
+        "expected_gap_contains": null,
+        "actual_gap": "Sai số trong bảng cửu chương",
+        "gap_ok": true
+      },
+      {
+        "case_id": "division-remainder-dropped",
+        "passed": false,
+        "expected_is_correct": false,
+        "actual_is_correct": true,
+        "expected_gap_contains": "dư",
+        "actual_gap": "",
+        "gap_ok": false
+      },
+      {
+        "case_id": "unit-conversion-mismatch",
+        "passed": false,
+        "expected_is_correct": false,
+        "actual_is_correct": true,
+        "expected_gap_contains": null,
+        "actual_gap": "",
+        "gap_ok": true
+      },
+      {
+        "case_id": "decimal-multiplication-correct-confident",
+        "passed": true,
+        "expected_is_correct": true,
+        "actual_is_correct": true,
+        "expected_gap_contains": null,
+        "actual_gap": "",
+        "gap_ok": true
+      }
+    ],
+    "passed": 2,
+    "total": 8,
+    "accuracy": 0.25
+  },
+  "format_compliance": 1.0
+}

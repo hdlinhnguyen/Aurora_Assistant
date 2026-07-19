@@ -8,8 +8,14 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"backend/internal/aicost"
 	"backend/internal/model"
 )
+
+// GetMonitoringAICost trả token/chi phí LLM tích luỹ (Tầng 3 — AI Cost Control).
+func (h *AdminHandler) GetMonitoringAICost(c fiber.Ctx) error {
+	return c.JSON(aicost.Current())
+}
 
 type AdminHandler struct {
 	db *gorm.DB
