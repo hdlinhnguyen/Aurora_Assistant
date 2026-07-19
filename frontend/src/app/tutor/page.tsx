@@ -1910,7 +1910,7 @@ export default function TutorHubPage() {
 
           {/* ===== EXAMS PANEL ===== */}
           {activeTab === "exams" && !needsDiagnostic && (
-            <div data-tour="lesson-exams" className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
+            <div data-tour="lesson-exams" className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%" }}>
               {/* Nếu học sinh đang làm bài thi */}
               {activeExam ? (
                 (() => {
@@ -2190,9 +2190,9 @@ export default function TutorHubPage() {
                 </div>
               ) : (
                 /* Màn hình danh sách đề thi */
-                <div style={{ display: "flex", gap: 24, alignItems: "stretch" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 24, alignItems: "stretch", width: "100%" }}>
                   {/* Cột 1: Nhập mã đề thi */}
-                  <div style={{ flex: 1, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                  <div style={{ minWidth: 0, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
                     <div>
                       <span style={{ ...POPPINS, fontSize: 10, background: "#f4f6f9", color: "#5b6072", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
                         Cách 1
@@ -2232,7 +2232,7 @@ export default function TutorHubPage() {
                   </div>
 
                   {/* Cột 2: Danh sách đề thi được giao */}
-                  <div style={{ flex: 1.2, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                  <div style={{ minWidth: 0, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", gap: 12, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
                     <div>
                       <span style={{ ...POPPINS, fontSize: 10, background: "#EFE9FD", color: "#7C46E8", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
                         Cách 2
@@ -2281,7 +2281,7 @@ export default function TutorHubPage() {
                   </div>
 
                   {/* Cột 3: Đánh giá chẩn đoán thích ứng */}
-                  <div style={{ flex: 1, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+                  <div style={{ minWidth: 0, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 14, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
                     <div>
                       <span style={{ ...POPPINS, fontSize: 10, background: "#F3FBF9", color: "#0FB9A6", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", padding: "4px 10px", borderRadius: 99 }}>
                         Chẩn đoán

@@ -19,6 +19,20 @@ interface NodeItem {
   isRoot: boolean;
 }
 
+export function selectDefaultFocusNode(
+  nodes: NodeItem[],
+  focusedNodeId?: string | null,
+  currentNodeId?: string,
+  initialNodeId?: string,
+) {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const preferredNodeId = [focusedNodeId, currentNodeId, initialNodeId].find(
+    (nodeId): nodeId is string => Boolean(nodeId && nodeIds.has(nodeId)),
+  );
+
+  return preferredNodeId ?? nodes.find((node) => node.isRoot)?.id ?? nodes[0]?.id ?? null;
+}
+
 interface EdgeItem {
   id: string;
   subject: string;

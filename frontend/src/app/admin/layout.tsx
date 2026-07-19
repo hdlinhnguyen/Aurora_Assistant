@@ -7,7 +7,6 @@ import dynamic from "next/dynamic";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 import {
-  Users,
   Home,
   BookOpen,
   LogOut,
@@ -55,7 +54,7 @@ export default function AdminLayout({
       }
       setAdminName(user.name || "Quản trị viên");
       setLoading(false);
-    } catch (e) {
+    } catch {
       localStorage.clear();
       router.push("/login");
     }
@@ -96,9 +95,9 @@ export default function AdminLayout({
   ];
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground font-[var(--font-body)]">
+    <div className="flex h-screen min-h-screen bg-background text-foreground font-[var(--font-body)]">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-card flex flex-col justify-between shrink-0">
+      <aside className="h-screen w-64 border-r border-border bg-card flex flex-col justify-between shrink-0">
         <div>
           {/* Logo / Header */}
           <div className="p-6 border-b border-border flex items-center gap-2">
@@ -151,7 +150,7 @@ export default function AdminLayout({
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-8 relative">
+      <main className="min-h-0 flex-1 overflow-y-auto p-8 relative">
         {/* Decorative ambient glows */}
         <div className="absolute top-0 right-0 h-96 w-96 rounded-full bg-[var(--purple)]/5 blur-[120px] pointer-events-none -z-10" />
         <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-[var(--mint)]/5 blur-[120px] pointer-events-none -z-10" />
