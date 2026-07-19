@@ -163,7 +163,7 @@ export default function StudentMasteryProfile({
         />
       </div>
 
-      <div className="w-[380px] flex flex-col gap-3 overflow-y-auto">
+      <div className="w-[380px] flex flex-col gap-3 h-full overflow-y-auto pr-1.5">
         {attentionItems.length > 0 && (
           <div className="bg-card border border-border rounded-3xl p-4.5 shadow-sm shrink-0">
             <div className="font-[var(--font-display)] font-extrabold text-[15px] text-foreground">Điểm cần chú ý</div>
@@ -254,19 +254,21 @@ export default function StudentMasteryProfile({
         </div>
 
         {sideView === "activity" ? (
-          <div className="flex-1 bg-card border border-border rounded-3xl p-5 overflow-y-auto shadow-sm">{activityContent}</div>
+          <div className="min-h-[300px] flex-1 bg-card border border-border rounded-3xl p-5 overflow-y-auto shadow-sm">{activityContent}</div>
         ) : selectedNode ? (
-          <MasteryTopicPanel
-            topicName={selectedNode.name}
-            state={masteryByTopic[selectedNode.id]}
-            history={history}
-            range={range}
-            loading={loadingHistory}
-            error={historyError}
-            onRangeChange={setRange}
-          />
+          <div className="h-[380px] shrink-0 flex flex-col">
+            <MasteryTopicPanel
+              topicName={selectedNode.name}
+              state={masteryByTopic[selectedNode.id]}
+              history={history}
+              range={range}
+              loading={loadingHistory}
+              error={historyError}
+              onRangeChange={setRange}
+            />
+          </div>
         ) : (
-          <div className="flex-1 rounded-3xl border border-dashed border-border bg-card p-6 flex items-center justify-center text-center text-[11px] text-muted-foreground">
+          <div className="min-h-[140px] py-8 rounded-3xl border border-dashed border-border bg-card p-6 flex items-center justify-center text-center text-[11px] text-muted-foreground shadow-sm">
             Chọn một topic trên cây để xem mastery BKT và biến động theo thời gian.
           </div>
         )}
