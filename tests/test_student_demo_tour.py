@@ -44,7 +44,7 @@ def test_student_page_mounts_the_guided_tour() -> None:
 
     assert 'import GuidedTour from "@/app/components/GuidedTour"' in source
     assert "<GuidedTour />" in source
-    assert 'data-tour={active ? "lesson-selector" : undefined}' in source
+    assert 'data-tour="lesson-selector"' in source
     for target in ("lesson-theory", "lesson-practice", "lesson-chat", "lesson-exams"):
         assert f'data-tour="{target}"' in source
     assert 'localStorage.getItem("aurora_tour_demo_session") !== "true"' in source
@@ -55,6 +55,7 @@ def test_guided_tour_switches_to_and_scrolls_to_each_student_target() -> None:
     source = GUIDED_TOUR.read_text(encoding="utf-8")
 
     assert 'new CustomEvent("aurora-tour-switch-student-tab"' in source
+    assert '"lesson-selector": "graph"' in source
     assert '"lesson-theory": "theory"' in source
     assert '"lesson-practice": "practice"' in source
     assert '"lesson-chat": "chat"' in source

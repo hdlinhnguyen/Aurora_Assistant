@@ -126,16 +126,6 @@ const TOUR_STEPS: TourStep[] = [
       "Tạo đề nháp, chọn câu từ ngân hàng hoặc soạn thủ công, cân đối điểm, sắp xếp câu hỏi và chuẩn bị đề để giao cho học sinh."
   },
   {
-    id: "teacher-exam-scoring",
-    title: "5. Chấm Bài Kiểm Tra",
-    roleBadge: "teacher",
-    badgeText: "Góc Giáo Viên",
-    targetPage: "/teacher",
-    targetSelector: '[data-tour="teacher-tab-exam-scoring"]',
-    content:
-      "Mở bài nộp, chấm từng câu và barem, lưu tiến độ, duyệt điểm cuối cùng và xem lại lịch sử chỉnh sửa."
-  },
-  {
     id: "teacher-students",
     title: "6. Báo Cáo Tiến Độ Học Tập",
     roleBadge: "teacher",
@@ -288,7 +278,8 @@ export default function GuidedTour() {
 
   useEffect(() => {
     if (!isActive || !currentStep) return;
-    const studentTabs: Record<string, "theory" | "practice" | "chat" | "exams"> = {
+    const studentTabs: Record<string, "graph" | "theory" | "practice" | "chat" | "exams"> = {
+      "lesson-selector": "graph",
       "lesson-theory": "theory",
       "lesson-practice": "practice",
       "lesson-chat": "chat",
@@ -304,7 +295,6 @@ export default function GuidedTour() {
       "teacher-graph-designer": "graph-designer",
       "teacher-question-bank": "question-bank",
       "teacher-exam-builder": "exam-builder",
-      "teacher-exam-scoring": "exam-scoring",
       "teacher-students": "students",
       "teacher-learning-path": "learning-path",
       "teacher-monitoring": "monitoring",

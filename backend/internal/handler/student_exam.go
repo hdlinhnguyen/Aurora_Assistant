@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -14,11 +16,12 @@ import (
 )
 
 type StudentExamHandler struct {
-	db *gorm.DB
+	db            *gorm.DB
+	masteryRecalc masteryRecalculator // reuses same interface from tutor.go
 }
 
-func NewStudentExamHandler(db *gorm.DB) *StudentExamHandler {
-	return &StudentExamHandler{db: db}
+func NewStudentExamHandler(db *gorm.DB, mr masteryRecalculator) *StudentExamHandler {
+	return &StudentExamHandler{db: db, masteryRecalc: mr}
 }
 
 type StudentExamQuestionResponse struct {
@@ -37,17 +40,38 @@ type SubmitExamRequest struct {
 }
 
 func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
+	userIDStr, ok := c.Locals("userID").(string)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized"})
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+
 	subject := c.Query("subject")
 	if subject == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Vui lòng cung cấp môn học"})
 	}
 
-	var exams []model.Exam
-	if err := h.db.Where("subject = ? AND status = ?", subject, "preparing_exam").Order("created_at desc").Find(&exams).Error; err != nil {
+	// 1. Tải danh sách đề thi lớp học (không phải đề chẩn đoán thích ứng)
+	var classExams []model.Exam
+	if err := h.db.Where("subject = ? AND status = ? AND title NOT LIKE ?", subject, "preparing_exam", "Đánh giá chẩn đoán thích ứng%").Order("created_at desc").Find(&classExams).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải danh sách đề thi: " + err.Error()})
 	}
 
-	if len(exams) == 0 {
+	// 2. Tìm hoặc tự động sinh đề chẩn đoán thích ứng riêng của học sinh này
+	var studentAdaptiveExam model.Exam
+	hasAdaptive := true
+	if err := h.db.Where("subject = ? AND status = ? AND title LIKE ? AND created_by = ?", subject, "preparing_exam", "Đánh giá chẩn đoán thích ứng%", userID).First(&studentAdaptiveExam).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			hasAdaptive = false
+		} else {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi truy vấn đề chẩn đoán: " + err.Error()})
+		}
+	}
+
+	if !hasAdaptive {
 		// Tự động sinh đề chẩn đoán mẫu và chọn câu hỏi xuất phát từ Hub Node đầu tiên
 		var firstQ model.Question
 		var rootNode model.Node
@@ -67,13 +91,6 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 		}
 
 		if err == nil {
-			var creator model.User
-			if err := h.db.Where("role = ?", "teacher").First(&creator).Error; err != nil {
-				if err := h.db.Where("role = ?", "admin").First(&creator).Error; err != nil {
-					creator.ID = uuid.Nil
-				}
-			}
-
 			newExam := model.Exam{
 				ID:              uuid.New(),
 				Title:           "Đánh giá chẩn đoán thích ứng - " + subject,
@@ -81,7 +98,7 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 				GradeLevel:      "Cả lớp",
 				DurationMinutes: 45,
 				Status:          "preparing_exam",
-				CreatedBy:       creator.ID,
+				CreatedBy:       userID, // Gắn với sinh viên hiện tại
 				CreatedAt:       time.Now(),
 				UpdatedAt:       time.Now(),
 			}
@@ -110,10 +127,18 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 			})
 
 			if errTx == nil {
-				exams = append(exams, newExam)
+				studentAdaptiveExam = newExam
+				hasAdaptive = true
 			}
 		}
 	}
+
+	// 3. Kết hợp kết quả đề thi
+	var exams []model.Exam
+	if hasAdaptive {
+		exams = append(exams, studentAdaptiveExam)
+	}
+	exams = append(exams, classExams...)
 
 	return c.JSON(exams)
 }
@@ -475,6 +500,15 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 			CreatedAt: time.Now(),
 		}
 		h.db.Create(&logEntry)
+
+		// Trigger BKT mastery recalculation immediately
+		if h.masteryRecalc != nil {
+			go func() {
+				if _, err := h.masteryRecalc.RecalculateStudent(context.Background(), userID, exam.Subject); err != nil {
+					log.Printf("[StudentExam] mastery recalc error after answer: %v", err)
+				}
+			}()
+		}
 	}
 
 	// 5. Đếm số câu hỏi đã làm trong đề thi này
@@ -685,5 +719,56 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 			"topicNodeIdsJson": nextExamQ.TopicNodeIDsJSON,
 		},
 	})
+}
+
+// ResetDiagnostic resets the student state back to needing diagnostic and deletes their diagnostic exam records.
+func (h *StudentExamHandler) ResetDiagnostic(c fiber.Ctx) error {
+	userIDStr := c.Locals("userID").(string)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+
+	subject := c.Query("subject")
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Vui lòng chọn môn học"})
+	}
+
+	// 1. Reset StudentState.NeedsDiagnostic = true
+	var studentState model.StudentState
+	err = h.db.Where("student_id = ? AND subject = ?", userID, subject).First(&studentState).Error
+	if err == nil {
+		studentState.NeedsDiagnostic = true
+		studentState.UpdatedAt = time.Now()
+		h.db.Save(&studentState)
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		studentState = model.StudentState{
+			ID:              uuid.New(),
+			StudentID:       userID,
+			Subject:         subject,
+			NeedsDiagnostic: true,
+			UpdatedAt:       time.Now(),
+		}
+		h.db.Create(&studentState)
+	}
+
+	// 2. Find and delete adaptive exams for this subject
+	var exams []model.Exam
+	h.db.Where("subject = ? AND title LIKE ? AND created_by = ?", subject, "Đánh giá chẩn đoán thích ứng%", userID).Find(&exams)
+	for _, ex := range exams {
+		// Delete ExamQuestions
+		h.db.Where("exam_id = ?", ex.ID).Delete(&model.ExamQuestion{})
+		h.db.Delete(&ex)
+	}
+
+	// 3. Clear activity logs for this subject to reset BKT evidence
+	h.db.Where("student_id = ? AND subject = ?", userID, subject).Delete(&model.ActivityLog{})
+
+	// 4. Trigger BKT mastery recalculation immediately so BKT returns to initial state (e.g. 30%)
+	if h.masteryRecalc != nil {
+		_, _ = h.masteryRecalc.RecalculateStudent(context.Background(), userID, subject)
+	}
+
+	return c.JSON(fiber.Map{"success": true})
 }
 

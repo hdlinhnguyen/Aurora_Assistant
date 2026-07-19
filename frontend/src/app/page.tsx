@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
@@ -87,14 +86,9 @@ export default function LandingPage() {
       <nav className="relative z-10 max-w-6xl mx-auto px-6 py-5 flex justify-between items-center border-b border-border bg-card/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300 cursor-pointer">
-            <Image
-              src="/icon.png"
-              alt=""
-              width={28}
-              height={28}
-              className="h-7 w-7 rounded-lg object-contain"
-              aria-hidden="true"
-            />
+            <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
           </div>
           <span className="text-xl font-[var(--font-display)] font-extrabold bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent tracking-tight">
             AURORA ASSISTANT

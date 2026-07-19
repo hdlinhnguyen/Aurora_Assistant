@@ -12,6 +12,8 @@ export interface HubNode {
   theory: string;
   topicGroup: string;
   isRoot: boolean;
+  posX: number;
+  posY: number;
 }
 export interface HubEdge {
   id: string;
@@ -128,10 +130,11 @@ export const chatTheory = (
   nodeId: string,
   message: string,
   history: { sender: string; content: string }[],
+  questionText?: string,
 ) =>
   apiFetch(`/nodes/${nodeId}/chat-theory`, {
     method: "POST",
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, questionText }),
   }) as Promise<{ reply: string }>;
 
 export interface HintResult {
@@ -262,6 +265,11 @@ export const getStudentState = (subject: string) =>
 export const getExams = (subject: string) =>
   apiFetch(`/student/exams?subject=${encodeURIComponent(subject)}`) as Promise<any[]>;
 
+export const resetDiagnostic = (subject: string) =>
+  apiFetch(`/student/exams/adaptive/reset?subject=${encodeURIComponent(subject)}`, {
+    method: "POST",
+  }) as Promise<{ success: boolean }>;
+
 export const getExam = (examId: string) =>
   apiFetch(`/student/exams/${examId}`) as Promise<{
     exam: any;
@@ -294,7 +302,7 @@ export const submitCantDo = (nodeId: string) =>
   }>;
 
 export const submitAdaptiveDowngrade = (nodeId: string) =>
-  apiFetch(`/subjects/nodes/${nodeId}/adaptive-downgrade`, {
+  apiFetch(`/nodes/${nodeId}/adaptive-downgrade`, {
     method: "POST",
   }) as Promise<{
     hasParent: boolean;
@@ -306,6 +314,7 @@ export const submitAdaptiveDowngrade = (nodeId: string) =>
 export type DiffTag = "Nhận biết" | "Thông hiểu" | "Vận dụng";
 export interface HubQuestion {
   id: string;
+  nodeId: string;
   q: string;
   opts: string[];
   correct: number;
@@ -328,6 +337,7 @@ export function mapQuestion(r: RawQuestion): HubQuestion {
   }
   return {
     id: r.id,
+    nodeId: r.nodeId,
     q: r.content,
     opts,
     correct: r.correctOption,

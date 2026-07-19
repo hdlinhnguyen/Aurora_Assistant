@@ -11,7 +11,6 @@ TEACHER_STEPS = [
     "teacher-graph-designer",
     "teacher-question-bank",
     "teacher-exam-builder",
-    "teacher-exam-scoring",
     "teacher-students",
     "teacher-learning-path",
     "teacher-monitoring",
@@ -38,7 +37,6 @@ def test_teacher_tour_maps_each_step_to_an_active_tab_workspace() -> None:
         "graph-designer",
         "question-bank",
         "exam-builder",
-        "exam-scoring",
         "students",
         "learning-path",
         "monitoring",
@@ -46,4 +44,4 @@ def test_teacher_tour_maps_each_step_to_an_active_tab_workspace() -> None:
     ):
         assert f'"teacher-{tab}": "{tab}"' in source
     assert 'data-tour={`teacher-tab-${activeTab}`}' in page
-    assert 'initialTab = "student-mgmt"' in page
+    assert '? "student-mgmt"' in page

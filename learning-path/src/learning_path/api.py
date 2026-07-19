@@ -20,6 +20,7 @@ import os
 import uuid
 import json
 from time import perf_counter
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +51,7 @@ DEFAULT_GRAPH_JSON = Path(__file__).resolve().parents[3] / "knowledge-graph" / "
 
 
 class CreatePathBody(BaseModel):
+    subject: str | None = None
     request: LearningPathRequest
     raw_quiz: list[RawQuizEvidence] | None = Field(default_factory=list)
     raw_paper: list[RawPaperEvidence] | None = Field(default_factory=list)
@@ -76,16 +78,24 @@ class HintBody(BaseModel):
 DEFAULT_MINUTES_BY_CAP = {"TH": 25, "THCS": 35, "THPT": 45}
 
 
-def fetch_dynamic_graph() -> CurriculumGraph:
+def fetch_dynamic_graph(subject: str | None = None) -> CurriculumGraph:
     url = os.environ.get("GO_BACKEND_GRAPH_URL", "http://localhost:8081/api/internal/graph")
+    clean_subject = (subject or "").strip()
+    if clean_subject:
+        separator = "&" if "?" in url else "?"
+        url = f"{url}{separator}{urllib.parse.urlencode({'subject': clean_subject})}"
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        headers = {"User-Agent": "Aurora-Learning-Path/1.0"}
+        internal_token = os.environ.get("INTERNAL_SERVICE_TOKEN", "").strip()
+        if internal_token:
+            headers["X-Internal-Token"] = internal_token
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=5) as response:
             raw = json.loads(response.read().decode('utf-8'))
             
         topics: dict[str, Topic] = {}
         edges: list[PrerequisiteEdge] = []
-        for node in raw["nodes"]:
+        for node in raw.get("nodes") or []:
             topics[node["id"]] = Topic(
                 topic_id=node["id"],
                 subject_id="toan",
@@ -93,15 +103,17 @@ def fetch_dynamic_graph() -> CurriculumGraph:
                 name=node["ten"],
                 estimated_learning_time=DEFAULT_MINUTES_BY_CAP.get(node["cap"], 30),
                 content_available=not node["mo"],
-                learning_outcomes=node.get("yccd", []),
+                learning_outcomes=node.get("yccd") or [],
             )
-            for prereq_id in node["tienQuyet"]:
+            for prereq_id in node.get("tienQuyet") or []:
                 edges.append(
                     PrerequisiteEdge(prerequisite_topic_id=prereq_id, dependent_topic_id=node["id"])
                 )
 
         return CurriculumGraph(topics, edges)
     except Exception as e:
+        if clean_subject:
+            raise RuntimeError(f"Failed to fetch subject-scoped dynamic graph for {clean_subject!r}: {e}") from e
         print(f"Failed to fetch dynamic graph from {url}: {e}. Falling back to static graph.json")
         from learning_path.adapters import load_chac_goc_graph
         from pathlib import Path
@@ -119,10 +131,14 @@ def create_app(
     app = FastAPI(title="learning-path", version="0.1.1")
     checkpointer_to_use = checkpointer or InMemorySaver()
 
-    def get_curriculum() -> CurriculumGraph:
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok", "service": "learning-path"}
+
+    def get_curriculum(subject: str | None = None) -> CurriculumGraph:
         if initial_curriculum is not None:
             return initial_curriculum
-        return fetch_dynamic_graph()
+        return fetch_dynamic_graph(subject)
 
     def _config(thread_id: str) -> dict:
         return {"configurable": {"thread_id": thread_id}}
@@ -150,7 +166,7 @@ def create_app(
     def create_learning_path(body: CreatePathBody) -> dict:
         thread_id = uuid.uuid4().hex
         started = perf_counter()
-        curr = get_curriculum()
+        curr = get_curriculum(body.subject)
         pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
         result = pipeline.invoke(
             {
@@ -171,7 +187,7 @@ def create_app(
         Dùng cho lộ trình LIVE: học sinh tự sinh path từ mastery tươi của chính mình."""
         thread_id = uuid.uuid4().hex
         started = perf_counter()
-        curr = get_curriculum()
+        curr = get_curriculum(body.subject)
         pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
         result = pipeline.invoke(
             {

@@ -7,6 +7,8 @@ import { NodeItem, StudentProgress } from "../page";
 
 interface LearningPathTabProps {
   nodes: NodeItem[];
+  diagnosticTopicIds: string[];
+  loadingDiagnosticTopics?: boolean;
   selectedTargetTopics: string[];
   setSelectedTargetTopics: React.Dispatch<React.SetStateAction<string[]>>;
   handleGenerateLearningPath: () => void;
@@ -21,8 +23,28 @@ interface LearningPathTabProps {
   handleDeleteStep: (sid: string, idx: number) => void;
 }
 
+type ClassGapCandidate = { gap: any; node: NodeItem | undefined; gapRatio: number };
+type VisibleClassGap = { gap: any; node: NodeItem; gapRatio: number };
+
+function readClassGapRatio(gap: any) {
+  return Number(gap?.gap_ratio ?? gap?.confirmed_gap_rate);
+}
+
+function formatGapRatio(value: unknown) {
+  const ratio = Number(value);
+  if (!Number.isFinite(ratio)) return "Chưa đủ DL";
+  return `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`;
+}
+
+function formatScore(value: unknown) {
+  const score = Number(value);
+  return Number.isFinite(score) ? score.toFixed(1) : "N/A";
+}
+
 export default function LearningPathTab({
   nodes,
+  diagnosticTopicIds,
+  loadingDiagnosticTopics = false,
   selectedTargetTopics,
   setSelectedTargetTopics,
   handleGenerateLearningPath,
@@ -36,6 +58,55 @@ export default function LearningPathTab({
   handleMoveStep,
   handleDeleteStep,
 }: LearningPathTabProps) {
+  const nodeById = React.useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const diagnosticTopicIdSet = React.useMemo(() => new Set(diagnosticTopicIds), [diagnosticTopicIds]);
+  const allClassGaps = React.useMemo(
+    () => (Array.isArray(insights?.class_wide_gaps) ? insights.class_wide_gaps : []),
+    [insights]
+  );
+  const classGapCandidates: ClassGapCandidate[] = React.useMemo(
+    () =>
+      allClassGaps.map((gap: any) => ({
+        gap,
+        node: nodeById.get(gap.topic_id),
+        gapRatio: readClassGapRatio(gap),
+      })),
+    [allClassGaps, nodeById]
+  );
+  const evidenceTopicIdsFromInsights = React.useMemo(
+    () =>
+      new Set(
+        classGapCandidates
+          .filter((item) => Boolean(item.node) && Number.isFinite(item.gapRatio) && Number(item.gap?.denominator ?? 0) > 0)
+          .map((item) => item.node!.id)
+      ),
+    [classGapCandidates]
+  );
+  const availableTargetNodes = React.useMemo(() => {
+    if (insights) {
+      return nodes.filter((node) => evidenceTopicIdsFromInsights.has(node.id));
+    }
+    return nodes.filter((node) => diagnosticTopicIdSet.has(node.id));
+  }, [diagnosticTopicIdSet, evidenceTopicIdsFromInsights, insights, nodes]);
+  const visibleClassGaps: VisibleClassGap[] = classGapCandidates.filter(
+    (item): item is VisibleClassGap =>
+      Boolean(item.node) &&
+      Number.isFinite(item.gapRatio) &&
+      Number(item.gap?.denominator ?? 0) > 0 &&
+      item.gapRatio > 0
+  );
+  const hiddenClassGapCount = classGapCandidates.filter(
+    (item) => !item.node || !Number.isFinite(item.gapRatio) || Number(item.gap?.denominator ?? 0) <= 0
+  ).length;
+
+  React.useEffect(() => {
+    const allowed = new Set(availableTargetNodes.map((node) => node.id));
+    setSelectedTargetTopics((prev) => {
+      const next = prev.filter((id) => allowed.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [availableTargetNodes, setSelectedTargetTopics]);
+
   return (
     <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 pb-6 animate-[fadeIn_0.3s_ease-out]">
       {/* Step 1: Select Target Topics */}
@@ -49,7 +120,7 @@ export default function LearningPathTab({
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[160px] overflow-y-auto p-1">
-          {nodes.map((node) => {
+          {availableTargetNodes.map((node) => {
             const isChecked = selectedTargetTopics.includes(node.id);
             return (
               <button
@@ -74,12 +145,22 @@ export default function LearningPathTab({
               </button>
             );
           })}
+          {availableTargetNodes.length === 0 && (
+            <div className="col-span-full rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-5 text-center">
+              <p className="text-xs font-black text-foreground">
+                {loadingDiagnosticTopics ? "Đang kiểm tra dữ liệu chẩn đoán..." : "Chưa có bài học nào đủ dữ liệu chẩn đoán"}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
+                Hãy cho học sinh làm đề/luyện tập trước; khi có đáp án theo bài học, hệ thống sẽ tự mở các lựa chọn phù hợp ở đây.
+              </p>
+            </div>
+          )}
         </div>
         
         <div className="flex pt-2 justify-end">
           <button
             onClick={handleGenerateLearningPath}
-            disabled={generatingPath || selectedTargetTopics.length === 0}
+            disabled={generatingPath || loadingDiagnosticTopics || availableTargetNodes.length === 0 || selectedTargetTopics.length === 0}
             className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer uppercase tracking-wider"
           >
             {generatingPath ? "Đang tính toán..." : "Lập lộ trình & Phân tích lớp học"}
@@ -116,24 +197,32 @@ export default function LearningPathTab({
                 <AlertTriangle size={15} className="text-amber-500" />
                 <span>Lỗ hổng kiến thức chung toàn lớp</span>
               </h3>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {insights.class_wide_gaps && insights.class_wide_gaps.map((gap: any) => {
-                  const gapNode = nodes.find(n => n.id === gap.topic_id);
+                {visibleClassGaps.map(({ gap, node, gapRatio }) => {
                   return (
                     <div key={gap.topic_id} className="p-4 bg-amber-50/20 border border-amber-100 rounded-2xl space-y-1.5 shadow-sm">
-                      <span className="font-black text-amber-900 text-xs block truncate" title={gapNode ? gapNode.name : gap.topic_id}>
-                        {gapNode ? gapNode.name : gap.topic_id}
+                      <span className="font-black text-amber-900 text-xs block truncate" title={node.name}>
+                        {node.name}
                       </span>
                       <div className="flex justify-between text-[10px] font-bold text-amber-700">
                         <span>Tỷ lệ hổng:</span>
-                        <span className="font-black text-amber-900">{(gap.gap_ratio * 100).toFixed(0)}%</span>
+                        <span className="font-black text-amber-900">{formatGapRatio(gapRatio)}</span>
                       </div>
                     </div>
                   );
                 })}
-                {(!insights.class_wide_gaps || insights.class_wide_gaps.length === 0) && (
-                  <p className="text-xs text-muted-foreground font-semibold col-span-2 py-4 text-center">Không phát hiện lỗ hổng kiến thức nghiêm trọng nào chung.</p>
+                {visibleClassGaps.length === 0 && (
+                  <p className="text-xs text-muted-foreground font-semibold col-span-2 py-4 text-center">
+                    {allClassGaps.length > 0
+                      ? "Không phát hiện lỗ hổng có bằng chứng trong dữ liệu hiện tại."
+                      : "Không phát hiện lỗ hổng kiến thức nghiêm trọng nào chung."}
+                  </p>
+                )}
+                {hiddenClassGapCount > 0 && (
+                  <p className="text-[10px] text-muted-foreground font-semibold col-span-2 -mt-1 text-center">
+                    Đã ẩn {hiddenClassGapCount} mục chưa đủ dữ liệu hoặc chưa khớp với cây kiến thức hiện tại.
+                  </p>
                 )}
               </div>
             </div>
@@ -147,7 +236,7 @@ export default function LearningPathTab({
               
               <div className="space-y-3">
                 {insights.intervention_groups && insights.intervention_groups.map((group: any, idx: number) => {
-                  const rootNode = nodes.find(n => n.id === group.root_cause_topic_id);
+                  const rootNode = nodeById.get(group.root_cause_topic_id);
                   
                   const names = group.student_ids.map((sid: string) => {
                     const p = studentsProgress.find(sp => sp.studentId === sid);
@@ -161,8 +250,8 @@ export default function LearningPathTab({
                           <span className="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded uppercase tracking-wider">
                             Nguyên nhân gốc rễ (Root Cause)
                           </span>
-                          <h4 className="font-black text-slate-800 text-xs mt-1" title={rootNode ? rootNode.name : group.root_cause_topic_id}>
-                            {rootNode ? rootNode.name : group.root_cause_topic_id}
+                          <h4 className="font-black text-slate-800 text-xs mt-1" title={rootNode?.name || "Nội dung chưa khớp cây kiến thức"}>
+                            {rootNode?.name || "Nội dung chưa khớp cây kiến thức"}
                           </h4>
                         </div>
                         <span className="px-2.5 py-1 bg-slate-900 text-white rounded-xl text-[10px] font-black shrink-0">
@@ -205,7 +294,7 @@ export default function LearningPathTab({
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right">
                           <span className="text-[10px] font-black text-rose-800 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 uppercase tracking-wider block">
-                            Độ khẩn cấp: {student.urgency_score.toFixed(1)}
+                            Độ khẩn cấp: {formatScore(student.urgency_score)}
                           </span>
                         </div>
                       </div>

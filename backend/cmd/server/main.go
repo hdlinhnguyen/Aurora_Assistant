@@ -22,18 +22,12 @@ import (
 	masteryprofile "backend/internal/mastery"
 	"backend/internal/middleware"
 	"backend/internal/model"
+	"backend/internal/runtime"
 	"backend/internal/scoring"
 	"backend/internal/service"
 	"backend/internal/syntheticseed"
 	"backend/internal/telemetry"
 )
-
-func envOrDefault(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
-}
 
 func main() {
 	// Load .env file
@@ -55,7 +49,7 @@ func main() {
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowOrigins: runtime.CORSOrigins(),
 		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization, Idempotency-Key, idempotency-key"},
 	}))
 
@@ -88,7 +82,8 @@ func main() {
 		exam.WithTelemetryPublisher(telemetryPublisher),
 	)
 	masteryRepo := masteryprofile.NewRepository(config.DB)
-	masteryClient := masteryprofile.NewClient(envOrDefault("LEARNING_PATH_URL", "http://127.0.0.1:8000"), nil)
+	learningPathURL := runtime.LearningPathURL()
+	masteryClient := masteryprofile.NewClient(learningPathURL, nil)
 	masterySvc := masteryprofile.NewService(
 		config.DB, masteryRepo, masteryClient,
 		masteryprofile.WithTelemetryPublisher(telemetryPublisher),
@@ -98,7 +93,12 @@ func main() {
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authSvc)
-	tutorHandler := handler.NewTutorHandler(tutorSvc, handler.WithTutorTelemetry(telemetryPublisher), handler.WithMasteryRecalc(masterySvc))
+	tutorHandler := handler.NewTutorHandler(
+		tutorSvc,
+		handler.WithTutorTelemetry(telemetryPublisher),
+		handler.WithMasteryRecalc(masterySvc),
+		handler.WithLearningPathURL(learningPathURL),
+	)
 	adminHandler := handler.NewAdminHandler(config.DB)
 	adminMetricsHandler := handler.NewAdminMetricsHandler(adminmetrics.NewService(config.DB))
 	studentMgmtHandler := handler.NewStudentMgmtHandler(config.DB)
@@ -107,7 +107,7 @@ func main() {
 	examHandler := handler.NewExamHandler(examSvc, os.Getenv("EXAM_INTERNAL_TOKEN"))
 	masteryHandler := handler.NewMasteryHandler(masterySvc)
 	gamificationHandler := handler.NewGamificationHandler(gamificationSvc)
-	studentExamHandler := handler.NewStudentExamHandler(config.DB)
+	studentExamHandler := handler.NewStudentExamHandler(config.DB, masterySvc)
 	scoringSvc := scoring.NewService(scoring.NewRepository(config.DB), func(db *gorm.DB) exam.ScoringGateway {
 		return exam.NewScoringGateway(db)
 	})
@@ -127,14 +127,18 @@ func main() {
 		}
 	}()
 
-	// Ensure at least one admin exists.
-	var adminCount int64
-	config.DB.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount)
-	if adminCount == 0 {
-		log.Println("No admin account found. Creating default admin: admin@aurora.edu.vn")
-		if _, err := authSvc.Register("admin@aurora.edu.vn", "demo123", "Quản trị viên Hệ thống", "admin"); err != nil {
-			log.Printf("Failed to create default admin: %v", err)
+	// Bootstrap an admin only when an explicit password is supplied.
+	if admin, enabled := runtime.AdminBootstrapConfig(); enabled {
+		var adminCount int64
+		config.DB.Model(&model.User{}).Where("role = ?", "admin").Count(&adminCount)
+		if adminCount == 0 {
+			log.Printf("No admin account found. Creating configured admin: %s", admin.Email)
+			if _, err := authSvc.Register(admin.Email, admin.Password, admin.Name, "admin"); err != nil {
+				log.Printf("Failed to create configured admin: %v", err)
+			}
 		}
+	} else {
+		log.Println("ADMIN_PASSWORD is not set; skipping admin bootstrap")
 	}
 
 	// Reset synthetic fixtures and derive BKT exclusively from generated answer events.
@@ -151,7 +155,7 @@ func main() {
 	// Public Routes
 	app.Post("/api/auth/register", authHandler.Register)
 	app.Post("/api/auth/login", authHandler.Login)
-	app.Get("/api/internal/graph", tutorHandler.GetInternalGraph)
+	app.Get("/api/internal/graph", internalServiceAuth(os.Getenv("INTERNAL_SERVICE_TOKEN")), tutorHandler.GetInternalGraph)
 
 	// Protected Routes
 	api := app.Group("/api", middleware.Protected(config.DB))
@@ -205,6 +209,7 @@ func main() {
 	studentMastery.Get("/exams/:examId", studentExamHandler.GetStudentExam)
 	studentMastery.Post("/exams/:examId/submit", studentExamHandler.SubmitStudentExam)
 	studentMastery.Post("/exams/:examId/adaptive/answer", studentExamHandler.SubmitAdaptiveAnswer)
+	studentMastery.Post("/exams/adaptive/reset", studentExamHandler.ResetDiagnostic)
 
 	app.Post("/internal/exams/:examId/first-submission", examHandler.FirstSubmission)
 	app.Post("/internal/exams/:examId/grading-completed", examHandler.GradingCompleted)
@@ -280,6 +285,7 @@ func main() {
 	teacherGroup.Get("/guardrail-events", tutorHandler.GetGuardrailEvents)
 	teacherGroup.Put("/guardrail-events/:id/handled", tutorHandler.MarkGuardrailEventHandled)
 	teacherGroup.Get("/students-progress", tutorHandler.GetStudentsProgress)
+	teacherGroup.Get("/diagnostic-topic-ids", tutorHandler.GetDiagnosticTopicIDs)
 	teacherGroup.Get("/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)
 	teacherGroup.Get("/monitoring/:subject", tutorHandler.GetMonitoringData)
 	teacherGroup.Post("/students/:studentId/re-diagnostic", tutorHandler.RequestReDiagnostic)

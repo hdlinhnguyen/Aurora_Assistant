@@ -146,21 +146,61 @@ func TestResetAndSeedPersistsGrade7CurriculumClosure(t *testing.T) {
 
 func TestResetAndSeedPreservesRealData(t *testing.T) {
 	service := setupSeedDatabase(t)
-	realUser := model.User{ID: uuid.New(), Email: "real@example.com", Password: "hash", Name: "Real User", Role: "teacher"}
-	realNode := model.Node{ID: uuid.New(), Subject: "Real subject", Name: "Real topic", IsRoot: true}
-	require.NoError(t, service.db.Create(&realUser).Error)
-	require.NoError(t, service.db.Create(&realNode).Error)
+	realTeacher := model.User{ID: uuid.New(), Email: "real.teacher@example.com", Password: "hash", Name: "Real Teacher", Role: "teacher"}
+	realStudent := model.User{ID: uuid.New(), Email: "real.student@example.com", Password: "hash", Name: "Real Student", Role: "student"}
+	realRoot := model.Node{ID: uuid.New(), Subject: DefaultConfig().Subject, Name: "Real root", IsRoot: true, StableKey: "real-root"}
+	realTopic := model.Node{ID: uuid.New(), Subject: DefaultConfig().Subject, Name: "Real topic", StableKey: "real-topic"}
+	realQuestion := model.Question{
+		ID: uuid.New(), NodeID: realTopic.ID, Content: "Real question", OptionsJSON: `["A","B"]`, CorrectOption: 0,
+		Difficulty: "easy", QuestionType: "multiple_choice", GradeLevel: "7",
+	}
+	realEdge := model.Edge{
+		ID: uuid.New(), Subject: DefaultConfig().Subject, SourceID: realRoot.ID, TargetID: realTopic.ID,
+		Status: "active", SourceType: "human",
+	}
+	realMastery := model.StudentTopicMastery{
+		ID: uuid.New(), StudentID: realStudent.ID, TopicID: realTopic.ID, MasteryProbability: 0.8,
+		ConfidenceScore: 0.7, Consistency: 0.9, EvidenceCount: 4, EffectiveEvidence: 4,
+		MasteryStatus: "mastered", EvidenceSummaryJSON: `{}`, SourceBreakdownJSON: `{}`, Version: 1,
+		CalculatedAt: time.Now().UTC(),
+	}
+	realHistory := model.StudentTopicMasteryHistory{
+		ID: uuid.New(), StudentID: realStudent.ID, TopicID: realTopic.ID, Version: 1, MasteryProbability: 0.8,
+		ConfidenceScore: 0.7, Consistency: 0.9, EvidenceCount: 4, EffectiveEvidence: 4,
+		MasteryStatus: "mastered", EvidenceSummaryJSON: `{}`, SourceBreakdownJSON: `{}`,
+		CalculatedAt: time.Now().UTC(), RecordedAt: time.Now().UTC(),
+	}
+	require.NoError(t, service.db.Create(&[]model.User{realTeacher, realStudent}).Error)
+	require.NoError(t, service.db.Create(&[]model.Node{realRoot, realTopic}).Error)
+	require.NoError(t, service.db.Create(&realQuestion).Error)
+	require.NoError(t, service.db.Create(&realEdge).Error)
+	require.NoError(t, service.db.Create(&realMastery).Error)
+	require.NoError(t, service.db.Create(&realHistory).Error)
 
 	result, err := service.ResetAndSeed(context.Background())
+	require.NoError(t, err)
+	_, err = service.ResetAndSeed(context.Background())
 	require.NoError(t, err)
 	require.Len(t, result.Students, 3)
 	require.Equal(t, DefaultConfig().Subject, result.Subject)
 
-	var userCount, nodeCount int64
-	require.NoError(t, service.db.Model(&model.User{}).Where("id = ?", realUser.ID).Count(&userCount).Error)
-	require.NoError(t, service.db.Model(&model.Node{}).Where("id = ?", realNode.ID).Count(&nodeCount).Error)
-	require.EqualValues(t, 1, userCount)
-	require.EqualValues(t, 1, nodeCount)
+	for _, record := range []struct {
+		model any
+		id    uuid.UUID
+	}{
+		{&model.User{}, realTeacher.ID},
+		{&model.User{}, realStudent.ID},
+		{&model.Node{}, realRoot.ID},
+		{&model.Node{}, realTopic.ID},
+		{&model.Question{}, realQuestion.ID},
+		{&model.Edge{}, realEdge.ID},
+		{&model.StudentTopicMastery{}, realMastery.ID},
+		{&model.StudentTopicMasteryHistory{}, realHistory.ID},
+	} {
+		var count int64
+		require.NoError(t, service.db.Model(record.model).Where("id = ?", record.id).Count(&count).Error)
+		require.EqualValues(t, 1, count, "real record %s must survive synthetic reset", record.id)
+	}
 }
 
 func TestResetAndSeedIsIdempotentAndCreatesAnswerEvidence(t *testing.T) {
@@ -183,14 +223,21 @@ func TestResetAndSeedIsIdempotentAndCreatesAnswerEvidence(t *testing.T) {
 	require.NoError(t, service.db.Model(&model.ActivityLog{}).Where("student_id IN ?", studentIDs(second.Students)).Count(&logs).Error)
 	require.EqualValues(t, 4, users)
 	require.EqualValues(t, 25, nodes)
-	require.EqualValues(t, 24, questions)
-	require.EqualValues(t, 54, logs)
+	require.EqualValues(t, second.QuestionCount, questions)
+	require.Equal(t, (len(second.NodeIDs)-1)*3, second.QuestionCount)
+	require.EqualValues(t, second.ActivityCount, logs)
 
-	for _, student := range second.Students {
+	for studentIndex, student := range second.Students {
 		var topicCount int64
 		require.NoError(t, service.db.Model(&model.ActivityLog{}).
 			Distinct("node_id").Where("student_id = ? AND action IN ?", student.ID, []string{"answer_correct", "answer_incorrect"}).
 			Count(&topicCount).Error)
-		require.EqualValues(t, 3, topicCount)
+		expectedTopics := 0
+		for nodePos := 0; nodePos < len(second.NodeIDs)-1; nodePos++ {
+			if len(GenerateFrontierAttempts(DefaultConfig().Seed, studentIndex, nodePos, len(second.NodeIDs)-1, 3)) > 0 {
+				expectedTopics++
+			}
+		}
+		require.EqualValues(t, expectedTopics, topicCount)
 	}
 }

@@ -50,6 +50,16 @@ export const formatMarkdown = (text: string, variant: "tutor" | "teacher" = "tea
     m = m.replace(/\\div/g, "÷");
     m = m.replace(/\\in/g, "∈");
     m = m.replace(/\\pm/g, "±");
+    m = m.replace(/\\approx/g, "≈");
+    m = m.replace(/\\sim/g, "∼");
+    m = m.replace(/\\parallel/g, "∥");
+    m = m.replace(/\\perp/g, "⊥");
+    m = m.replace(/\\angle/g, "∠");
+    m = m.replace(/\\infty/g, "∞");
+    m = m.replace(/\\pi/g, "π");
+    m = m.replace(/\\sqrt\{([^}]+)\}/g, "√($1)");
+    m = m.replace(/\\overline\{([^}]+)\}/g, "<span style=\"text-decoration: overline;\">$1</span>");
+    m = m.replace(/\\vec\{([^}]+)\}/g, "<span style=\"text-decoration: overline;\">$1</span>");
 
     // Blackboard bold sets
     m = m.replace(/\\mathbb\{Z\}/g, "ℤ");
@@ -69,15 +79,27 @@ export const formatMarkdown = (text: string, variant: "tutor" | "teacher" = "tea
     return m;
   };
 
-  // 1. First: Replace LaTeX formulas wrapped in $...$
-  html = html.replace(/\$(.*?)\$/g, (_match, p1) => {
-    const cleaned = cleanMathSymbols(p1);
+  const inlineMath = (value: string) => {
+    const cleaned = cleanMathSymbols(value);
     if (variant === "tutor") {
       return `<span class="font-mono bg-indigo-50/70 text-indigo-900 px-1.5 py-0.5 rounded text-[12px] font-bold border border-indigo-200/60 mx-0.5 inline-flex items-center">${cleaned}</span>`;
-    } else {
-      return `<span class="font-serif italic text-slate-800 mx-0.5 inline-flex items-center align-middle">${cleaned}</span>`;
     }
-  });
+    return `<span class="font-serif italic text-slate-800 mx-0.5 inline-flex items-center align-middle">${cleaned}</span>`;
+  };
+
+  const blockMath = (value: string) => {
+    const cleaned = cleanMathSymbols(value);
+    if (variant === "tutor") {
+      return `<div class="my-2 rounded-lg border border-indigo-200/70 bg-indigo-50/70 px-3 py-2 text-center font-mono text-[13px] font-bold text-indigo-950">${cleaned}</div>`;
+    }
+    return `<div class="my-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-center font-serif italic text-slate-800">${cleaned}</div>`;
+  };
+
+  // 1. First: Replace LaTeX formulas in common wrappers.
+  html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_match, p1) => blockMath(p1));
+  html = html.replace(/\\\[([\s\S]*?)\\\]/g, (_match, p1) => blockMath(p1));
+  html = html.replace(/\\\(([\s\S]*?)\\\)/g, (_match, p1) => inlineMath(p1));
+  html = html.replace(/\$(?!\s)([^$\n]+?)\$/g, (_match, p1) => inlineMath(p1));
 
   // 2. Second: Clean up any raw LaTeX commands outside of $...$ (e.g. raw \in, \neq, \mathbb{Z})
   html = cleanMathSymbols(html);
