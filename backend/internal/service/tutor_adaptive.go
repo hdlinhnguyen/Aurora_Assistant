@@ -85,11 +85,17 @@ func (s *tutorService) SubmitAnswer(studentID uuid.UUID, nodeID uuid.UUID, quest
 	}
 
 	isCorrect := q.CorrectOption == selectedOption
+	hintsUsed := 0
+	var learningState model.TutorLearningState
+	if s.db.Where("student_id = ? AND topic_id = ?", studentID, nodeID).First(&learningState).Error == nil &&
+		learningState.Phase == "guided_practice" {
+		hintsUsed = learningState.HintLevel
+	}
 	action := "answer_incorrect"
-	detail := fmt.Sprintf("[question_id=%s] [difficulty=%s] Trả lời câu hỏi '%s' (Độ khó: %s), chọn %d (Sai, Đáp án đúng: %d)", q.ID, q.Difficulty, q.Content, q.Difficulty, selectedOption, q.CorrectOption)
+	detail := fmt.Sprintf("[question_id=%s] [difficulty=%s] [hints_used=%d] Trả lời câu hỏi '%s' (Độ khó: %s), chọn %d (Sai, Đáp án đúng: %d)", q.ID, q.Difficulty, hintsUsed, q.Content, q.Difficulty, selectedOption, q.CorrectOption)
 	if isCorrect {
 		action = "answer_correct"
-		detail = fmt.Sprintf("[question_id=%s] [difficulty=%s] Trả lời câu hỏi '%s' (Độ khó: %s), chọn %d (Đúng)", q.ID, q.Difficulty, q.Content, q.Difficulty, selectedOption)
+		detail = fmt.Sprintf("[question_id=%s] [difficulty=%s] [hints_used=%d] Trả lời câu hỏi '%s' (Độ khó: %s), chọn %d (Đúng)", q.ID, q.Difficulty, hintsUsed, q.Content, q.Difficulty, selectedOption)
 
 		var state model.StudentState
 		err := s.db.Where("student_id = ? AND subject = ?", studentID, node.Subject).First(&state).Error

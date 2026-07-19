@@ -265,12 +265,19 @@ func (s *Service) loadEvidence(ctx context.Context, studentID uuid.UUID, subject
 		if difficulty == "" {
 			difficulty = "medium"
 		}
+		hintsUsed := 0
+		if raw := markerValue(log.Detail, "hints_used"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+				hintsUsed = parsed
+			}
+		}
 		result = append(result, QuizEvidence{
 			EvidenceID: log.ID.String(), StudentID: studentID, SessionID: "activity-log",
 			QuestionID: questionID, TopicID: log.NodeID, Score: score, AttemptNumber: attemptsByQuestion[questionID],
 			GradingMethod: "auto", OccurredAt: log.CreatedAt,
 			InferenceWeight: inferenceWeightFromActivityDetail(log.Detail),
 			Difficulty:      difficulty,
+			HintsUsed:       hintsUsed,
 		})
 	}
 	return result, nil

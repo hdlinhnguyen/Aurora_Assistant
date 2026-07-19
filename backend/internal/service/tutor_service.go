@@ -63,6 +63,9 @@ type TutorService interface {
 	LogActivity(studentID uuid.UUID, subject string, nodeID uuid.UUID, action string, detail string) error
 	RequestReDiagnostic(studentID uuid.UUID, subject string) error
 	AdaptiveDowngrade(studentID uuid.UUID, nodeID uuid.UUID) (map[string]interface{}, error)
+	RecordHint(studentID, topicID uuid.UUID, level int) (*model.TutorLearningState, error)
+	RecordLearningAnswer(studentID uuid.UUID, question *model.Question, selectedOption int, correct bool) (*model.TutorLearningState, error)
+	RecordChatSignal(studentID, topicID uuid.UUID, message string) (*model.TutorLearningState, error)
 
 	// Teacher Dashboard Progress
 	GetStudentsProgress(teacherID uuid.UUID) ([]map[string]interface{}, error)
