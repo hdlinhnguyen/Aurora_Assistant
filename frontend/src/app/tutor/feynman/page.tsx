@@ -245,7 +245,7 @@ function FeynmanInner() {
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "20px 34px 6px" }}>
         <Link
-          href="/tutor/hub"
+          href="/tutor"
           style={{
             background: "#fff",
             border: "1px solid #eef1f4",
