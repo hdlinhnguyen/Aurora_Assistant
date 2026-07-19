@@ -8,8 +8,8 @@ import dynamic from "next/dynamic";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const DEMO_TOURS = {
-  student: { email: "student@aurora.edu.vn", route: "/tutor", label: "Học sinh" },
-  teacher: { email: "teacher@aurora.edu.vn", route: "/teacher", label: "Giáo viên" },
+  student: { email: "synthetic.student.b@aurora.local", route: "/tutor", label: "Học sinh" },
+  teacher: { email: "synthetic.teacher@aurora.local", route: "/teacher", label: "Giáo viên" },
 } as const;
 
 type DemoTourRole = keyof typeof DEMO_TOURS;

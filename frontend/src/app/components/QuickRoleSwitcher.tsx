@@ -42,7 +42,7 @@ export default function QuickRoleSwitcher() {
     if (loading) return;
     setLoading(true);
 
-    const targetEmail = targetRole === "teacher" ? "teacher@aurora.edu.vn" : "student@aurora.edu.vn";
+    const targetEmail = targetRole === "teacher" ? "synthetic.teacher@aurora.local" : "synthetic.student.b@aurora.local";
 
     try {
       const data = await apiFetch("/auth/login", {
