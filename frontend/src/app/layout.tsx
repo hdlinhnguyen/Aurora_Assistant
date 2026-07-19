@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   title: "Aurora Socratic Assistant — Học thật, hiểu thật",
   description:
     "Hệ thống AI gia sư phản biện giúp học sinh tự tư duy tìm ra đáp án, kết hợp dashboard thông minh cho giáo viên.",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -16,6 +21,9 @@ export default function RootLayout({
   return (
     <html lang="vi" className="h-full antialiased">
       <head>
+        <link rel="icon" href="/icon.png" type="image/png" />
+        <link rel="shortcut icon" href="/icon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

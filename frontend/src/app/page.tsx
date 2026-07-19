@@ -8,8 +8,8 @@ import dynamic from "next/dynamic";
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 const DEMO_TOURS = {
-  student: { email: "student@aurora.edu.vn", route: "/tutor", label: "Học sinh" },
-  teacher: { email: "teacher@aurora.edu.vn", route: "/teacher", label: "Giáo viên" },
+  student: { email: "synthetic.student.b@aurora.local", route: "/tutor", label: "Học sinh" },
+  teacher: { email: "synthetic.teacher@aurora.local", route: "/teacher", label: "Giáo viên" },
 } as const;
 
 type DemoTourRole = keyof typeof DEMO_TOURS;
@@ -77,41 +77,70 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background font-[var(--font-body)] text-foreground overflow-x-hidden relative">
+    <div className="min-h-screen bg-background font-[var(--font-body)] text-foreground relative">
       {/* Background Subtle Gradient Blobs */}
       <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-[var(--mint)]/30 blur-[120px] pointer-events-none" />
       <div className="absolute top-[30%] right-[-10%] h-[500px] w-[500px] rounded-full bg-[var(--purple)]/20 blur-[120px] pointer-events-none" />
 
       {/* Navigation Header */}
-      <nav className="relative z-10 max-w-6xl mx-auto px-6 py-5 flex justify-between items-center border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300 cursor-pointer">
-            <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+      <div className="fixed top-0 left-0 right-0 z-50 w-full bg-background/85 backdrop-blur-md py-3 border-b border-border/40 transition-all">
+        <nav className="max-w-6xl mx-auto px-6 py-2.5 flex justify-between items-center border border-border/80 bg-card/95 rounded-2xl shadow-md">
+          <div className="flex items-center gap-8">
+            <div 
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="flex items-center gap-3 cursor-pointer"
+            >
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300">
+                <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <span className="text-xl font-[var(--font-display)] font-extrabold bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent tracking-tight">
+                AURORA ASSISTANT
+              </span>
+            </div>
+
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center gap-6 text-sm font-semibold">
+              <button 
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Home
+              </button>
+              <button 
+                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Tính Năng
+              </button>
+              <button 
+                onClick={() => document.getElementById("method")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Phương Pháp
+              </button>
+              <button 
+                onClick={() => document.getElementById("users")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Người Dùng
+              </button>
+            </div>
           </div>
-          <span className="text-xl font-[var(--font-display)] font-extrabold bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent tracking-tight">
-            AURORA ASSISTANT
-          </span>
-        </div>
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => router.push("/login?role=teacher")}
-            className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Hướng dẫn sử dụng
-          </button>
-          <button
-            onClick={() => router.push("/login")}
-            className="bg-foreground hover:opacity-90 text-background px-5 py-2.5 rounded-full text-sm font-semibold shadow-[var(--shadow-card)] transition-all"
-          >
-            Đăng Nhập
-          </button>
-        </div>
-      </nav>
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => router.push("/login")}
+              className="border-2 border-slate-300/80 text-blue-700 hover:text-zinc-800 bg-transparent px-6 py-2 rounded-[14px] text-sm font-bold transition-colors"
+            >
+              Đăng Nhập
+            </button>
+          </div>
+        </nav>
+      </div>
 
       {/* Hero Section */}
-      <header className="relative z-10 max-w-6xl mx-auto px-6 pt-16 pb-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <header className="relative z-10 max-w-6xl mx-auto px-6 pt-28 pb-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
         {/* Left Column: Heading */}
         <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-[var(--mint)]/15 to-[var(--purple)]/15 text-xs font-bold text-foreground border border-[var(--mint)]/30 tracking-wide uppercase shadow-sm">
@@ -175,7 +204,7 @@ export default function LandingPage() {
       </header>
 
       {/* Interactive Socratic Demo Section */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
+      <section id="method" className="scroll-mt-24 relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch">
           {/* Left Column: Explanation */}
           <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
@@ -183,7 +212,10 @@ export default function LandingPage() {
               Phương Pháp Khác Biệt
             </div>
             <h2 className="text-3xl md:text-4xl font-[var(--font-display)] font-extrabold text-foreground leading-tight">
-              Trải nghiệm lớp học <br className="hidden md:block" /> gợi mở Socratic
+              Trải nghiệm lớp học <br className="hidden md:block" /> gợi mở{" "}
+              <span className="bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent">
+                Socratic
+              </span>
             </h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Phương pháp Socratic không cung cấp lời giải trực tiếp. Thay vào đó, AI đóng vai trò là một người dẫn dắt thông thái, đặt ra các câu hỏi gợi mở theo từng bước để giúp học sinh tự tìm ra bản chất của vấn đề và ghi nhớ sâu sắc hơn.
@@ -280,8 +312,55 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Core Features Section */}
+      <section id="features" className="scroll-mt-24 relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
+        <div className="text-left mb-12">
+          <h2 className="text-3xl md:text-4xl font-[var(--font-display)] font-extrabold uppercase tracking-tight">
+            <span className="text-foreground">Tính năng </span>
+            <span className="bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent">
+              chính
+            </span>
+          </h2>
+          <p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed font-medium">
+            Mỗi tính năng đều tập trung vào việc làm sáng tỏ tư duy của người học thay vì phô diễn công nghệ.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Feature 1 */}
+          <div className="relative overflow-hidden rounded-[2rem] bg-card border border-border p-8 shadow-[var(--shadow-card)] flex flex-col items-start transition hover:-translate-y-1 hover:shadow-lg">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-muted/50 rounded-bl-[4rem] -mr-6 -mt-6"></div>
+            <img src="/gif/celebrate.gif" alt="Socratic Chat" className="w-40 h-40 object-contain self-center mb-8 drop-shadow-md relative z-10" />
+            <h3 className="text-xl font-bold text-foreground mb-3 relative z-10">Socratic Chat</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+              Hỏi gợi mở, chia nhỏ vấn đề, và giúp người học tự tìm ra giải pháp thay vì cho sẵn đáp án.
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="relative overflow-hidden rounded-[2rem] bg-card border border-border p-8 shadow-[var(--shadow-card)] flex flex-col items-start transition hover:-translate-y-1 hover:shadow-lg">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-muted/50 rounded-bl-[4rem] -mr-6 -mt-6"></div>
+            <img src="/gif/encourage.gif" alt="Bản đồ kiến thức" className="w-40 h-40 object-contain self-center mb-8 drop-shadow-md relative z-10" />
+            <h3 className="text-xl font-bold text-foreground mb-3 relative z-10">Bản đồ kiến thức</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+              Kết nối các khái niệm, ví dụ và bài tập để người học thấy rõ điểm mạnh và phần cần ôn tập.
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="relative overflow-hidden rounded-[2rem] bg-card border border-border p-8 shadow-[var(--shadow-card)] flex flex-col items-start transition hover:-translate-y-1 hover:shadow-lg">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-muted/50 rounded-bl-[4rem] -mr-6 -mt-6"></div>
+            <img src="/gif/review.gif" alt="Tiến trình rõ ràng" className="w-40 h-40 object-contain self-center mb-8 drop-shadow-md relative z-10" />
+            <h3 className="text-xl font-bold text-foreground mb-3 relative z-10">Tiến trình rõ ràng</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+              Theo dõi nhịp độ học tập, mức độ thành thạo và thành tích để duy trì động lực lâu dài.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Target Audiences Sections */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
+      <section id="users" className="scroll-mt-24 relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-[var(--font-display)] font-extrabold text-foreground">Giải pháp cho Cả Học sinh & Thầy cô</h2>
           <p className="text-muted-foreground text-sm mt-2">Được thiết kế thích ứng giúp việc tự học trở nên thú vị và việc giảng dạy nhẹ nhàng hơn</p>
@@ -290,12 +369,14 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Path 1: Primary Students */}
           <div className="group relative overflow-hidden rounded-3xl border border-border bg-card p-8 space-y-6 shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-lg">
-            <div className="inline-block p-3 rounded-2xl bg-[var(--mint)]/15 text-[var(--mint)]">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
+            <div className="flex items-center justify-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-[var(--mint)]/15 text-[var(--mint)] flex-shrink-0">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh</h3>
             </div>
-            <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-[var(--mint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -316,22 +397,26 @@ export default function LandingPage() {
                 Chế độ làm bài Offline giúp học tập mọi lúc, mọi nơi ngay cả khi mạng yếu.
               </li>
             </ul>
-            <button
-              onClick={() => router.push("/login?role=student")}
-              className="inline-block text-sm font-bold text-[var(--mint)] hover:underline"
-            >
-              Bắt đầu Học thử ngay &rarr;
-            </button>
+            <div className="text-center pt-2">
+              <button
+                onClick={() => router.push("/login?role=student")}
+                className="inline-block text-sm font-bold text-[var(--mint)] hover:underline"
+              >
+                Bắt đầu Học thử ngay &rarr;
+              </button>
+            </div>
           </div>
 
           {/* Path 2: Teachers */}
           <div className="group relative overflow-hidden rounded-3xl border border-border bg-card p-8 space-y-6 shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-lg">
-            <div className="inline-block p-3 rounded-2xl bg-[var(--purple)]/15 text-[var(--purple)]">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2zm12-5a2 2 0 11-4 0 2 2 0 014 0zM9 20h12" />
-              </svg>
+            <div className="flex items-center justify-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-[var(--purple)]/15 text-[var(--purple)] flex-shrink-0">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2zm12-5a2 2 0 11-4 0 2 2 0 014 0zM9 20h12" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-foreground">Dành cho Giáo viên & Thầy cô</h3>
             </div>
-            <h3 className="text-2xl font-bold text-foreground">Dành cho Giáo viên & Thầy cô</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-[var(--purple)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -352,12 +437,14 @@ export default function LandingPage() {
                 Tiết kiệm hàng giờ chấm bài và soạn câu hỏi phản lý thuyết thủ công.
               </li>
             </ul>
-            <button
-              onClick={() => router.push("/login?role=teacher")}
-              className="inline-block text-sm font-bold text-[var(--purple)] hover:underline"
-            >
-              Truy cập Dashboard Giáo viên &rarr;
-            </button>
+            <div className="text-center pt-2">
+              <button
+                onClick={() => router.push("/login?role=teacher")}
+                className="inline-block text-sm font-bold text-[var(--purple)] hover:underline"
+              >
+                Truy cập Dashboard Giáo viên &rarr;
+              </button>
+            </div>
           </div>
         </div>
       </section>

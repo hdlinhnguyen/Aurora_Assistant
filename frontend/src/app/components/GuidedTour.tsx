@@ -393,7 +393,7 @@ export default function GuidedTour() {
         const res = await fetch(`${API_BASE_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: "teacher@aurora.edu.vn", password: "demo123" }),
+          body: JSON.stringify({ email: "synthetic.teacher@aurora.local", password: "demo123" }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -408,7 +408,7 @@ export default function GuidedTour() {
         const res = await fetch(`${API_BASE_URL}/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: "student@aurora.edu.vn", password: "demo123" }),
+          body: JSON.stringify({ email: "synthetic.student.b@aurora.local", password: "demo123" }),
         });
         if (res.ok) {
           const data = await res.json();

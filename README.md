@@ -1,23 +1,20 @@
 # Aurora Assistant: Học thật, hiểu thật 🎓🚀
 
-> Tóm tắt 1 câu: Hệ thống gia sư AI thích ứng giải quyết khoảng cách năng lực trong lớp học đông học sinh, giúp chẩn đoán lỗ hổng kiến thức và hỗ trợ giáo viên thông qua phương pháp Socratic và kỹ thuật Feynman.
+> Tóm tắt 1 câu: Hệ thống gia sư AI thích ứng giải quyết khoảng cách năng lực trong lớp học đông học sinh, giúp chẩn đoán lỗ hổng kiến thức và hỗ trợ giáo viên thông qua phương pháp Socratic cùng các giải thích minh hoạ bằng hình ảnh và học từ nguyên lý gốc (First Principle).
 
 ## Vấn đề (Problem)
 
 Khoảng cách năng lực trong các lớp học đông học sinh ở Việt Nam:
 - **Giáo viên và học sinh ở vùng khó khăn/lớp học đông:** Một giáo viên phải quản lý lớp ~40 học sinh với nền tảng kiến thức rất khác nhau.
 - **Hệ quả:** Học sinh yếu bị bỏ lại phía sau, trong khi học sinh giỏi bị kìm hãm sự phát triển.
-- **Không đủ nguồn lực cho gia sư 1-1:** Giáo viên không có đủ thời gian để kèm riêng từng em theo đúng lỗ hổng kiến thức cá nhân; gia sư 1-1 truyền thống lại quá tốn kém, không phải gia đình nào cũng tiếp cận được.
 - **Hạn chế của giải pháp hiện tại:** Các ứng dụng học tập hiện tại chỉ đẩy bài giảng theo thứ tự cố định, thiếu tính thích ứng cho từng cá nhân học sinh và bỏ qua vai trò quan trọng của giáo viên trên lớp.
 
 ## Giải pháp (Solution)
 
 Hệ thống gia sư thích ứng (Adaptive Tutoring System) kiên quyết nói **KHÔNG** với phương pháp học thụ động (cho sẵn lời giải), thay vào đó chia nhỏ vấn đề và dẫn dắt tư duy:
 - **Phương pháp Socratic (Socratic Questioning):** Gợi mở từng bước nhỏ, chẩn đoán lỗi sai ở đâu để đặt câu hỏi bù đắp kiến thức nền trước khi đi tiếp.
-- **Kỹ thuật Feynman (Feynman Technique):** Bắt học sinh đóng vai người dạy giảng lại kiến thức cho bạn nhỏ AI bằng ngôn ngữ đơn giản nhất để kiểm tra mức độ thấu hiểu bản chất.
 - **Tư duy từ Nguyên lý gốc (First Principles Thinking):** Bóc tách bài toán phức tạp về các chân lý toán học/tự nhiên cơ sở nhất (Axioms) và lập luận logic đi lên.
 - **Teacher Dashboard (Bắt buộc):** Tự động phân nhóm học sinh theo nhu cầu, gợi ý giáo viên ai cần giúp đỡ trước, và phát hiện các lỗ hổng kiến thức chung của cả lớp để giáo viên giảng lại.
-- **RAG (Retrieval-Augmented Generation) hỗ trợ như gia sư 1-1:** Hệ thống truy xuất đúng kiến thức nền/bài giảng bám sát Chương trình GDPT 2018 từ knowledge base để cá nhân hóa lộ trình học cho từng em — bù đắp phần giáo viên không đủ thời gian kèm riêng, không thay thế mà hỗ trợ vai trò của giáo viên.
 - **Tính năng đặc thù:** Hoạt động offline hoặc ở điều kiện băng thông thấp, nội dung bám sát Chương trình Giáo dục phổ thông theo Văn bản của Bộ Giáo dục công bố năm 2018.
 
 ## Target User
@@ -45,18 +42,6 @@ Hệ thống gia sư thích ứng (Adaptive Tutoring System) kiên quyết nói 
 | AI Engine | Google Gemini API (giao thức tương thích OpenAI adapter) |
 | DevOps | Docker + GitHub Actions (Script tự động `run.ps1` / `run.sh`) |
 
-### Hồ sơ năng lực theo topic (BKT Mastery Profile)
-
-Hệ thống lưu trạng thái BKT hiện tại và lịch sử theo từng cặp học sinh-topic.
-Giảng viên chọn một học sinh trong danh sách lớp để xem badge `BKT %` trên cây
-kiến thức, bấm topic để xem confidence và biến động 30 ngày/90 ngày/toàn bộ.
-Học sinh chỉ đọc được hồ sơ của chính mình tại dashboard cá nhân.
-
-- Python: `POST /mastery/calculate` tính trạng thái BKT.
-- Go teacher: `GET /api/teacher/students/:studentId/mastery` và endpoint history.
-- Go student: `GET /api/student/mastery` và endpoint history tự lấy ID từ token.
-- PostgreSQL: `student_topic_masteries` lưu trạng thái mới nhất;
-  `student_topic_mastery_histories` lưu snapshot bất biến.
 ## Quick Start
 
 ### Yêu cầu trước khi cài đặt:
@@ -76,55 +61,134 @@ cd Aurora_Assistant
 
 # 3. Trải nghiệm
 # Mở trình duyệt truy cập: http://localhost:3000
-# Đăng nhập nhanh bằng thẻ One-Click Login (tài khoản synthetic, seed khi backend khởi động):
-# - Giáo viên:   synthetic.teacher@aurora.local   / demo123
-# - Học sinh A:  synthetic.student.a@aurora.local / demo123
-# - Học sinh B:  synthetic.student.b@aurora.local / demo123
-# - Học sinh C:  synthetic.student.c@aurora.local / demo123
+# - Tài khoản Học sinh Demo:  student@aurora.edu.vn / demo123
+# - Tài khoản Giáo viên Demo: teacher@aurora.edu.vn / demo123
+# - Tài khoản Quản trị Demo:  admin@aurora.edu.vn   / demo123
 ```
 
-> Synthetic data được reset về trạng thái mẫu mỗi lần backend khởi động; backend tạo answer events rồi gọi BKT service để tính mastery (frontend không chứa phần trăm mastery hardcode). Đặt `ENABLE_SYNTHETIC_DATA=false` để giữ nguyên database và bỏ qua bước reset/seed.
+Các cổng dịch vụ khi chạy local:
+
+| Dịch vụ | URL |
+|---------|-----|
+| Frontend (Next.js) | http://localhost:3000 |
+| Go Backend | http://localhost:8081/api/health |
+| Python AI API (Swagger) | http://localhost:8000/docs |
+| PostgreSQL (Docker) | localhost:5436 |
+
 ## Project Structure
 
+Aurora là một **monorepo** gồm 3 phân hệ chạy song song (Go backend, Next.js frontend, Python AI service) cùng dữ liệu chương trình và tài liệu. Xem bản đồ tài liệu đầy đủ tại [`docs/INDEX.md`](docs/INDEX.md) và hướng dẫn cho người mới tại [`docs/ONBOARDING.md`](docs/ONBOARDING.md).
+
 ```
-├── src/
-│   ├── agents/          # LangGraph agent definitions
-│   │   ├── graph.py     # Main graph (nodes + edges)
-│   │   ├── state.py     # State schema
-│   │   ├── nodes/       # Individual nodes
-│   │   └── tools/       # Agent tools
-│   ├── api/             # FastAPI routes
-│   ├── models/          # Pydantic schemas
-│   ├── services/        # Business logic
-│   ├── config.py        # Settings
-│   └── main.py          # App entry point
-├── tests/               # Test suite
-├── docs/                # Documentation
-├── eval/                # Evaluation results
-├── presentation/        # Demo materials
-├── Dockerfile           # Multi-stage build
-├── docker-compose.yml   # Full stack
-└── .github/workflows/   # CI/CD pipelines
+Aurora_Assistant/
+├── backend/                    # Go API server (Fiber v3) — cổng :8081
+│   ├── cmd/
+│   │   ├── server/             # main.go: khởi tạo app + đăng ký route
+│   │   ├── seed/               # seed dữ liệu DB
+│   │   ├── import_bank/        # nạp ngân hàng câu hỏi
+│   │   └── ...                 # check_questions, dump_mock, telemetry_rebuild, ...
+│   ├── internal/
+│   │   ├── handler/            # HTTP handlers (auth, exam, admin, mastery, tutor, scoring...)
+│   │   ├── service/            # Business logic (ai_service, tutor_service, guardrail, tagging...)
+│   │   ├── exam/ scoring/ mastery/ telemetry/ gamification/ adminmetrics/   # domain packages
+│   │   ├── model/              # GORM models
+│   │   ├── middleware/         # JWT auth + phân quyền theo role
+│   │   ├── syntheticseed/      # dữ liệu demo tổng hợp (synthetic)
+│   │   └── config/ runtime/    # cấu hình DB & runtime
+│   └── docker/                 # docker-compose (PostgreSQL cổng 5436)
+├── frontend/                   # Next.js (App Router + Tailwind) — cổng :3000
+│   └── src/app/
+│       ├── login/  tutor/  teacher/  admin/   # route theo vai trò
+│       └── api/                # Next.js route handler (proxy hint)
+├── learning-path/              # Python FastAPI + LangGraph — cổng :8000
+│   └── src/learning_path/      # BKT mastery, planner, diagnosis, hints, ranking...
+├── knowledge-graph/            # Sơ đồ kiến thức chương trình (JSON) + công cụ review
+├── evals/                      # Bộ đánh giá (pytest) — bằng chứng chất lượng AI
+├── data/                       # Ngân hàng câu hỏi & nguồn chương trình (exam_bank.json, master_bank.json)
+├── design/                     # Design handoff & asset nhân vật (animation)
+├── docs/                       # Tài liệu — bắt đầu ở docs/INDEX.md
+├── presentation/               # Ghi chú pitch deck & bằng chứng nghiên cứu
+├── ai-log/                     # Log prompt AI theo từng thành viên (deliverable)
+├── tests/                      # Test tích hợp/smoke liên phân hệ (Python)
+├── artifacts/                  # Ảnh chụp E2E (desktop/mobile)
+├── architecture.md             # Tài liệu kiến trúc hệ thống
+├── run.sh / run.ps1            # Khởi chạy toàn bộ stack bằng 1 lệnh
+└── README.md
 ```
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /health | Health check |
-| POST | /api/v1/chat | Chat with agent |
-| POST | /api/v1/analyze | Analyze input |
+Toàn bộ API nghiệp vụ do **Go backend** (`:8081`, tiền tố `/api`) phục vụ, bảo vệ bằng JWT và phân quyền theo vai trò. Dưới đây là các nhóm chính (danh sách đầy đủ xem `backend/cmd/server/main.go`):
+
+**Công khai (Public)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/api/health` | Health check |
+| POST | `/api/auth/register` | Đăng ký tài khoản |
+| POST | `/api/auth/login` | Đăng nhập, trả JWT |
+
+**Học sinh (role: `student`)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/api/student/mastery` · `/review-path` · `/badges` | Hồ sơ thành thạo (BKT), lộ trình ôn, huy hiệu |
+| GET · POST | `/api/student/exams` · `/exams/:examId/submit` | Danh sách & nộp bài thi |
+| GET | `/api/student/learning-path` · `/learning-path/live` | Lộ trình học cá nhân hoá |
+
+**Giáo viên (role: `teacher` / `admin`)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| CRUD | `/api/teacher/exams/**` | Soạn/sửa đề thi, câu hỏi, rubric, export DOCX |
+| CRUD | `/api/teacher/question-bank/**` | Ngân hàng câu hỏi + gán chủ đề (tagging) |
+| CRUD | `/api/teacher/students` · `/classrooms` | Quản lý học sinh & lớp |
+| GET | `/api/teacher/dashboard` · `/students-progress` · `/monitoring/:subject` | Bảng theo dõi & phân hoá lớp |
+| CRUD | `/api/teacher/grading-batches/**` · `/scoring-submissions/**` | Chấm điểm thủ công theo rubric |
+
+**Gia sư AI (mọi tài khoản đã đăng nhập)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| POST · GET | `/api/tutor/sessions/**` | Phiên chat Socratic + lưu axiom (Bản đồ Nguyên lý) |
+| GET | `/api/subjects/:subject/tree` · `/nodes/:nodeId/questions` | Cây kiến thức & câu hỏi theo node |
+| POST | `/api/feynman/score` · `/api/student/hints` | Chấm Clarity Score (Feynman) & thang gợi ý |
+
+**Quản trị (role: `admin`)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| CRUD | `/api/admin/teachers` · `/classrooms` | Quản lý giáo viên & lớp |
+| GET | `/api/admin/telemetry-dashboard` | Bảng đo lường hệ thống |
+
+**Nội bộ (service-to-service, token riêng) & Telemetry**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/api/internal/graph` | Cấp graph kiến thức cho Python service |
+| POST | `/internal/exams/:examId/first-submission` · `/grading-completed` | Callback chấm bài |
+| POST | `/api/telemetry/events` | Thu thập sự kiện học tập (ẩn danh) |
+
+### AI Service (Python FastAPI + LangGraph) — `:8000`, xem `/docs`
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/health` | Health check |
+| POST | `/learning-path` · `/learning-path/live` | Sinh/cập nhật lộ trình học (LangGraph) |
+| POST | `/learning-path/{thread_id}/approve` · `/evidence` | Giáo viên duyệt lộ trình & nạp bằng chứng |
+| POST | `/hints` | Sinh thang gợi ý (hint ladder) |
+| POST | `/mastery/calculate` | Tính mức thành thạo bằng BKT |
 
 ## Deliverables Checklist
 
 - [x] Source Code (GitHub)
 - [x] README.md
 - [x] Architecture Diagram (`architecture.md`)
-- [ ] AI Logs (LangSmith or application traces)
-- [ ] Live URL / Deploy
-- [ ] Video Demo
-- [ ] Pitch Deck (`presentation/`)
-- [ ] Evaluation Evidence (`evals`)
+- [x] AI Logs (LangSmith or application traces)
+- [x] Live URL / Deploy
+- [x] Video Demo
+- [x] Pitch Deck 
+- [x] Evaluation Evidence (`evals`)
 
 ## Team
 

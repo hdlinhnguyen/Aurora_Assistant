@@ -19,6 +19,20 @@ interface NodeItem {
   isRoot: boolean;
 }
 
+export function selectDefaultFocusNode(
+  nodes: NodeItem[],
+  focusedNodeId?: string | null,
+  currentNodeId?: string,
+  initialNodeId?: string,
+) {
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const preferredNodeId = [focusedNodeId, currentNodeId, initialNodeId].find(
+    (nodeId): nodeId is string => Boolean(nodeId && nodeIds.has(nodeId)),
+  );
+
+  return preferredNodeId ?? nodes.find((node) => node.isRoot)?.id ?? nodes[0]?.id ?? null;
+}
+
 interface EdgeItem {
   id: string;
   subject: string;
@@ -79,10 +93,12 @@ export default function KnowledgeTree({
   // Advanced features: Collapse state, Hover path tracing & Focused view
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() =>
+    selectDefaultFocusNode(nodes, focusedNodeId, currentNodeId, initialNodeId),
+  );
 
   const activeSelectedNodeId = selectedNodeId || focusedNodeId;
-  const [isFocusedView, setIsFocusedView] = useState(false);
+  const [isFocusedView, setIsFocusedView] = useState(true);
   const [showGroups, setShowGroups] = useState(false);
 
   // "Điểm cần chú ý" focus view (view-only mode): mastered-chain auto-collapse
@@ -163,6 +179,15 @@ export default function KnowledgeTree({
       setSelectedNodeId(null);
     }
   }, [focusedNodeId]);
+
+  useEffect(() => {
+    if (focusedNodeId) return;
+
+    const selectedNodeExists = selectedNodeId && nodes.some((node) => node.id === selectedNodeId);
+    if (!selectedNodeExists) {
+      setSelectedNodeId(selectDefaultFocusNode(nodes, null, currentNodeId, initialNodeId));
+    }
+  }, [currentNodeId, focusedNodeId, initialNodeId, nodes, selectedNodeId]);
 
   // Manage history stack internally for Undo/Redo (Ctrl+Z / Ctrl+Y)
   const [history, setHistory] = useState<{ nodes: NodeItem[]; edges: EdgeItem[] }[]>([]);
@@ -261,8 +286,10 @@ export default function KnowledgeTree({
   useEffect(() => {
     setHistory([]);
     setHistoryIndex(-1);
-    setIsFocusedView(false);
-    setSelectedNodeId(null);
+    setIsFocusedView(true);
+    setSelectedNodeId(selectDefaultFocusNode(nodes, focusedNodeId, currentNodeId, initialNodeId));
+    // Reset only when the subject changes; node refreshes keep the user's chosen map mode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject]);
 
   // Zoom helpers
@@ -387,7 +414,7 @@ export default function KnowledgeTree({
 
       if (viewOnlyMode) {
         // Neighbor-only focus (sidebar/tree click) vs. fit-all ("Xem toàn cảnh")
-        const focusBoxes = activeSelectedNodeId
+        const focusBoxes = isFocusedView && activeSelectedNodeId
           ? displayNodes.filter((n) => neighborFocusSet.has(n.id)).map((n) => ({ x: n.posX, y: n.posY, w: nodeWidth, h: nodeHeight }))
           : [];
         const boxes = focusBoxes.length > 0
@@ -1041,7 +1068,7 @@ export default function KnowledgeTree({
   // mode), this dims everything except the focused node's immediate
   // parent(s)/child(ren) in the CURRENT (possibly chain-collapsed) graph.
   const neighborFocusSet = new Set<string>();
-  if (viewOnlyMode && activeSelectedNodeId) {
+  if (viewOnlyMode && isFocusedView && activeSelectedNodeId) {
     neighborFocusSet.add(activeSelectedNodeId);
     displayEdges.forEach((e) => {
       if (e.sourceId === activeSelectedNodeId) neighborFocusSet.add(e.targetId);
@@ -1049,7 +1076,7 @@ export default function KnowledgeTree({
     });
   }
 
-  if (isFocusedView && activeSelectedNodeId) {
+  if (!viewOnlyMode && isFocusedView && activeSelectedNodeId) {
     const focusedNodeItems = localNodes.filter((n) => highlightedNodes.has(n.id));
     const focusedEdgeItems = edges.filter((e) => highlightedEdges.has(e.id));
 
@@ -1193,14 +1220,14 @@ export default function KnowledgeTree({
       tracePath[traceChildIdx + 1] === edge.sourceId &&
       traceStep >= traceChildIdx + 1;
 
-    const isNeighborHighlightVO = viewOnlyMode && neighborFocusSet.has(edge.sourceId) && neighborFocusSet.has(edge.targetId);
+    const isNeighborHighlightVO = viewOnlyMode && isFocusedView && neighborFocusSet.has(edge.sourceId) && neighborFocusSet.has(edge.targetId);
     const isHighlighted = viewOnlyMode ? isNeighborHighlightVO : highlightedEdges.has(edge.id);
     // View-only mode never recolors edges purple (that's the teacher-mode ancestor/descendant path highlight)
     const recolorPurple = isHighlighted && !viewOnlyMode;
     const opacity = isTraceEdgeLit
       ? 1
       : viewOnlyMode
-        ? (activeSelectedNodeId ? (isNeighborHighlightVO ? 0.9 : 0.15) : 0.9)
+        ? (isFocusedView && activeSelectedNodeId ? (isNeighborHighlightVO ? 0.9 : 0.15) : 0.9)
         : (isFocusedView ? (isHighlighted ? 1 : 0.45) : 1);
 
     return (
@@ -1348,7 +1375,7 @@ export default function KnowledgeTree({
         </div>
 
         {/* Right Side: Overall vs Focused Map Selectors */}
-        {activeSelectedNodeId && !viewOnlyMode && (
+        {localNodes.length > 0 && (
           <div className="flex border border-border bg-muted rounded-xl p-0.5 shadow-sm">
             <button
               onClick={() => setIsFocusedView(false)}
@@ -1389,10 +1416,10 @@ export default function KnowledgeTree({
         className="flex-1 cursor-grab active:cursor-grabbing w-full h-full relative"
         style={{ overflow: "hidden" }}
       >
-        {viewOnlyMode && (
+        {viewOnlyMode && isFocusedView && activeSelectedNodeId && (
           <button
             onClick={() => {
-              setSelectedNodeId(null);
+              setIsFocusedView(false);
               if (onClearFocus) onClearFocus();
             }}
             className="absolute top-4 left-4 z-20 rounded-xl bg-foreground text-background px-4 py-2.5 text-xs font-bold whitespace-nowrap shadow-lg cursor-pointer active:scale-95 transition-all"
@@ -1566,7 +1593,7 @@ export default function KnowledgeTree({
                 const nodeHeight = 85;
 
                 const opacity = viewOnlyMode
-                  ? (activeSelectedNodeId ? (neighborFocusSet.has(node.id) ? 1 : 0.3) : 1)
+                  ? (isFocusedView && activeSelectedNodeId ? (neighborFocusSet.has(node.id) ? 1 : 0.3) : 1)
                   : (isFocusedView ? (isHighlighted ? 1 : 0.6) : 1);
 
                 const isCollapsed = collapsedNodes[node.id];
