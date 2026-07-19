@@ -132,6 +132,7 @@ export default function TutorHubPage() {
 
   // ---- diagnostic & exam states ----
   const [studentState, setStudentState] = useState<{ needsDiagnostic: boolean } | null>(null);
+  const [skipDiagnostic, setSkipDiagnostic] = useState(false);
   const [examsList, setExamsList] = useState<any[]>([]);
   const [activeExam, setActiveExam] = useState<any | null>(null);
   const [examQuestions, setExamQuestions] = useState<any[]>([]);
@@ -503,7 +504,7 @@ export default function TutorHubPage() {
   }
 
   // ---- derived ----
-  const needsDiagnostic = studentState === null || studentState?.needsDiagnostic;
+  const needsDiagnostic = !skipDiagnostic && (studentState === null || studentState?.needsDiagnostic);
   const currentNode = nodes.find((n) => n.id === currentStepId);
   const filteredQuestions = difficultyFilter
     ? questions.filter((item) => item.tag === "Nhận biết")
@@ -2322,17 +2323,40 @@ export default function TutorHubPage() {
                 maxWidth: 580,
                 width: "100%",
                 padding: "40px 36px 32px",
+                position: "relative",
                 boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
                 textAlign: "center",
                 animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)",
               }}
             >
+              <button
+                type="button"
+                aria-label="Bỏ qua đánh giá chẩn đoán"
+                onClick={() => {
+                  setSkipDiagnostic(true);
+                  setActiveTab("theory");
+                }}
+                style={{
+                  position: "absolute",
+                  top: 16,
+                  right: 18,
+                  border: "none",
+                  background: "transparent",
+                  color: "#9aa1b0",
+                  fontSize: 24,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  padding: 4,
+                }}
+              >
+                X
+              </button>
               <div style={{ fontSize: 56, marginBottom: 12, animation: "ah-float 3s ease-in-out infinite" }}>📐</div>
               <div style={{ ...BALOO, fontWeight: 800, fontSize: 26, color: "#16161F", marginBottom: 10 }}>
                 Yêu cầu đánh giá chẩn đoán!
               </div>
               <p style={{ fontSize: 14, color: "#4b5060", lineHeight: 1.6, marginBottom: 26 }}>
-                Chào mừng em đến với <b>Aurora Socratic Tutor</b>. Lộ trình học tập của em tạm thời bị khóa. Em cần hoàn thành bài khảo sát/kiểm tra đầu vào để hệ thống chẩn đoán và xác định lỗ hổng kiến thức nền tảng của em.
+                Chào mừng em đến với <b>Aurora Socratic Tutor</b>. Em có thể làm bài khảo sát đầu vào để cá nhân hóa lộ trình, hoặc bỏ qua để bắt đầu học ngay.
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 16, textAlign: "left" }}>
