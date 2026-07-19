@@ -83,27 +83,54 @@ export default function LandingPage() {
       <div className="absolute top-[30%] right-[-10%] h-[500px] w-[500px] rounded-full bg-[var(--purple)]/20 blur-[120px] pointer-events-none" />
 
       {/* Navigation Header */}
-      <nav className="relative z-10 max-w-6xl mx-auto px-6 py-5 flex justify-between items-center border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300 cursor-pointer">
-            <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+      <nav className="sticky top-4 z-50 max-w-6xl mx-4 md:mx-auto px-6 py-3.5 flex justify-between items-center border border-border/80 bg-card/85 backdrop-blur-md rounded-2xl shadow-lg shadow-black/5 transition-all">
+        <div className="flex items-center gap-8">
+          <div 
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="flex items-center gap-3 cursor-pointer"
+          >
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300">
+              <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span className="text-xl font-[var(--font-display)] font-extrabold bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent tracking-tight">
+              AURORA ASSISTANT
+            </span>
           </div>
-          <span className="text-xl font-[var(--font-display)] font-extrabold bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent tracking-tight">
-            AURORA ASSISTANT
-          </span>
+
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center gap-6 text-sm font-semibold">
+            <button 
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Home
+            </button>
+            <button 
+              onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Tính Năng
+            </button>
+            <button 
+              onClick={() => document.getElementById("method")?.scrollIntoView({ behavior: "smooth" })}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Phương Pháp
+            </button>
+            <button 
+              onClick={() => document.getElementById("users")?.scrollIntoView({ behavior: "smooth" })}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Người Dùng
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-6">
           <button
-            onClick={() => router.push("/login?role=teacher")}
-            className="text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Hướng dẫn sử dụng
-          </button>
-          <button
             onClick={() => router.push("/login")}
-            className="bg-foreground hover:opacity-90 text-background px-5 py-2.5 rounded-full text-sm font-semibold shadow-[var(--shadow-card)] transition-all"
+            className="border-2 border-slate-300/80 text-blue-700 hover:text-zinc-800 bg-transparent px-6 py-2 rounded-[14px] text-sm font-bold transition-colors"
           >
             Đăng Nhập
           </button>
@@ -175,7 +202,7 @@ export default function LandingPage() {
       </header>
 
       {/* Interactive Socratic Demo Section */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
+      <section id="method" className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch">
           {/* Left Column: Explanation */}
           <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
@@ -183,7 +210,10 @@ export default function LandingPage() {
               Phương Pháp Khác Biệt
             </div>
             <h2 className="text-3xl md:text-4xl font-[var(--font-display)] font-extrabold text-foreground leading-tight">
-              Trải nghiệm lớp học <br className="hidden md:block" /> gợi mở Socratic
+              Trải nghiệm lớp học <br className="hidden md:block" /> gợi mở{" "}
+              <span className="bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent">
+                Socratic
+              </span>
             </h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
               Phương pháp Socratic không cung cấp lời giải trực tiếp. Thay vào đó, AI đóng vai trò là một người dẫn dắt thông thái, đặt ra các câu hỏi gợi mở theo từng bước để giúp học sinh tự tìm ra bản chất của vấn đề và ghi nhớ sâu sắc hơn.
@@ -280,8 +310,55 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Core Features Section */}
+      <section id="features" className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
+        <div className="text-left mb-12">
+          <h2 className="text-3xl md:text-4xl font-[var(--font-display)] font-extrabold uppercase tracking-tight">
+            <span className="text-foreground">Tính năng </span>
+            <span className="bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent">
+              chính
+            </span>
+          </h2>
+          <p className="text-muted-foreground text-sm mt-3 max-w-2xl leading-relaxed font-medium">
+            Mỗi tính năng đều tập trung vào việc làm sáng tỏ tư duy của người học thay vì phô diễn công nghệ.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Feature 1 */}
+          <div className="relative overflow-hidden rounded-[2rem] bg-card border border-border p-8 shadow-[var(--shadow-card)] flex flex-col items-start transition hover:-translate-y-1 hover:shadow-lg">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-muted/50 rounded-bl-[4rem] -mr-6 -mt-6"></div>
+            <img src="/gif/celebrate.gif" alt="Socratic Chat" className="w-40 h-40 object-contain self-center mb-8 drop-shadow-md relative z-10" />
+            <h3 className="text-xl font-bold text-foreground mb-3 relative z-10">Socratic Chat</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+              Hỏi gợi mở, chia nhỏ vấn đề, và giúp người học tự tìm ra giải pháp thay vì cho sẵn đáp án.
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="relative overflow-hidden rounded-[2rem] bg-card border border-border p-8 shadow-[var(--shadow-card)] flex flex-col items-start transition hover:-translate-y-1 hover:shadow-lg">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-muted/50 rounded-bl-[4rem] -mr-6 -mt-6"></div>
+            <img src="/gif/encourage.gif" alt="Bản đồ kiến thức" className="w-40 h-40 object-contain self-center mb-8 drop-shadow-md relative z-10" />
+            <h3 className="text-xl font-bold text-foreground mb-3 relative z-10">Bản đồ kiến thức</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+              Kết nối các khái niệm, ví dụ và bài tập để người học thấy rõ điểm mạnh và phần cần ôn tập.
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="relative overflow-hidden rounded-[2rem] bg-card border border-border p-8 shadow-[var(--shadow-card)] flex flex-col items-start transition hover:-translate-y-1 hover:shadow-lg">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-muted/50 rounded-bl-[4rem] -mr-6 -mt-6"></div>
+            <img src="/gif/review.gif" alt="Tiến trình rõ ràng" className="w-40 h-40 object-contain self-center mb-8 drop-shadow-md relative z-10" />
+            <h3 className="text-xl font-bold text-foreground mb-3 relative z-10">Tiến trình rõ ràng</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed relative z-10">
+              Theo dõi nhịp độ học tập, mức độ thành thạo và thành tích để duy trì động lực lâu dài.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Target Audiences Sections */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
+      <section id="users" className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-[var(--font-display)] font-extrabold text-foreground">Giải pháp cho Cả Học sinh & Thầy cô</h2>
           <p className="text-muted-foreground text-sm mt-2">Được thiết kế thích ứng giúp việc tự học trở nên thú vị và việc giảng dạy nhẹ nhàng hơn</p>
