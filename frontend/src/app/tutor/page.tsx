@@ -52,7 +52,6 @@ import {
   GraduationCap,
   Trophy,
   BarChart3,
-  Network,
   RefreshCw,
   Lock,
   TrendingUp,
@@ -128,7 +127,6 @@ export default function TutorHubPage() {
   const [traceModal, setTraceModal] = useState<{ path: string[]; rootId: string } | null>(null);
   // Lộ trình ôn tập cá nhân hoá (dựa trên BKT mastery)
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
-  const [showReview, setShowReview] = useState(false);
   const [roadmap, setRoadmap] = useState<RoadmapStep[]>([]);
   const [summary, setSummary] = useState<GameSummary | null>(null);
   const router = useRouter();
@@ -139,7 +137,7 @@ export default function TutorHubPage() {
 
   // ---- quiz / ui ----
   const [screen, setScreen] = useState<"lesson" | "complete">("lesson");
-  const [activeTab, setActiveTab] = useState<"review" | "exams" | "graph">("graph");
+  const [activeTab, setActiveTab] = useState<"review" | "exams" | "roadmap">("roadmap");
   const [reviewLeftSubTab, setReviewLeftSubTab] = useState<"practice" | "theory">("practice");
   const [qIndex, setQIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -633,7 +631,6 @@ export default function TutorHubPage() {
   }
 
   function goToReviewNode(nodeId: string, name: string) {
-    setShowReview(false);
     setCurrentStepId(nodeId);
     setActiveTab("review");
     setReviewLeftSubTab("practice");
@@ -972,42 +969,6 @@ export default function TutorHubPage() {
 
         {/* Right: Gamification Info & User profile & Logout */}
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          {/* Personalized Review button */}
-          {!studentState?.needsDiagnostic && reviewItems.length > 0 && (
-            <button
-              onClick={() => setShowReview(true)}
-              style={{
-                ...POPPINS,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                borderRadius: 12,
-                border: "1px solid #ffd9b8",
-                background: "linear-gradient(135deg,#fff5ec,#fff)",
-                color: "#c2560f",
-                fontWeight: 800,
-                fontSize: 12,
-                cursor: "pointer",
-                boxShadow: "0 4px 10px -4px rgba(194,86,15,0.2)",
-                transition: "all .15s",
-              }}
-            >
-              <span>🔄 Ôn tập ({reviewItems.length})</span>
-              <span
-                style={{
-                  background: "#ffe1c4",
-                  color: "#c2560f",
-                  borderRadius: 6,
-                  padding: "1px 5px",
-                  fontSize: 9.5,
-                  fontWeight: 800,
-                }}
-              >
-                cần củng cố
-              </span>
-            </button>
-          )}
           {/* Stats: Streak & Stars */}
           <div
             style={{
@@ -1144,8 +1105,23 @@ export default function TutorHubPage() {
           <div style={{ display: "flex", gap: 9, margin: "22px 0 18px", alignItems: "center" }}>
             {!needsDiagnostic ? (
               <>
-                <div onClick={() => setActiveTab("graph")} style={activeTab === "graph" ? tabOn : tabOff}>
-                  <Network size={15} /> Sơ đồ năng lực
+                <div onClick={() => setActiveTab("roadmap")} style={activeTab === "roadmap" ? tabOn : tabOff}>
+                  <span style={{ fontSize: 15 }}>🗺️</span> Lộ trình ôn tập
+                  {reviewItems.length > 0 && (
+                    <span
+                      style={{
+                        background: activeTab === "roadmap" ? "rgba(255,255,255,.22)" : "#ffe1c4",
+                        color: activeTab === "roadmap" ? "#fff" : "#c2560f",
+                        fontSize: 11,
+                        padding: "1px 8px",
+                        borderRadius: 999,
+                        fontFamily: "'Inter', sans-serif",
+                        marginLeft: 4,
+                      }}
+                    >
+                      {reviewItems.length}
+                    </span>
+                  )}
                 </div>
                 <div onClick={() => {
                   setActiveTab("review");
@@ -1176,60 +1152,97 @@ export default function TutorHubPage() {
             </div>
           </div>
 
-          {/* ===== GRAPH (KNOWLEDGE TREE) PANEL ===== */}
-          {activeTab === "graph" && (
-            <div className="ah-panel" style={{ height: 600, position: "relative", border: "1px solid #eef1f4", borderRadius: 22, overflow: "hidden", background: "#fff", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
-              {nodes.length > 0 ? (
-                <KnowledgeTree
-                  subject={subject}
-                  nodes={nodes}
-                  edges={edges.map(e => ({ ...e, subject }))}
-                  masteryByTopic={mastery.topics as any}
-                  mode="student"
-                  studentNodeStatus={(() => {
-                    const statusMap: Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial"> = {};
-                    roadmap.forEach((st) => {
-                      if (st.status === "done") {
-                        statusMap[st.id] = "mastered";
-                      } else if (st.status === "current") {
-                        statusMap[st.id] = "learning";
-                      } else {
-                        statusMap[st.id] = "locked";
-                      }
-                    });
-                    if (studentState?.initialLevelNodeId) {
-                      statusMap[studentState.initialLevelNodeId] = "initial";
-                    }
-                    return statusMap;
-                  })()}
-                  initialNodeId={studentState?.initialLevelNodeId}
-                  currentNodeId={studentState?.currentLevelNodeId || currentStepId}
-                  focusedNodeId={currentStepId}
-                  onFocusedNodeChange={(id) => {
-                    const step = roadmap.find((st) => st.id === id);
-                    if (step) {
-                      setCurrentStepId(id);
-                      resetChat(step.name);
-                      loadQuestions(id);
-                    }
-                  }}
-                  onShowContentClick={(node: any) => {
-                    const step = roadmap.find((st) => st.id === node.id);
-                    if (step) {
-                      selectStep(step);
-                    }
-                  }}
-                  onNodeClick={(node: any) => {
-                    const step = roadmap.find((st) => st.id === node.id);
-                    if (step) {
-                      selectStep(step);
-                    }
-                  }}
-                  onRefresh={() => loadAll()}
-                />
+          {/* ===== LỘ TRÌNH ÔN TẬP (ROADMAP game-hoá) PANEL ===== */}
+          {activeTab === "roadmap" && (
+            <div className="ah-panel" style={{ border: "1px solid #eef1f4", borderRadius: 22, background: "linear-gradient(180deg,#fff7ef 0%,#fff 120px)", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", padding: "26px 22px 32px" }}>
+              <div style={{ textAlign: "center", marginBottom: 22 }}>
+                <div style={{ ...BALOO, fontWeight: 800, fontSize: 22, color: "#c2560f" }}>🗺️ Lộ trình ôn tập của em</div>
+                <div style={{ fontSize: 13, color: "#5b6072", fontWeight: 600, marginTop: 4 }}>
+                  Ôn từ gốc lên — chinh phục từng chặng, xong mới lên chặng sau 💪
+                </div>
+              </div>
+
+              {reviewItems.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 0", color: "#0FB9A6" }}>
+                  <div style={{ fontSize: 44, marginBottom: 8 }}>🎉</div>
+                  <div style={{ ...POPPINS, fontWeight: 800, fontSize: 17, color: "#16161F" }}>Tuyệt vời! Chưa có chặng nào cần ôn lại.</div>
+                  <div style={{ fontSize: 13, color: "#9aa1b0", fontWeight: 600, marginTop: 4 }}>Gốc của em đang rất vững — cứ tiến lên bài mới nhé!</div>
+                </div>
               ) : (
-                <div style={{ padding: 40, textAlign: "center", color: "#9aa1b0" }}>
-                  Đang tải sơ đồ học tập...
+                <div style={{ maxWidth: 640, margin: "0 auto" }}>
+                  {reviewItems.map((it, idx) => {
+                    const barColor = it.masteryPct >= 70 ? "#0FB9A6" : it.masteryPct >= 40 ? "#e0912a" : "#e05a7a";
+                    const isStart = it.isStart ?? idx === 0;
+                    return (
+                      <div key={it.nodeId} style={{ display: "flex", gap: 14 }}>
+                        {/* Cột chặng + đường nối */}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                          <div
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: "50%",
+                              background: isStart ? "linear-gradient(135deg,#ff9d4d,#c2560f)" : "#fff",
+                              border: isStart ? "none" : `3px solid ${barColor}`,
+                              color: isStart ? "#fff" : barColor,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 800,
+                              fontSize: 16,
+                              boxShadow: isStart ? "0 6px 14px -4px rgba(194,86,15,.5)" : "0 2px 6px -2px rgba(0,0,0,.15)",
+                              zIndex: 1,
+                            }}
+                          >
+                            {it.order ?? idx + 1}
+                          </div>
+                          <div style={{ width: 3, flex: 1, minHeight: 26, background: "repeating-linear-gradient(180deg,#ffd9b8 0 6px,transparent 6px 12px)", margin: "2px 0" }} />
+                        </div>
+
+                        {/* Thẻ chặng */}
+                        <div
+                          onClick={() => goToReviewNode(it.nodeId, it.name)}
+                          style={{
+                            flex: 1,
+                            marginBottom: 6,
+                            border: isStart ? "2px solid #ffb877" : "1px solid #eef1f4",
+                            borderRadius: 16,
+                            padding: 15,
+                            cursor: "pointer",
+                            background: isStart ? "linear-gradient(135deg,#fff7ef,#fff)" : "#fff",
+                            boxShadow: "0 6px 16px -12px rgba(0,0,0,.2)",
+                            transition: "transform .12s",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 15, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</div>
+                                {isStart && <span style={{ flexShrink: 0, background: "#c2560f", color: "#fff", borderRadius: 6, padding: "2px 7px", fontSize: 9.5, fontWeight: 800 }}>Bắt đầu từ đây</span>}
+                              </div>
+                              <div style={{ fontSize: 11.5, color: "#9aa1b0", fontWeight: 600, marginTop: 1 }}>{it.topicGroup}</div>
+                            </div>
+                            <span style={{ ...POPPINS, fontWeight: 800, fontSize: 16, color: barColor, flexShrink: 0 }}>{it.masteryPct}%</span>
+                          </div>
+                          <div style={{ height: 7, background: "#eef1f4", borderRadius: 7, marginBottom: 10 }}>
+                            <div style={{ height: 7, background: barColor, borderRadius: 7, width: `${it.masteryPct}%`, transition: "width .4s" }} />
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                            <span style={{ fontSize: 11.5, fontWeight: 700, color: "#c2560f", background: "#fff1e5", border: "1px solid #ffdcc0", borderRadius: 8, padding: "3px 9px" }}>{it.reason}</span>
+                            <span style={{ ...POPPINS, fontWeight: 800, fontSize: 13, color: "#fff", background: "linear-gradient(135deg,#8B5CF6,#7C46E8)", borderRadius: 10, padding: "6px 14px", flexShrink: 0 }}>Ôn ngay →</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Đích */}
+                  <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                    <div style={{ width: 40, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, boxShadow: "0 6px 14px -4px rgba(15,185,166,.5)" }}>🏁</div>
+                    </div>
+                    <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#0FB9A6" }}>Đích — vững gốc, sẵn sàng đi tiếp!</div>
+                  </div>
                 </div>
               )}
             </div>
@@ -2832,129 +2845,7 @@ export default function TutorHubPage() {
         </div>
       )}
 
-      {/* ============ MODAL LỘ TRÌNH ÔN TẬP ============ */}
-      {showReview && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 60,
-            background: "rgba(15,23,42,.5)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            animation: "fadeIn .2s ease-out",
-          }}
-          onClick={() => setShowReview(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "min(560px, 96vw)",
-              maxHeight: "88vh",
-              background: "#fff",
-              borderRadius: 22,
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 30px 60px -20px rgba(0,0,0,.4)",
-            }}
-          >
-            <div style={{ padding: "18px 22px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ ...BALOO, fontWeight: 800, fontSize: 19, color: "#c2560f" }}>🔄 Lộ trình Ôn tập</div>
-                <div style={{ fontSize: 12.5, color: "#5b6072", fontWeight: 600, marginTop: 2 }}>
-                  Ôn theo thứ tự từ gốc lên — bắt đầu ở bước 1, xong mới lên bước sau
-                </div>
-              </div>
-              <button
-                onClick={() => setShowReview(false)}
-                style={{ background: "#f1f5f9", border: "none", borderRadius: 12, width: 34, height: 34, cursor: "pointer", fontWeight: 800, color: "#64748b", flexShrink: 0 }}
-              >
-                ✕
-              </button>
-            </div>
-            <div style={{ padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-              {reviewItems.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: "#9aa1b0", fontWeight: 700 }}>
-                  🎉 Tuyệt vời! Hiện chưa có chủ đề nào cần ôn lại.
-                </div>
-              ) : (
-                reviewItems.map((it, idx) => {
-                  const barColor = it.masteryPct >= 70 ? "#0FB9A6" : it.masteryPct >= 40 ? "#e0912a" : "#e05a7a";
-                  return (
-                    <div
-                      key={it.nodeId}
-                      onClick={() => goToReviewNode(it.nodeId, it.name)}
-                      style={{
-                        border: "1px solid #eef1f4",
-                        borderRadius: 15,
-                        padding: 14,
-                        cursor: "pointer",
-                        transition: "all .15s",
-                        background: idx === 0 ? "linear-gradient(135deg,#fff7ef,#fff)" : "#fff",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                        <span
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 8,
-                            background: idx === 0 ? "#c2560f" : "#eef1f4",
-                            color: idx === 0 ? "#fff" : "#5b6072",
-                            fontWeight: 800,
-                            fontSize: 12,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {idx + 1}
-                        </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {it.name}
-                            </div>
-                            {(it.isStart ?? idx === 0) && (
-                              <span style={{ flexShrink: 0, background: "#c2560f", color: "#fff", borderRadius: 6, padding: "1px 6px", fontSize: 9, fontWeight: 800 }}>Bắt đầu từ đây</span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600 }}>{it.topicGroup}</div>
-                        </div>
-                        <span style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: barColor, flexShrink: 0 }}>{it.masteryPct}%</span>
-                      </div>
-                      <div style={{ height: 6, background: "#eef1f4", borderRadius: 6, marginBottom: 8 }}>
-                        <div style={{ height: 6, background: barColor, borderRadius: 6, width: `${it.masteryPct}%` }} />
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: "#c2560f",
-                            background: "#fff1e5",
-                            border: "1px solid #ffdcc0",
-                            borderRadius: 8,
-                            padding: "3px 8px",
-                          }}
-                        >
-                          {it.reason}
-                        </span>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: "#7C46E8" }}>Ôn ngay →</span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Lộ trình ôn tập giờ là một tab (activeTab === "roadmap"), không còn dùng modal. */}
 
       {/* ============ MODAL TRUY VẾT GỐC RỄ ============ */}
       {traceModal && (
