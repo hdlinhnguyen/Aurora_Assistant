@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -232,6 +233,11 @@ TIÊU CHÍ (mỗi tiêu chí 0-100):
 - score_essence (Đúng bản chất): nội dung đúng kiến thức, nêu được VÌ SAO chứ không chỉ CÁCH LÀM; phát hiện học vẹt (lặp công thức máy móc, thiếu giải thích) thì chấm thấp.
 - clarity_score: điểm tổng hợp 0-100 (thiên về score_essence).
 
+RÀNG BUỘC NGỮ CẢNH:
+- Mọi nhận xét và câu hỏi phải chỉ nói về chủ đề '%s' và lý thuyết chuẩn ở trên.
+- Tuyệt đối không nhắc đến một bài học khác. Nếu lời giảng ngắn hoặc thiếu ý, hãy hỏi thêm về chính chủ đề này.
+- Điểm clarity_score phải nhất quán với ba điểm thành phần và ưu tiên score_essence.
+
 %s
 
 Trả về DUY NHẤT JSON thô, không markdown:
@@ -243,7 +249,7 @@ Trả về DUY NHẤT JSON thô, không markdown:
   "vague_spots": ["<tối đa 3 chỗ em bé vẫn chưa hiểu, viết giọng nhẹ nhàng cho học sinh>"],
   "follow_up_questions": ["<tối đa 3 câu hỏi ngây thơ của em bé để học sinh giảng tiếp>"],
   "safety_flag": "<'' | 'jailbreak' | 'inappropriate' | 'distress' theo Quy tắc an toàn>"
-}`, topic, theoryBlock, safetyRules)
+}`, topic, theoryBlock, topic, safetyRules)
 
 	reqBody := map[string]interface{}{
 		"messages": []map[string]string{
@@ -282,6 +288,12 @@ Trả về DUY NHẤT JSON thô, không markdown:
 	grade.ScoreClear = clamp(grade.ScoreClear)
 	grade.ScoreExample = clamp(grade.ScoreExample)
 	grade.ScoreEssence = clamp(grade.ScoreEssence)
+	// Giữ điểm tổng nhất quán và đặt trọng tâm vào mức hiểu bản chất.
+	grade.ClarityScore = clamp(int(math.Round(
+		float64(grade.ScoreClear)*0.25 +
+			float64(grade.ScoreExample)*0.20 +
+			float64(grade.ScoreEssence)*0.55,
+	)))
 	return &grade, nil
 }
 
@@ -512,7 +524,7 @@ func (s *aiService) sendRequestWithFallback(reqBodyMap map[string]interface{}) (
 	if apiBase == "" {
 		apiBase = "https://generativelanguage.googleapis.com/v1beta/openai"
 	}
-	
+
 	// 1. Get and split API keys (supports comma separated rotation list)
 	rawKeys := os.Getenv("OPENAI_API_KEY")
 	var apiKeys []string
@@ -524,7 +536,7 @@ func (s *aiService) sendRequestWithFallback(reqBodyMap map[string]interface{}) (
 			}
 		}
 	}
-	
+
 	if len(apiKeys) == 0 {
 		return "", errors.New("API key not configured")
 	}
@@ -563,7 +575,7 @@ func (s *aiService) sendRequestWithFallback(reqBodyMap map[string]interface{}) (
 	for _, modelName := range uniqueModels {
 		for _, key := range apiKeys {
 			reqBodyMap["model"] = modelName
-			
+
 			jsonValue, err := json.Marshal(reqBodyMap)
 			if err != nil {
 				return "", err
@@ -586,7 +598,7 @@ func (s *aiService) sendRequestWithFallback(reqBodyMap map[string]interface{}) (
 				fmt.Printf("[AI ROUTER WARNING] Gọi thất bại (%s): %v. Thử phương án dự phòng tiếp theo...\n", modelName, err)
 				continue
 			}
-			
+
 			bodyBytes, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
 
@@ -635,4 +647,3 @@ func Min(a, b int) int {
 	}
 	return b
 }
-

@@ -10,7 +10,16 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
-import { BookOpen, PenTool, ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  CircleHelp,
+  LoaderCircle,
+  MessageCircle,
+  Mic,
+  PenTool,
+  Search,
+} from "lucide-react";
 import {
   buildRoadmap,
   getLearningPathLive,
@@ -48,17 +57,17 @@ interface TierInfo {
 
 const TIERS: Record<Tier, TierInfo> = {
   high: {
-    label: "Thấu hiểu bản chất! 🌟",
+    label: "Thấu hiểu bản chất",
     color: "#0FB9A6",
     chip: "#F0FCF8",
     chipBd: "#b8ede0",
     chipTx: "#0d7a6c",
     msg: "Tuyệt vời! Em giảng rõ ràng, có ví dụ và đúng bản chất — đây là dấu hiệu em đã HIỂU THẬT chứ không học vẹt.",
     mood: "happy",
-    line: "A! Con hiểu rồi! Em giảng hay quá, cảm ơn nha! 🎉",
+    line: "A! Con hiểu rồi! Em giảng hay quá, cảm ơn nha!",
   },
   mid: {
-    label: "Hiểu khá 👍",
+    label: "Hiểu khá",
     color: "#e0912a",
     chip: "#fff8ec",
     chipBd: "#ffe6bd",
@@ -68,7 +77,7 @@ const TIERS: Record<Tier, TierInfo> = {
     line: "Ừm... con hiểu kha khá rồi, nhưng còn thắc mắc chỗ này...",
   },
   low: {
-    label: "Cần hiểu thêm 🤔",
+    label: "Cần hiểu thêm",
     color: "#e05a7a",
     chip: "#fef3f5",
     chipBd: "#f8d3da",
@@ -87,33 +96,42 @@ interface Analysis {
   tier: Tier;
 }
 
-/** Heuristic chấm Clarity theo thiết kế (chủ đề Phân số); thay bằng LLM khi thật hoá. */
-function analyze(text: string): Analysis {
+/** Fallback bảo thủ, chỉ dùng cấu trúc lời giảng và chủ đề hiện tại. */
+function analyze(text: string, topicName: string): Analysis {
   const low = text.toLowerCase();
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const kws = ["quy đồng", "mẫu số", "cùng", "tử", "bằng nhau", "phần", "chung"];
-  const kwHits = kws.filter((k) => low.includes(k)).length;
-  const hasExample = /\d/.test(text) || low.includes("ví dụ");
-  const hasCommonDenom = low.includes("mẫu số chung") || low.includes("quy đồng");
+  const topicLabel = topicName.trim() || "chủ đề này";
+  const topicWords = topicLabel
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 3 && !["các", "trên", "trong", "phép"].includes(word));
+  const topicHits = topicWords.filter((word) => low.includes(word)).length;
+  const topicCoverage = topicWords.length > 0 ? topicHits / topicWords.length : 0;
+  const hasExample = /\b(ví dụ|chẳng hạn|như|gồm)\b/i.test(text) || /\d/.test(text);
+  const explainsWhy = /\b(vì|bởi|do đó|nghĩa là|để)\b/i.test(text);
 
-  let score = 8 + Math.min(30, words * 1.4) + Math.min(40, kwHits * 9) + (hasExample ? 20 : 0);
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  const clear = Math.min(82, Math.round(25 + Math.min(45, words * 1.5)));
+  const example = hasExample ? Math.min(78, Math.round(45 + words * 0.6)) : 15;
+  const essence = Math.min(78, Math.round(topicCoverage * 45 + (explainsWhy ? 25 : 0) + (words >= 35 ? 8 : 0)));
+  const score = Math.round(clear * 0.25 + example * 0.2 + essence * 0.55);
 
   const subBars: SubBar[] = [
-    { label: "Rõ ràng", val: Math.min(100, Math.round(35 + words * 2.2)) },
-    { label: "Có ví dụ", val: hasExample ? 92 : 22 },
-    { label: "Đúng bản chất", val: Math.min(100, kwHits * 20) },
+    { label: "Rõ ràng", val: clear },
+    { label: "Có ví dụ", val: example },
+    { label: "Đúng bản chất", val: essence },
   ].map((b) => ({ ...b, color: b.val >= 70 ? "#0FB9A6" : b.val >= 45 ? "#e0912a" : "#e05a7a" }));
 
   const vagueSpots: string[] = [];
-  if (!hasCommonDenom) vagueSpots.push("Chưa nói rõ làm sao đưa hai phân số về CÙNG một mẫu số (quy đồng).");
-  if (!hasExample) vagueSpots.push("Chưa có ví dụ bằng số cụ thể (ví dụ 1/2 + 1/3 = ?).");
+  if (topicCoverage < 0.5) vagueSpots.push(`Lời giảng chưa nêu rõ khái niệm cốt lõi của “${topicLabel}”.`);
+  if (!explainsWhy) vagueSpots.push(`Em mới mô tả cách làm, chưa giải thích vì sao “${topicLabel}” hoạt động như vậy.`);
+  if (!hasExample) vagueSpots.push(`Chưa có ví dụ cụ thể để minh hoạ “${topicLabel}”.`);
   if (words < 18) vagueSpots.push("Lời giảng hơi ngắn — thử giải thích kỹ hơn từng bước nhé.");
 
-  const followUps: string[] = [];
-  if (!hasCommonDenom) followUps.push("Tại sao phải làm cho hai mẫu số giống nhau rồi mới cộng ạ?");
-  if (!hasExample) followUps.push("Cho con một ví dụ với số thật để con dễ hình dung đi ạ?");
-  followUps.push("Sau khi quy đồng thì mình cộng tử số hay cộng cả mẫu số ạ?");
+  const followUps = [
+    `“${topicLabel}” là gì nếu nói bằng lời thật đơn giản ạ?`,
+    `Anh/chị cho con một ví dụ khác về “${topicLabel}” được không?`,
+    `Vì sao ví dụ đó đúng với “${topicLabel}” ạ?`,
+  ];
 
   const tier: Tier = score >= 75 ? "high" : score >= 45 ? "mid" : "low";
   return { score, subBars, vagueSpots, followUps: followUps.slice(0, 3), tier };
@@ -125,7 +143,6 @@ function FeynmanInner() {
   const params = useSearchParams();
   const char = useCharacter();
   const buddyName = char === "sheep" ? "bé Cừu" : "bé Nấm";
-  const buddyEmoji = char === "sheep" ? "🐑" : "🍄";
 
   const [topic, setTopic] = useState({
     id: params.get("node") ?? "",
@@ -210,7 +227,7 @@ function FeynmanInner() {
       };
     } catch {
       // Offline hoặc AI chưa cấu hình → heuristic local, Tập Vở vẫn dùng được
-      r = analyze(v);
+      r = analyze(v, topic.name);
     }
     setScoring(false);
     setResult(r);
@@ -237,7 +254,7 @@ function FeynmanInner() {
   const buddyMood: Mood = submitted ? tier.mood : "cheerful";
   const buddyLine = submitted
     ? tier.line
-    : `Con là ${buddyName} nè! Con chưa hiểu bài này lắm... anh/chị giảng lại cho con nghe với, nói thật đơn giản nha! ${buddyEmoji}`;
+    : `Con là ${buddyName} nè! Con chưa hiểu bài này lắm... anh/chị giảng lại cho con nghe với, nói thật đơn giản nha!`;
 
   return (
     <div
@@ -360,7 +377,7 @@ function FeynmanInner() {
               <textarea
                 ref={inputRef}
                 onInput={onType}
-                placeholder="Ví dụ: Muốn cộng 1/2 và 1/3, mình phải cắt hai cái bánh thành các miếng cùng cỡ (quy đồng mẫu số chung là 6). 1/2 thành 3/6, 1/3 thành 2/6, rồi cộng hai tử số: 3 + 2 = 5, được 5/6..."
+                placeholder={`Hãy giải thích “${topic.name || "bài đang học"}” bằng lời thật đơn giản: khái niệm là gì, cho một ví dụ cụ thể và nói vì sao ví dụ đó đúng.`}
                 style={{
                   width: "100%",
                   minHeight: 190,
@@ -394,7 +411,10 @@ function FeynmanInner() {
                   boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)",
                 }}
               >
-                {scoring ? `⏳ ${buddyName} đang lắng nghe...` : `🎤 Giảng cho ${buddyName} nghe`}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                  {scoring ? <LoaderCircle size={17} className="animate-spin" /> : <Mic size={17} />}
+                  {scoring ? `${buddyName} đang lắng nghe...` : `Giảng cho ${buddyName} nghe`}
+                </span>
               </div>
               {submitted && (
                 <div
@@ -483,7 +503,9 @@ function FeynmanInner() {
               {/* vague spots */}
               {result.vagueSpots.length > 0 && (
                 <div style={{ marginTop: 22 }}>
-                  <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13, marginBottom: 10 }}>🔍 Chỗ {buddyName} chưa hiểu</div>
+                  <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Search size={15} /> Chỗ {buddyName} chưa hiểu
+                  </div>
                   {result.vagueSpots.map((v) => (
                     <div
                       key={v}
@@ -498,7 +520,7 @@ function FeynmanInner() {
                         marginBottom: 8,
                       }}
                     >
-                      <span style={{ fontSize: 15 }}>❓</span>
+                      <CircleHelp size={16} style={{ color: "#e05a7a", flexShrink: 0 }} />
                       <span style={{ fontSize: 13, color: "#8a5a1e", lineHeight: 1.5 }}>{v}</span>
                     </div>
                   ))}
@@ -507,7 +529,9 @@ function FeynmanInner() {
 
               {/* follow-up */}
               <div style={{ marginTop: 20, background: "#faf7ff", border: "1px solid #ece5fb", borderRadius: 16, padding: 16 }}>
-                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13, color: "#5b2fc0", marginBottom: 8 }}>💬 {buddyName} hỏi lại</div>
+                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13, color: "#5b2fc0", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <MessageCircle size={15} /> {buddyName} hỏi lại
+                </div>
                 {result.followUps.map((q) => (
                   <div key={q} style={{ fontSize: 13.5, color: "#4b5060", lineHeight: 1.6, marginBottom: 6 }}>
                     • {q}

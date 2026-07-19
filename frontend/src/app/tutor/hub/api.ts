@@ -253,12 +253,12 @@ export interface FeynmanScoreResult {
   followUps: string[];
 }
 
-// Chấm Tập Vở Feynman bằng LLM; timeout ngắn để rơi về heuristic local khi offline.
+// Cho phép router thử key/model dự phòng khi nhà cung cấp tạm giới hạn tốc độ.
 export const scoreFeynman = (nodeId: string, explanation: string) =>
   apiFetch("/feynman/score", {
     method: "POST",
     body: JSON.stringify({ nodeId, explanation }),
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(35000),
   }) as Promise<FeynmanScoreResult>;
 
 export const getStudentState = (subject: string) =>

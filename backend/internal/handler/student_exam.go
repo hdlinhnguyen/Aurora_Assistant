@@ -82,11 +82,11 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 
 		var err error
 		if rootNode.ID != uuid.Nil {
-			err = h.db.Where("node_id = ?", rootNode.ID).Order("RANDOM()").First(&firstQ).Error
+			err = h.db.Where("node_id = ? AND question_type = ? AND options_json <> ''", rootNode.ID, "multiple_choice").Order("RANDOM()").First(&firstQ).Error
 		}
 		if err != nil || rootNode.ID == uuid.Nil {
 			err = h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
-				Where("nodes.subject = ?", subject).
+				Where("nodes.subject = ? AND questions.question_type = ? AND questions.options_json <> ''", subject, "multiple_choice").
 				Order("RANDOM()").First(&firstQ).Error
 		}
 
@@ -134,7 +134,7 @@ func (h *StudentExamHandler) GetStudentExams(c fiber.Ctx) error {
 	}
 
 	// 3. Kết hợp kết quả đề thi
-	var exams []model.Exam
+	exams := []model.Exam{}
 	if hasAdaptive {
 		exams = append(exams, studentAdaptiveExam)
 	}
@@ -431,6 +431,8 @@ type SubmitAdaptiveAnswerRequest struct {
 	SelectedChoiceID string `json:"selectedChoiceId"` // "0", "1", "2", "3"
 }
 
+
+
 func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 	userIDStr, ok := c.Locals("userID").(string)
 	if !ok {
@@ -600,9 +602,14 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 		})
 	}
 
-	// 6. Lựa chọn câu hỏi tiếp theo dựa trên Thuật toán CAT 3 chặng
+	// 6. Lựa chọn câu hỏi tiếp theo dựa trên Thuật toán CAT 3 chặng, loại bỏ câu hỏi trùng lặp
 	var nextQ model.Question
 	foundNext := false
+
+	var usedQuestionIDs []uuid.UUID
+	h.db.Model(&model.ExamQuestion{}).
+		Where("exam_id = ? AND source_question_id IS NOT NULL", examID).
+		Pluck("source_question_id", &usedQuestionIDs)
 
 	// CHẶNG 1: Routing (Khảo sát sơ bộ) - Từ câu 1 đến câu 7
 	if answeredCount < 7 {
@@ -623,8 +630,11 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 			targetDiff = "easy"
 		}
 
-		err = h.db.Where("node_id IN ? AND difficulty = ?", hubIDs, targetDiff).
-			Order("RANDOM()").First(&nextQ).Error
+		query := h.db.Where("node_id IN ? AND difficulty = ? AND question_type = ? AND options_json <> ''", hubIDs, targetDiff, "multiple_choice")
+		if len(usedQuestionIDs) > 0 {
+			query = query.Where("id NOT IN ?", usedQuestionIDs)
+		}
+		err = query.Order("RANDOM()").First(&nextQ).Error
 		if err == nil {
 			foundNext = true
 		}
@@ -633,7 +643,7 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 	// CHẶNG 2: Drilling & Backtracking (Đào sâu & Truy vết ngược) - Từ câu 8 đến 17
 	if !foundNext && answeredCount >= 7 && answeredCount < 18 {
 		var wrongLogs []model.ActivityLog
-		h.db.Where("student_id = ? AND subject = ? AND action = ?", userID, exam.Subject, "answer_incorrect").
+		h.db.Where("student_id = ? AND subject = ? AND action = ? AND created_at >= ?", userID, exam.Subject, "answer_incorrect", exam.CreatedAt).
 			Order("created_at desc").Limit(3).Find(&wrongLogs)
 
 		if len(wrongLogs) > 0 {
@@ -654,7 +664,11 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 				for idx, pn := range parentNodes {
 					parentIDs[idx] = pn.ID
 				}
-				err = h.db.Where("node_id IN ?", parentIDs).Order("RANDOM()").First(&nextQ).Error
+				query := h.db.Where("node_id IN ? AND question_type = ? AND options_json <> ''", parentIDs, "multiple_choice")
+				if len(usedQuestionIDs) > 0 {
+					query = query.Where("id NOT IN ?", usedQuestionIDs)
+				}
+				err = query.Order("RANDOM()").First(&nextQ).Error
 				if err == nil {
 					foundNext = true
 				}
@@ -664,18 +678,24 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 
 	// CHẶNG 3: Cross-Verification (Xác thực chéo) - Từ câu 18 đến 24
 	if !foundNext {
-		err = h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
-			Where("nodes.subject = ? AND questions.difficulty IN ?", exam.Subject, []string{"easy", "medium"}).
-			Order("RANDOM()").First(&nextQ).Error
+		query := h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
+			Where("nodes.subject = ? AND questions.difficulty IN ? AND questions.question_type = ? AND questions.options_json <> ''", exam.Subject, []string{"easy", "medium"}, "multiple_choice")
+		if len(usedQuestionIDs) > 0 {
+			query = query.Where("questions.id NOT IN ?", usedQuestionIDs)
+		}
+		err = query.Order("RANDOM()").First(&nextQ).Error
 		if err == nil {
 			foundNext = true
 		}
 	}
 
 	if !foundNext {
-		err = h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
-			Where("nodes.subject = ?", exam.Subject).
-			Order("RANDOM()").First(&nextQ).Error
+		query := h.db.Joins("JOIN nodes ON nodes.id = questions.node_id").
+			Where("nodes.subject = ? AND questions.question_type = ? AND questions.options_json <> ''", exam.Subject, "multiple_choice")
+		if len(usedQuestionIDs) > 0 {
+			query = query.Where("questions.id NOT IN ?", usedQuestionIDs)
+		}
+		err = query.Order("RANDOM()").First(&nextQ).Error
 		if err == nil {
 			foundNext = true
 		}

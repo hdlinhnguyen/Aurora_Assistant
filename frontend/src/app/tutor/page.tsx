@@ -251,7 +251,7 @@ export default function TutorHubPage() {
       setRoadmap(rm);
       setSummary(summaryRes);
       setStudentState(stateRes);
-      setExamsList(examsRes);
+      setExamsList(examsRes || []);
       const isDiag = stateRes === null || stateRes?.needsDiagnostic;
       if (isDiag && localStorage.getItem("aurora_tour_demo_session") !== "true") {
         setActiveTab("exams");
@@ -2818,14 +2818,14 @@ export default function TutorHubPage() {
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 16, textAlign: "left" }}>
-                {/* Cách 1: Đề thi được giao sẵn */}
+                {/* Đề chẩn đoán được hệ thống tự sinh từ ngân hàng câu hỏi */}
                 {examsList.length > 0 ? (
                   <div>
                     <div style={{ ...POPPINS, fontSize: 11, fontWeight: 800, color: "#7C46E8", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>
-                      Đề thi được giao cho em
+                      Đề chẩn đoán hệ thống đã tạo
                     </div>
                     <div style={{ fontSize: 12, color: "#5b6072", marginBottom: 10, lineHeight: 1.5 }}>
-                      Em chỉ cần hoàn thành <b>1 đề bất kỳ</b> trong danh sách dưới đây để mở khóa lộ trình học nhé!
+                      Câu hỏi được tự chọn từ ngân hàng theo kiến thức, độ khó và câu trả lời trước đó của em.
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "min(320px, 32dvh)", overflowY: "auto", paddingRight: 4 }}>
                       {examsList.map((ex) => (
@@ -2860,7 +2860,7 @@ export default function TutorHubPage() {
                   </div>
                 ) : (
                   <div style={{ textAlign: "center", padding: "16px 10px", fontSize: 12.5, color: "#9aa1b0", fontWeight: 600, border: "1px dashed #eef1f4", borderRadius: 16, background: "#fcfdfe", fontStyle: "italic", marginBottom: 6 }}>
-                    Chưa có đề thi được giao sẵn cho lớp của em.
+                    Ngân hàng chưa có câu hỏi khớp với cây kiến thức của môn học này.
                   </div>
                 )}
 
