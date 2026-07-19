@@ -195,12 +195,55 @@ export default function GuidedTour() {
     };
   }, [updateTargetRect]);
 
+  const clearDemoTourSession = () => {
+    localStorage.removeItem("aurora_token");
+    localStorage.removeItem("aurora_user");
+    localStorage.removeItem("aurora_tour_active");
+    localStorage.removeItem("aurora_tour_step");
+    localStorage.removeItem("aurora_tour_mode");
+    localStorage.removeItem("aurora_tour_demo_session");
+    localStorage.removeItem("aurora_tour_completed");
+  };
+
+  const completeTour = () => {
+    setIsActive(false);
+
+    if (localStorage.getItem("aurora_tour_demo_session") === "true") {
+      clearDemoTourSession();
+      router.replace("/");
+      return;
+    }
+
+    localStorage.removeItem("aurora_tour_active");
+    localStorage.setItem("aurora_tour_completed", "true");
+    window.location.reload();
+  };
+
+  const requestExitTour = () => {
+    if (localStorage.getItem("aurora_tour_demo_session") === "true") {
+      const confirmed = window.confirm(
+        "Hướng dẫn chưa hoàn tất. Nếu thoát, phiên demo sẽ kết thúc và bạn sẽ được đăng xuất.",
+      );
+      if (!confirmed) return;
+
+      setIsActive(false);
+      clearDemoTourSession();
+      router.replace("/");
+      return;
+    }
+
+    setIsActive(false);
+    localStorage.removeItem("aurora_tour_active");
+    localStorage.setItem("aurora_tour_completed", "true");
+    window.location.reload();
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isActive) return;
       if (e.key === "Escape") {
-        closeTour();
+        requestExitTour();
       } else if (e.key === "ArrowRight") {
         nextStep();
       } else if (e.key === "ArrowLeft") {
@@ -210,15 +253,6 @@ export default function GuidedTour() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isActive, stepIndex, activeSteps]);
-
-  const closeTour = () => {
-    setIsActive(false);
-    localStorage.removeItem("aurora_tour_active");
-    localStorage.setItem("aurora_tour_completed", "true");
-    if (typeof window !== "undefined") {
-      window.location.reload();
-    }
-  };
 
   const goToStep = async (index: number) => {
     if (index < 0 || index >= activeSteps.length) return;
@@ -287,7 +321,7 @@ export default function GuidedTour() {
     if (stepIndex < activeSteps.length - 1) {
       goToStep(stepIndex + 1);
     } else {
-      closeTour();
+      completeTour();
     }
   };
 
@@ -373,7 +407,7 @@ export default function GuidedTour() {
       {/* Dimmed Background Overlay */}
       <div
         className="fixed inset-0 bg-black/25 backdrop-blur-[0.5px] transition-all duration-300 pointer-events-auto"
-        onClick={closeTour}
+        onClick={requestExitTour}
       />
 
       {/* Spotlight highlight box around target element */}
@@ -412,7 +446,7 @@ export default function GuidedTour() {
               </h3>
             </div>
             <button
-              onClick={closeTour}
+              onClick={requestExitTour}
               title="Thoát Tour (Esc)"
               className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >

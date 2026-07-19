@@ -39,6 +39,7 @@ import {
 } from "./hub/api";
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 import KnowledgeTree from "@/app/components/KnowledgeTree";
+import GuidedTour from "@/app/components/GuidedTour";
 import { computeTracePath } from "@/lib/rootCauseTrace";
 import { SafeHtml } from "@/components/ui/safe-html";
 
@@ -2684,6 +2685,7 @@ export default function TutorHubPage() {
           </div>
         </div>
       )}
+      <GuidedTour />
     </div>
   );
 }

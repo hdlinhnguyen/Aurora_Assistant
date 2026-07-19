@@ -10,6 +10,8 @@ const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 
 export default function LandingPage() {
   const router = useRouter();
+  const [tourLoading, setTourLoading] = useState(false);
+  const [tourError, setTourError] = useState("");
   
   // Lottie animation state
   const [animationData, setAnimationData] = useState<any>(null);
@@ -20,6 +22,37 @@ export default function LandingPage() {
       .then((data) => setAnimationData(data))
       .catch((err) => console.error("Error loading animation:", err));
   }, []);
+
+  const startStudentDemoTour = async () => {
+    setTourLoading(true);
+    setTourError("");
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "student@aurora.edu.vn", password: "demo123" }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Không thể mở tài khoản học sinh demo. Vui lòng thử lại.");
+      }
+
+      const data = await res.json();
+      localStorage.setItem("aurora_token", data.token);
+      localStorage.setItem("aurora_user", JSON.stringify(data.user));
+      localStorage.setItem("aurora_tour_demo_session", "true");
+      localStorage.setItem("aurora_tour_active", "true");
+      localStorage.setItem("aurora_tour_mode", "student");
+      localStorage.setItem("aurora_tour_step", "1");
+      localStorage.removeItem("aurora_tour_completed");
+      router.push("/tutor");
+    } catch (error) {
+      setTourError(error instanceof Error ? error.message : "Không thể bắt đầu tour học sinh demo.");
+    } finally {
+      setTourLoading(false);
+    }
+  };
 
   // Interactive mock chat state to showcase Socratic learning
   const [mockStep, setMockStep] = useState(0);
@@ -105,28 +138,18 @@ export default function LandingPage() {
               </svg>
             </button>
             <button
-              onClick={async () => {
-                try {
-                  const res = await fetch(`${API_BASE_URL}/auth/login`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email: "student@aurora.edu.vn", password: "demo123" }),
-                  });
-                  if (res.ok) {
-                    const data = await res.json();
-                    localStorage.setItem("aurora_token", data.token);
-                    localStorage.setItem("aurora_user", JSON.stringify(data.user));
-                  }
-                } catch (e) {}
-                localStorage.setItem("aurora_tour_active", "true");
-                localStorage.setItem("aurora_tour_step", "0");
-                router.push("/tutor");
-              }}
+              onClick={startStudentDemoTour}
+              disabled={tourLoading}
               className="bg-gradient-to-r from-[var(--purple)] to-indigo-600 hover:brightness-110 text-white px-8 py-4 rounded-full font-bold shadow-md transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
             >
-              <span>🚀 Tour Hướng Dẫn (2 phút)</span>
+              <span>{tourLoading ? "Đang mở tài khoản demo..." : "🚀 Tour Hướng Dẫn (2 phút)"}</span>
             </button>
           </div>
+          {tourError && (
+            <p className="mt-3 text-sm font-semibold text-rose-600" role="alert">
+              {tourError}
+            </p>
+          )}
         </div>
 
         {/* Right Column: Lottie Animation */}
