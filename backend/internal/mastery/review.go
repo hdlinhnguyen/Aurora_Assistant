@@ -21,6 +21,8 @@ type ReviewItem struct {
 	Reason        string  `json:"reason"`
 	Priority      float64 `json:"priority"`
 	DaysSince     int     `json:"daysSince"` // số ngày kể từ lần luyện gần nhất (-1 nếu chưa rõ)
+	Order         int     `json:"order"`     // thứ tự trong lộ trình ôn (1 = ôn trước nhất)
+	IsStart       bool    `json:"isStart"`   // true = điểm bắt đầu (nền tảng nhất)
 }
 
 // BuildReviewPath sinh LỘ TRÌNH ÔN TẬP dựa trên hồ sơ BKT: chọn các chủ đề đã có
@@ -55,8 +57,35 @@ func (s *Service) BuildReviewPath(ctx context.Context, studentID uuid.UUID, subj
 
 	// children[source] = các nút phụ thuộc vào source (cạnh tiên quyết -> phụ thuộc).
 	children := make(map[uuid.UUID][]uuid.UUID, len(edges))
+	// parents[target] = các nút tiên quyết của target.
+	parents := make(map[uuid.UUID][]uuid.UUID, len(edges))
 	for _, e := range edges {
 		children[e.SourceID] = append(children[e.SourceID], e.TargetID)
+		parents[e.TargetID] = append(parents[e.TargetID], e.SourceID)
+	}
+
+	// depth = độ sâu tiên quyết (chuỗi dài nhất từ gốc). Càng nhỏ càng nền tảng →
+	// dùng để xếp lộ trình ôn "từ gốc lên". Memo hoá, chặn chu trình bằng cờ visiting.
+	depthMemo := make(map[uuid.UUID]int, len(nodes))
+	visiting := make(map[uuid.UUID]bool)
+	var depthOf func(uuid.UUID) int
+	depthOf = func(n uuid.UUID) int {
+		if d, ok := depthMemo[n]; ok {
+			return d
+		}
+		if visiting[n] {
+			return 0 // gặp chu trình (không mong muốn) → coi như gốc
+		}
+		visiting[n] = true
+		best := 0
+		for _, p := range parents[n] {
+			if d := depthOf(p) + 1; d > best {
+				best = d
+			}
+		}
+		visiting[n] = false
+		depthMemo[n] = best
+		return best
 	}
 	// downstreamCount: số hậu duệ (chủ đề bị chặn nếu nút này yếu) qua BFS.
 	downstreamCount := func(root uuid.UUID) int {
@@ -161,6 +190,7 @@ func (s *Service) BuildReviewPath(ctx context.Context, studentID uuid.UUID, subj
 		})
 	}
 
+	// 1. CHỌN các chủ đề quan trọng nhất theo độ ưu tiên (mức độ cần ôn).
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].Priority != items[j].Priority {
 			return items[i].Priority > items[j].Priority
@@ -169,6 +199,22 @@ func (s *Service) BuildReviewPath(ctx context.Context, studentID uuid.UUID, subj
 	})
 	if limit > 0 && len(items) > limit {
 		items = items[:limit]
+	}
+
+	// 2. XẾP LẠI thành LỘ TRÌNH theo thứ tự tiên quyết: nút nền tảng (depth nhỏ) ôn
+	//    trước → học sinh biết "bắt đầu từ đâu"; cùng độ sâu thì ưu tiên cái cần hơn.
+	sort.SliceStable(items, func(i, j int) bool {
+		di, _ := uuid.Parse(items[i].NodeID)
+		dj, _ := uuid.Parse(items[j].NodeID)
+		depthI, depthJ := depthOf(di), depthOf(dj)
+		if depthI != depthJ {
+			return depthI < depthJ
+		}
+		return items[i].Priority > items[j].Priority
+	})
+	for i := range items {
+		items[i].Order = i + 1
+		items[i].IsStart = i == 0
 	}
 	return items, nil
 }

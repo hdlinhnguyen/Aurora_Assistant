@@ -59,7 +59,7 @@ export default function StudentMasteryProfile({
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
-  const [reviewItems, setReviewItems] = useState<Array<{ nodeId: string; name: string; topicGroup: string; masteryPct: number; reason: string }>>([]);
+  const [reviewItems, setReviewItems] = useState<Array<{ nodeId: string; name: string; topicGroup: string; masteryPct: number; reason: string; order?: number; isStart?: boolean }>>([]);
 
   // "Điểm cần chú ý": struggle nodes first, then learning nodes
   const attentionItems = useMemo(() => {
@@ -202,34 +202,43 @@ export default function StudentMasteryProfile({
           <div className="bg-card border border-orange-200 rounded-3xl p-4.5 shadow-sm shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-[15px]">🔄</span>
-              <div className="font-[var(--font-display)] font-extrabold text-[15px] text-foreground">Đề xuất ôn tập</div>
+              <div className="font-[var(--font-display)] font-extrabold text-[15px] text-foreground">Lộ trình ôn tập</div>
             </div>
-            <div className="text-[11px] font-semibold text-slate-400 mt-1">Xếp theo độ ưu tiên BKT — bấm để phóng vào cây</div>
-            <div className="flex flex-col gap-2 mt-3.5">
-              {reviewItems.slice(0, 5).map((it, idx) => {
+            <div className="text-[11px] font-semibold text-slate-400 mt-1">Ôn theo thứ tự từ gốc lên — bắt đầu ở bước 1, bấm để phóng vào cây</div>
+            <div className="flex flex-col mt-3.5">
+              {reviewItems.slice(0, 5).map((it, idx, arr) => {
                 const active = focusedNodeId === it.nodeId;
                 const bar = it.masteryPct >= 70 ? "bg-emerald-500" : it.masteryPct >= 40 ? "bg-orange-500" : "bg-rose-500";
+                const isStart = it.isStart ?? idx === 0;
                 return (
-                  <div
-                    key={it.nodeId}
-                    onClick={() => {
-                      const node = nodes.find((n) => n.id === it.nodeId);
-                      setFocusedNodeId(it.nodeId);
-                      if (node) setSelectedNode(node as TreeNode);
-                      setSideView("mastery");
-                    }}
-                    className={`cursor-pointer p-3 rounded-2xl border transition-colors ${active ? "bg-orange-50 border-orange-200" : "bg-slate-50/70 border-border hover:bg-orange-50/60"}`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className={`h-5 w-5 rounded-lg shrink-0 flex items-center justify-center text-[10px] font-black ${idx === 0 ? "bg-orange-500 text-white" : "bg-slate-200 text-slate-600"}`}>{idx + 1}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-extrabold text-xs text-foreground truncate">{it.name}</div>
-                        <div className="text-[10px] font-semibold text-orange-600 mt-0.5 truncate">{it.reason}</div>
-                      </div>
-                      <span className="text-[11px] font-black text-slate-500 shrink-0">{it.masteryPct}%</span>
+                  <div key={it.nodeId} className="flex gap-2.5">
+                    {/* Cột số thứ tự + đường nối lộ trình */}
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className={`h-6 w-6 rounded-lg flex items-center justify-center text-[10px] font-black ${isStart ? "bg-orange-500 text-white" : "bg-slate-200 text-slate-600"}`}>{it.order ?? idx + 1}</span>
+                      {idx < arr.length - 1 && <span className="w-0.5 flex-1 bg-orange-200 my-1" />}
                     </div>
-                    <div className="h-1.5 bg-slate-200 rounded-full mt-2">
-                      <div className={`h-1.5 rounded-full ${bar}`} style={{ width: `${it.masteryPct}%` }} />
+                    <div
+                      onClick={() => {
+                        const node = nodes.find((n) => n.id === it.nodeId);
+                        setFocusedNodeId(it.nodeId);
+                        if (node) setSelectedNode(node as TreeNode);
+                        setSideView("mastery");
+                      }}
+                      className={`flex-1 mb-2 cursor-pointer p-3 rounded-2xl border transition-colors ${active ? "bg-orange-50 border-orange-200" : "bg-slate-50/70 border-border hover:bg-orange-50/60"}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <div className="font-extrabold text-xs text-foreground truncate">{it.name}</div>
+                            {isStart && <span className="shrink-0 rounded-md bg-orange-500 px-1.5 py-0.5 text-[9px] font-black text-white">Bắt đầu từ đây</span>}
+                          </div>
+                          <div className="text-[10px] font-semibold text-orange-600 mt-0.5 truncate">{it.reason}</div>
+                        </div>
+                        <span className="text-[11px] font-black text-slate-500 shrink-0">{it.masteryPct}%</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-200 rounded-full mt-2">
+                        <div className={`h-1.5 rounded-full ${bar}`} style={{ width: `${it.masteryPct}%` }} />
+                      </div>
                     </div>
                   </div>
                 );

@@ -104,6 +104,8 @@ export interface ReviewItem {
   reason: string;
   priority: number;
   daysSince: number;
+  order: number;
+  isStart: boolean;
 }
 
 // Lộ trình ôn tập cá nhân hoá: các chủ đề cần củng cố, xếp theo độ ưu tiên (dựa trên BKT).

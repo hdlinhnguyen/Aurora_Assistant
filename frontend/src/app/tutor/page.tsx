@@ -2866,7 +2866,7 @@ export default function TutorHubPage() {
               <div>
                 <div style={{ ...BALOO, fontWeight: 800, fontSize: 19, color: "#c2560f" }}>🔄 Lộ trình Ôn tập</div>
                 <div style={{ fontSize: 12.5, color: "#5b6072", fontWeight: 600, marginTop: 2 }}>
-                  Aurora chọn sẵn các chủ đề cần củng cố nhất cho em (dựa trên hồ sơ năng lực BKT)
+                  Ôn theo thứ tự từ gốc lên — bắt đầu ở bước 1, xong mới lên bước sau
                 </div>
               </div>
               <button
@@ -2916,8 +2916,13 @@ export default function TutorHubPage() {
                           {idx + 1}
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {it.name}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {it.name}
+                            </div>
+                            {(it.isStart ?? idx === 0) && (
+                              <span style={{ flexShrink: 0, background: "#c2560f", color: "#fff", borderRadius: 6, padding: "1px 6px", fontSize: 9, fontWeight: 800 }}>Bắt đầu từ đây</span>
+                            )}
                           </div>
                           <div style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600 }}>{it.topicGroup}</div>
                         </div>
