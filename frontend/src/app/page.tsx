@@ -367,12 +367,14 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Path 1: Primary Students */}
           <div className="group relative overflow-hidden rounded-3xl border border-border bg-card p-8 space-y-6 shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-lg">
-            <div className="inline-block p-3 rounded-2xl bg-[var(--mint)]/15 text-[var(--mint)]">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
+            <div className="flex items-center justify-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-[var(--mint)]/15 text-[var(--mint)] flex-shrink-0">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh</h3>
             </div>
-            <h3 className="text-2xl font-bold text-foreground">Dành cho Học sinh</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-[var(--mint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -403,12 +405,14 @@ export default function LandingPage() {
 
           {/* Path 2: Teachers */}
           <div className="group relative overflow-hidden rounded-3xl border border-border bg-card p-8 space-y-6 shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-lg">
-            <div className="inline-block p-3 rounded-2xl bg-[var(--purple)]/15 text-[var(--purple)]">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2zm12-5a2 2 0 11-4 0 2 2 0 014 0zM9 20h12" />
-              </svg>
+            <div className="flex items-center justify-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-[var(--purple)]/15 text-[var(--purple)] flex-shrink-0">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2a2 2 0 002-2zm12-5a2 2 0 11-4 0 2 2 0 014 0zM9 20h12" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-foreground">Dành cho Giáo viên & Thầy cô</h3>
             </div>
-            <h3 className="text-2xl font-bold text-foreground">Dành cho Giáo viên & Thầy cô</h3>
             <ul className="space-y-3 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
                 <svg className="h-4 w-4 text-[var(--purple)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
