@@ -132,7 +132,11 @@ func (h *TutorHandler) GetMessages(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID phiên học không hợp lệ"})
 	}
 
-	messages, err := h.svc.GetSessionMessages(sessionID)
+	userID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	messages, err := h.svc.GetSessionMessages(sessionID, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải tin nhắn"})
 	}
@@ -186,7 +190,11 @@ func (h *TutorHandler) SaveAxioms(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
-	if err := h.svc.SaveSessionAxioms(sessionID, req.AxiomsJSON); err != nil {
+	userID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	if err := h.svc.SaveSessionAxioms(sessionID, userID, req.AxiomsJSON); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể lưu sơ đồ nguyên lý gốc"})
 	}
 
@@ -200,7 +208,11 @@ func (h *TutorHandler) GetAxioms(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID phiên học không hợp lệ"})
 	}
 
-	axiomsJSON, err := h.svc.GetSessionAxioms(sessionID)
+	userID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	axiomsJSON, err := h.svc.GetSessionAxioms(sessionID, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải sơ đồ nguyên lý gốc"})
 	}
@@ -225,7 +237,11 @@ func (h *TutorHandler) GetDashboard(c fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Bạn không có quyền truy cập bảng thông tin Giáo viên"})
 	}
 
-	gapStats, studentsNeedHelp, feynmanStats, err := h.svc.GetTeacherDashboardData()
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	gapStats, studentsNeedHelp, feynmanStats, err := h.svc.GetTeacherDashboardData(teacherID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Lỗi tải báo cáo"})
 	}
@@ -811,7 +827,11 @@ func (h *TutorHandler) GetStudentsProgress(c fiber.Ctx) error {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Chỉ giáo viên mới có quyền xem tiến trình"})
 	}
 
-	progress, err := h.svc.GetStudentsProgress()
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	progress, err := h.svc.GetStudentsProgress(teacherID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -863,7 +883,11 @@ func (h *TutorHandler) GetMonitoringData(c fiber.Ctx) error {
 		subject = subjectRaw
 	}
 
-	stats, err := h.svc.GetMonitoringData(subject)
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	stats, err := h.svc.GetMonitoringData(teacherID, subject)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -890,7 +914,11 @@ func (h *TutorHandler) GetClassInterventionGroups(c fiber.Ctx) error {
 		subject = subjectRaw
 	}
 
-	groups, err := h.svc.GetClassInterventionGroups(subject)
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	groups, err := h.svc.GetClassInterventionGroups(teacherID, subject)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -918,6 +946,17 @@ func (h *TutorHandler) GetStudentSubjectProgress(c fiber.Ctx) error {
 	studentID, err := uuid.Parse(studentIdStr)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID học sinh không hợp lệ"})
+	}
+	teacherID, err := uuid.Parse(c.Locals("userID").(string))
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Xác thực không hợp lệ"})
+	}
+	owns, err := h.svc.TeacherOwnsStudent(teacherID, studentID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể xác minh quyền truy cập"})
+	}
+	if !owns {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Bạn không có quyền xem học sinh này"})
 	}
 	subjectRaw := c.Params("subject")
 	subject, err := url.PathUnescape(subjectRaw)

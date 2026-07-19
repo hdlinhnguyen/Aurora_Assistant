@@ -54,13 +54,14 @@ func Protected(db *gorm.DB) fiber.Handler {
 
 		if claims, ok := token.Claims.(jwt.MapClaims); ok {
 			if sub, exists := claims["sub"].(string); exists {
-				var count int64
-				if err := db.Model(&model.User{}).Where("id = ?", sub).Count(&count).Error; err != nil || count == 0 {
+				var user model.User
+				if err := db.Select("id", "role").Where("id = ?", sub).First(&user).Error; err != nil {
 					return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 						"error": "User account no longer exists. Please relogin.",
 					})
 				}
 				c.Locals("userID", sub)
+				c.Locals("userRole", user.Role)
 			} else {
 				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 					"error": "Invalid token signature subject.",
@@ -83,9 +84,14 @@ func RequireRole(allowedRoles ...string) fiber.Handler {
 		if !ok {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Unauthorized: Invalid claims"})
 		}
-		userRole, exists := claims["role"].(string)
+		userRole, exists := c.Locals("userRole").(string)
 		if !exists {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Forbidden: Role not specified in token"})
+			// Protected populates userRole from the current database record.
+			// The claim fallback supports isolated middleware use in tests.
+			userRole, exists = claims["role"].(string)
+			if !exists {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Forbidden: Current role unavailable"})
+			}
 		}
 		for _, role := range allowedRoles {
 			if userRole == role {

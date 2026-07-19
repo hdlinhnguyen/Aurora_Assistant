@@ -82,14 +82,17 @@ func (s *Service) GetHistory(ctx context.Context, studentID, topicID uuid.UUID, 
 }
 
 func (s *Service) CanTeacherView(ctx context.Context, teacherID, studentID uuid.UUID) error {
-	var teacherCount, studentCount int64
+	var teacherCount, relationshipCount int64
 	if err := s.db.WithContext(ctx).Model(&model.User{}).Where("id = ? AND role = ?", teacherID, "teacher").Count(&teacherCount).Error; err != nil {
 		return err
 	}
-	if err := s.db.WithContext(ctx).Model(&model.User{}).Where("id = ? AND role = ?", studentID, "student").Count(&studentCount).Error; err != nil {
+	if err := s.db.WithContext(ctx).Model(&model.User{}).
+		Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+		Where("users.id = ? AND users.role = ? AND classrooms.teacher_id = ?", studentID, "student", teacherID).
+		Count(&relationshipCount).Error; err != nil {
 		return err
 	}
-	if teacherCount != 1 || studentCount != 1 {
+	if teacherCount != 1 || relationshipCount != 1 {
 		return ErrForbidden
 	}
 	return nil

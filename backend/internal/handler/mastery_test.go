@@ -19,6 +19,10 @@ type fakeMasteryService struct {
 	requestedID uuid.UUID
 }
 
+func (f *fakeMasteryService) BuildReviewPath(context.Context, uuid.UUID, string, int) ([]mastery.ReviewItem, error) {
+	return []mastery.ReviewItem{}, nil
+}
+
 func (f *fakeMasteryService) GetProfile(_ context.Context, studentID uuid.UUID, _ string) (mastery.Profile, error) {
 	f.requestedID = studentID
 	return f.profile, f.serviceErr
