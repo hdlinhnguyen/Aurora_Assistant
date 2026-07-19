@@ -734,11 +734,11 @@ export default function TeacherDashboard() {
         localStorage.getItem("aurora_tour_active") === "true" &&
         localStorage.getItem("aurora_tour_mode") === "teacher" &&
         localStorage.getItem("aurora_tour_demo_session") === "true";
-      const tourSubject = "Số và Đại Số";
-      if (isTeacherTour && !finalSubjects.includes(tourSubject)) {
-        finalSubjects = [tourSubject, ...finalSubjects];
-      }
-      const requestedSubject = selectSubjectName || (isTeacherTour ? tourSubject : undefined);
+      const tourSubjectName = "Số và Đại số";
+      const seededTourSubject = finalSubjects.find((subject: string) =>
+        subject.localeCompare(tourSubjectName, "vi", { sensitivity: "base" }) === 0,
+      );
+      const requestedSubject = selectSubjectName || (isTeacherTour ? seededTourSubject : undefined);
       setSubjects(finalSubjects);
       setSelectedSubject(resolveTeacherSubject(finalSubjects, requestedSubject));
     } catch (err) {
