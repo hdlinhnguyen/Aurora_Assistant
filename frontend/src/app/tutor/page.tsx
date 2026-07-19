@@ -1173,6 +1173,39 @@ export default function TutorHubPage() {
             <div onClick={() => setActiveTab("exams")} style={activeTab === "exams" ? tabOn : tabOff}>
               <FileText size={15} /> Đề thi & Kiểm tra
             </div>
+            {!needsDiagnostic && (
+              <div
+                onClick={() =>
+                  router.push(
+                    `/tutor/feynman?${new URLSearchParams({
+                      node: currentStepId,
+                      name: currentNode?.name ?? "",
+                      subject,
+                      group: currentNode?.topicGroup ?? "",
+                    }).toString()}`,
+                  )
+                }
+                title="Giảng lại bài cho bé Nấm để kiểm tra em đã hiểu bản chất chưa"
+                style={{
+                  ...POPPINS,
+                  marginLeft: "auto",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "10px 16px",
+                  borderRadius: 14,
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  color: "#0d7a6c",
+                  background: "linear-gradient(135deg,#e7fbf6,#fff)",
+                  border: "1px solid #b8ede0",
+                  boxShadow: "0 6px 14px -8px rgba(15,185,166,.4)",
+                }}
+              >
+                📓 Tập Vở Feynman
+              </div>
+            )}
           </div>
 
           {/* ===== LỘ TRÌNH ÔN TẬP (ROADMAP bản đồ uốn lượn — port từ design handoff) ===== */}
