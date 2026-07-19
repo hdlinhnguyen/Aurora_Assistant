@@ -18,7 +18,7 @@ from learning_path.schemas import RawPaperEvidence, RawQuizEvidence
 NOW = datetime(2026, 7, 17, 12, 0, tzinfo=timezone.utc)
 
 
-def quiz(evidence_id="q1", *, score=1.0, hints_used=0, attempt_number=1, occurred_at=NOW):
+def quiz(evidence_id="q1", *, score=1.0, hints_used=0, attempt_number=1, inference_weight=1.0, difficulty="medium", occurred_at=NOW):
     return RawQuizEvidence(
         evidence_id=evidence_id,
         student_id="minh",
@@ -29,6 +29,8 @@ def quiz(evidence_id="q1", *, score=1.0, hints_used=0, attempt_number=1, occurre
         attempt_number=attempt_number,
         hints_used=hints_used,
         grading_method="auto",
+        inference_weight=inference_weight,
+        difficulty=difficulty,
         occurred_at=occurred_at,
     )
 
@@ -79,9 +81,23 @@ def test_hint_used_multiplies_070():
     assert e.evidence_weight == pytest.approx(0.85 * 0.70)
 
 
-def test_second_attempt_multiplies_080():
+def test_attempts_decay_exponentially():
     e = calibrate_quiz(quiz(attempt_number=2), as_of=NOW)
-    assert e.evidence_weight == pytest.approx(0.85 * 0.80)
+    third = calibrate_quiz(quiz(attempt_number=3), as_of=NOW)
+    assert e.evidence_weight == pytest.approx(0.85 * 0.60)
+    assert third.evidence_weight == pytest.approx(0.85 * 0.60**2)
+
+
+def test_indirect_distractor_evidence_uses_inference_weight():
+    e = calibrate_quiz(quiz(score=0.0, inference_weight=0.35), as_of=NOW)
+    assert e.evidence_weight == pytest.approx(0.85 * 0.35)
+
+
+def test_difficulty_changes_informativeness_with_safe_bounds():
+    easy = calibrate_quiz(quiz(difficulty="easy"), as_of=NOW)
+    medium = calibrate_quiz(quiz(difficulty="medium"), as_of=NOW)
+    hard = calibrate_quiz(quiz(difficulty="hard"), as_of=NOW)
+    assert easy.evidence_weight < medium.evidence_weight < hard.evidence_weight <= 1
 
 
 def test_older_evidence_weighs_less_monotonically():

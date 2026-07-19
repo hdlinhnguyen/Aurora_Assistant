@@ -108,6 +108,22 @@ def knowledge_state(
         total_weight += e.evidence_weight
         p_l = _update_once(p_l, e.observation_value, e.evidence_weight, params)
 
+    unique_questions = {e.question_id or e.evidence_id for e in ordered}
+    sources = {e.source for e in ordered}
+    known_difficulties = {
+        (e.difficulty or "").strip().lower()
+        for e in ordered
+        if (e.difficulty or "").strip().lower() not in ("", "unknown")
+    }
+    diversity_limited = len(unique_questions) < 3
+    if sources == {"quiz"} and known_difficulties and len(known_difficulties) < 2:
+        diversity_limited = True
+    # Repetition may raise the posterior, but cannot by itself create full
+    # mastery. Keep it below the mastered threshold until evidence covers
+    # enough independent questions (and, for quizzes, difficulty bands).
+    if diversity_limited:
+        p_l = min(p_l, max(params.p_l0, config.mastered_threshold - 0.01))
+
     consistency = 1.0 - (weighted_error / total_weight) if total_weight > 0 else 1.0
 
     effective = total_weight
@@ -137,6 +153,9 @@ def knowledge_state(
             ),
             "evidence_sufficiency": sufficiency,
             "posterior_certainty": certainty,
+            "unique_question_count": float(len(unique_questions)),
+            "difficulty_band_count": float(len(known_difficulties)),
+            "diversity_limited": 1.0 if diversity_limited else 0.0,
         },
         source_breakdown=source_breakdown,
     )
@@ -189,8 +208,9 @@ def propagate_mastery(
         # Nếu có chu trình (không mong muốn), duyệt theo danh sách các topics
         reverse_topo = list(curriculum.topics.keys())
 
-    # Các hằng số cho Dynamic Alpha
-    alpha_0 = 0.75
+    # Dynamic inference is deliberately conservative: indirect evidence must
+    # never be as strong as answering the prerequisite directly.
+    alpha_0 = 0.40
     lambda_val = 0.4
 
     for tid_c in reverse_topo:
@@ -210,27 +230,49 @@ def propagate_mastery(
             else:
                 break
 
-        # Tính toán Dynamic Alpha: alpha_n = alpha_0 + (1 - alpha_0) * (1 - e^(-lambda_val * n))
+        # Streak strengthens inference, while confidence and the authored edge
+        # strength limit how much knowledge can travel across the graph.
         alpha_n = alpha_0 + (1 - alpha_0) * (1.0 - math.exp(-lambda_val * n))
 
         # Lan truyền cho từng tiên quyết
         for tid_p in prereqs:
             state_p = full_states[tid_p]
 
-            propagated_mastery = alpha_n * state_c.mastery_probability
+            edge_strength = float(g.edges[tid_p, tid_c].get("strength", 0.7))
+            confidence_factor = 0.5 + 0.5 * state_c.confidence_score
+            propagation_weight = min(1.0, edge_strength * confidence_factor * alpha_n)
+            propagated_mastery = propagation_weight * state_c.mastery_probability
             if propagated_mastery > state_p.mastery_probability:
                 state_p.mastery_probability = propagated_mastery
 
                 # Lan truyền thông số tin cậy và số evidence ảo
                 state_p.effective_evidence = max(
-                    state_p.effective_evidence, alpha_n * state_c.effective_evidence
+                    state_p.effective_evidence,
+                    propagation_weight * state_c.effective_evidence,
                 )
                 state_p.confidence_score = max(
-                    state_p.confidence_score, alpha_n * state_c.confidence_score
+                    state_p.confidence_score,
+                    propagation_weight * state_c.confidence_score,
                 )
-                state_p.evidence_count = max(
-                    state_p.evidence_count, int(alpha_n * state_c.evidence_count)
+                inferred_count = (
+                    max(1, math.ceil(propagation_weight * state_c.evidence_count))
+                    if state_c.evidence_count > 0
+                    else 0
                 )
+                state_p.evidence_count = max(state_p.evidence_count, inferred_count)
+                if state_c.last_evidence_at is not None:
+                    if (
+                        state_p.last_evidence_at is None
+                        or state_c.last_evidence_at > state_p.last_evidence_at
+                    ):
+                        state_p.last_evidence_at = state_c.last_evidence_at
+                state_p.source_breakdown = dict(state_p.source_breakdown)
+                state_p.source_breakdown["inferred_prerequisite"] = max(
+                    state_p.source_breakdown.get("inferred_prerequisite", 0),
+                    inferred_count,
+                )
+                state_p.evidence_summary = dict(state_p.evidence_summary)
+                state_p.evidence_summary["inferred_from_dependent"] = 1.0
 
                 # Phân loại lại trạng thái dựa trên các thông số lan truyền mới
                 state_p.mastery_status = classify(
@@ -239,6 +281,11 @@ def propagate_mastery(
                     state_p.evidence_count,
                     config,
                 )
+                # Positive evidence inferred from a dependent can support a
+                # prerequisite, but it must never manufacture a confirmed gap.
+                # Gap conclusions require direct or explicit negative evidence.
+                if state_p.mastery_status == "confirmed_gap":
+                    state_p.mastery_status = "uncertain"
 
     return full_states
 

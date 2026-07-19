@@ -1127,7 +1127,7 @@ export default function TutorHubPage() {
               <div>
                 <div style={{ ...BALOO, fontWeight: 800, fontSize: 19, color: "#c2560f" }}>🔄 Lộ trình Ôn tập</div>
                 <div style={{ fontSize: 12.5, color: "#5b6072", fontWeight: 600, marginTop: 2 }}>
-                  Các chủ đề cần củng cố nhất, chọn dựa trên hồ sơ năng lực BKT của em
+                  Ôn theo thứ tự từ gốc lên — bắt đầu ở bước 1, xong mới lên bước sau
                 </div>
               </div>
               <button onClick={() => setShowReview(false)} style={{ background: "#f1f5f9", border: "none", borderRadius: 12, width: 34, height: 34, cursor: "pointer", fontWeight: 800, color: "#64748b", flexShrink: 0 }}>✕</button>
@@ -1144,7 +1144,12 @@ export default function TutorHubPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                       <span style={{ width: 24, height: 24, borderRadius: 8, background: idx === 0 ? "#c2560f" : "#eef1f4", color: idx === 0 ? "#fff" : "#5b6072", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</div>
+                          {(it.isStart ?? idx === 0) && (
+                            <span style={{ flexShrink: 0, background: "#c2560f", color: "#fff", borderRadius: 6, padding: "1px 6px", fontSize: 9, fontWeight: 800 }}>Bắt đầu từ đây</span>
+                          )}
+                        </div>
                         <div style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600 }}>{it.topicGroup}</div>
                       </div>
                       <span style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: barColor, flexShrink: 0 }}>{it.masteryPct}%</span>
