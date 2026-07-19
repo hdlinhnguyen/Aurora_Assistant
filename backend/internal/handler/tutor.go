@@ -808,6 +808,31 @@ func (h *TutorHandler) GetStudentsProgress(c fiber.Ctx) error {
 	return c.JSON(progress)
 }
 
+func (h *TutorHandler) GetDiagnosticTopicIDs(c fiber.Ctx) error {
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Thiếu môn học cần lọc dữ liệu chẩn đoán"})
+	}
+
+	var topicUUIDs []uuid.UUID
+	if err := config.DB.Model(&model.ActivityLog{}).
+		Distinct("node_id").
+		Where("subject = ? AND action IN ?", subject, []string{"answer_correct", "answer_incorrect"}).
+		Order("node_id").
+		Pluck("node_id", &topicUUIDs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải dữ liệu chẩn đoán theo bài học"})
+	}
+
+	topicIDs := make([]string, 0, len(topicUUIDs))
+	for _, id := range topicUUIDs {
+		if id != uuid.Nil {
+			topicIDs = append(topicIDs, id.String())
+		}
+	}
+
+	return c.JSON(fiber.Map{"topicIds": topicIDs})
+}
+
 func (h *TutorHandler) GetMonitoringData(c fiber.Ctx) error {
 	token, ok := c.Locals("user").(*jwt.Token)
 	if !ok {

@@ -36,7 +36,6 @@ import StudentMgmtTab from "./components/StudentMgmtTab";
 import StudentMasteryProfile from "./components/StudentMasteryProfile";
 import StudentActivityFeed from "./components/StudentActivityFeed";
 import ExamBuilderTab from "./components/ExamBuilderTab";
-import ExamScoringTab from "./components/ExamScoringTab";
 import GuardrailTab from "./components/GuardrailTab";
 import {
   Users,
@@ -68,7 +67,6 @@ import {
   TrendingUp,
   BarChart2,
   FilePenLine,
-  ClipboardCheck,
   FlaskConical,
   GitCommit,
   PlusCircle,
@@ -161,7 +159,25 @@ interface RubricDraft {
   points: string;
 }
 
-type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "student-mgmt" | "exam-builder" | "exam-scoring" | "guardrail";
+type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "student-mgmt" | "exam-builder" | "guardrail";
+
+function normalizeTeacherTab(tab: string | null): ActiveTab {
+  switch (tab) {
+    case "students":
+    case "graph-designer":
+    case "learning-path":
+    case "question-bank":
+    case "monitoring":
+    case "student-mgmt":
+    case "exam-builder":
+    case "guardrail":
+      return tab;
+    case "exam-scoring":
+      return "exam-builder";
+    default:
+      return "student-mgmt";
+  }
+}
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -202,6 +218,8 @@ export default function TeacherDashboard() {
   const [selectedStudent, setSelectedStudent] = useState<StudentProgress | null>(null);
   const [studentDetail, setStudentDetail] = useState<StudentDetailProgress | null>(null);
   const [subjectQuestions, setSubjectQuestions] = useState<Question[]>([]);
+  const [diagnosticTopicIds, setDiagnosticTopicIds] = useState<string[]>([]);
+  const [loadingDiagnosticTopics, setLoadingDiagnosticTopics] = useState(false);
   const [examsCount, setExamsCount] = useState<number>(0);
   const [hasActiveExam, setHasActiveExam] = useState<boolean>(false);
   const [dismissedSteps, setDismissedSteps] = useState<Record<string, boolean>>({});
@@ -224,7 +242,7 @@ export default function TeacherDashboard() {
   const loadExamsStatus = async () => {
     if (!selectedSubject) return;
     try {
-      const list = await apiFetch(`/teacher/exams`);
+      const list = await apiFetch(`/teacher/exams?subject=${encodeURIComponent(selectedSubject)}`);
       setExamsCount(list?.length || 0);
       setHasActiveExam(list?.some((e: any) => e.status === "preparing_exam") || false);
     } catch (e) {
@@ -307,7 +325,7 @@ export default function TeacherDashboard() {
 
     // Restore saved states from localStorage
     const savedSubject = localStorage.getItem("aurora_teacher_subject");
-    const savedTab = localStorage.getItem("aurora_teacher_tab") as ActiveTab | null;
+    const savedTab = localStorage.getItem("aurora_teacher_tab");
     const savedStudent = localStorage.getItem("aurora_teacher_student");
     const savedViewMode = localStorage.getItem("aurora_teacher_view_mode") as "tree" | "matrix" | null;
 
@@ -316,7 +334,7 @@ export default function TeacherDashboard() {
     }
     const isTourActive = localStorage.getItem("aurora_tour_active") === "true";
     const savedStepIdxStr = localStorage.getItem("aurora_tour_step");
-    let initialTab = savedTab || "student-mgmt";
+    let initialTab = normalizeTeacherTab(savedTab);
 
     if (isTourActive && savedStepIdxStr) {
       const stepIdx = parseInt(savedStepIdxStr, 10);
@@ -367,9 +385,9 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     const handleSwitchTab = (e: Event) => {
-      const customEvent = e as CustomEvent<ActiveTab>;
+      const customEvent = e as CustomEvent<string>;
       if (customEvent.detail) {
-        setActiveTab(customEvent.detail);
+        setActiveTab(normalizeTeacherTab(customEvent.detail));
       }
     };
     window.addEventListener("aurora-tour-switch-tab", handleSwitchTab);
@@ -385,6 +403,25 @@ export default function TeacherDashboard() {
       setSubjectQuestions(data || []);
     } catch (err) {
       console.error("Failed to load subject questions:", err);
+    }
+  };
+
+  const loadDiagnosticTopicIds = async () => {
+    if (!selectedSubject) {
+      setDiagnosticTopicIds([]);
+      return;
+    }
+    setLoadingDiagnosticTopics(true);
+    try {
+      const data = await apiFetch(
+        `/teacher/diagnostic-topic-ids?subject=${encodeURIComponent(selectedSubject)}`,
+      );
+      setDiagnosticTopicIds(Array.isArray(data?.topicIds) ? data.topicIds : []);
+    } catch (err) {
+      console.error("Failed to load diagnostic topic ids:", err);
+      setDiagnosticTopicIds([]);
+    } finally {
+      setLoadingDiagnosticTopics(false);
     }
   };
 
@@ -661,6 +698,7 @@ export default function TeacherDashboard() {
         loadStudentDetailProgress(selectedStudent.studentId);
       }
       loadSubjectQuestions();
+      loadDiagnosticTopicIds();
       loadMonitoringData();
       checkClassInterventions(selectedSubject);
       loadExamsStatus();
@@ -673,6 +711,9 @@ export default function TeacherDashboard() {
     }
     if (activeTab === "monitoring" && selectedSubject) {
       loadMonitoringData();
+    }
+    if (activeTab === "learning-path" && selectedSubject) {
+      loadDiagnosticTopicIds();
     }
     if (selectedSubject) {
       loadExamsStatus();
@@ -1022,6 +1063,7 @@ export default function TeacherDashboard() {
       setActiveThreadId(res.thread_id);
       setInsights(res.class_insight);
       setDraftPaths(res.paths);
+      await loadDiagnosticTopicIds();
       telemetry.track("learning_path_generated", {
         thread_id: res.thread_id,
         path_count: Object.keys(res.paths || {}).length,
@@ -1860,26 +1902,6 @@ export default function TeacherDashboard() {
 
               <button
                 onClick={() => {
-                  setActiveTab("exam-scoring");
-                  setSelectedStudent(null);
-                }}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black transition-all border relative ${
-                  activeTab === "exam-scoring"
-                    ? "bg-slate-100 border-transparent text-slate-900 font-extrabold"
-                    : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <ClipboardCheck size={16} />
-                  <span>4. Chấm bài kiểm tra</span>
-                </div>
-                {activeTab === "exam-scoring" && (
-                  <span className="absolute right-0 top-2 bottom-2 w-1 bg-amber-600 rounded-l" />
-                )}
-              </button>
-
-              <button
-                onClick={() => {
                   setActiveTab("students");
                   setSelectedStudent(null);
                 }}
@@ -1891,7 +1913,7 @@ export default function TeacherDashboard() {
               >
                 <div className="flex items-center gap-3">
                   <Users size={16} />
-                  <span>5. Báo cáo Tiến độ Học sinh</span>
+                  <span>4. Báo cáo Tiến độ Học sinh</span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {hasInterventions && activeTab !== "students" && (
@@ -1919,7 +1941,7 @@ export default function TeacherDashboard() {
               >
                 <div className="flex items-center gap-3">
                   <ListTodo size={16} />
-                  <span>6. Lập lộ trình cá nhân</span>
+                  <span>5. Lập lộ trình cá nhân</span>
                 </div>
                 {activeTab === "learning-path" && (
                   <span className="absolute right-0 top-2 bottom-2 w-1 bg-amber-600 rounded-l" />
@@ -1939,7 +1961,7 @@ export default function TeacherDashboard() {
               >
                 <div className="flex items-center gap-3">
                   <TrendingUp size={16} />
-                  <span>7. Giám sát Lớp học</span>
+                  <span>6. Giám sát Lớp học</span>
                 </div>
                 {activeTab === "monitoring" && (
                   <span className="absolute right-0 top-2 bottom-2 w-1 bg-amber-600 rounded-l" />
@@ -1959,7 +1981,7 @@ export default function TeacherDashboard() {
               >
                 <div className="flex items-center gap-3">
                   <Shield size={16} />
-                  <span>8. An toàn học sinh</span>
+                  <span>7. An toàn học sinh</span>
                 </div>
                 {activeTab === "guardrail" && (
                   <span className="absolute right-0 top-2 bottom-2 w-1 bg-emerald-600 rounded-l" />
@@ -2049,7 +2071,7 @@ export default function TeacherDashboard() {
 
       {/* Main Panel Workspace */}
       <main className="flex-1 flex flex-col p-6 overflow-hidden bg-background relative">
-        {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" && activeTab !== "exam-scoring" ? (
+        {!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" ? (
           // Subject Selection Screen Dashboard
           <div className="flex-1 flex flex-col justify-center items-center max-w-6xl mx-auto w-full py-12 px-4 overflow-y-auto">
             {isSidebarCollapsed && (
@@ -2285,9 +2307,7 @@ export default function TeacherDashboard() {
                   <h1 className="text-lg font-[var(--font-display)] font-extrabold text-foreground uppercase tracking-tight">
                     {activeTab === "exam-builder"
                       ? "Tạo đề kiểm tra"
-                      : activeTab === "exam-scoring"
-                        ? "Chấm bài kiểm tra"
-                        : activeTab === "students"
+                      : activeTab === "students"
                           ? "Báo cáo tiến độ học tập"
                           : activeTab === "graph-designer"
                             ? "Thiết kế & Biên soạn sơ đồ cây"
@@ -2300,9 +2320,7 @@ export default function TeacherDashboard() {
                   <p className="text-xs text-muted-foreground mt-1">
                     {activeTab === "exam-builder"
                       ? "Biên soạn câu hỏi, cân đối điểm và chuẩn bị đề trong một workspace"
-                      : activeTab === "exam-scoring"
-                        ? "Chấm từng bài, lưu tự động, duyệt điểm và theo dõi lịch sử"
-                        : activeTab === "students"
+                      : activeTab === "students"
                           ? "Theo dõi hành trình học tập và kết quả của từng học sinh"
                           : activeTab === "graph-designer"
                             ? "Biên soạn các nút lý thuyết, liên kết mối quan hệ tiên quyết"
@@ -2438,8 +2456,6 @@ export default function TeacherDashboard() {
               <StudentMgmtTab />
             ) : activeTab === "exam-builder" ? (
               <ExamBuilderTab subjects={subjects} selectedSubject={selectedSubject} />
-            ) : activeTab === "exam-scoring" ? (
-              <ExamScoringTab selectedSubject={selectedSubject} />
             ) : activeTab === "students" ? (
               <StudentsProgressTab
                 studentsProgress={studentsProgress}
@@ -2961,6 +2977,8 @@ export default function TeacherDashboard() {
             ) : activeTab === "learning-path" ? (
               <LearningPathTab
                 nodes={nodes}
+                diagnosticTopicIds={diagnosticTopicIds}
+                loadingDiagnosticTopics={loadingDiagnosticTopics}
                 selectedTargetTopics={selectedTargetTopics}
                 setSelectedTargetTopics={setSelectedTargetTopics}
                 handleGenerateLearningPath={handleGenerateLearningPath}

@@ -281,6 +281,7 @@ func main() {
 	teacherGroup.Get("/guardrail-events", tutorHandler.GetGuardrailEvents)
 	teacherGroup.Put("/guardrail-events/:id/handled", tutorHandler.MarkGuardrailEventHandled)
 	teacherGroup.Get("/students-progress", tutorHandler.GetStudentsProgress)
+	teacherGroup.Get("/diagnostic-topic-ids", tutorHandler.GetDiagnosticTopicIDs)
 	teacherGroup.Get("/students/:studentId/progress/:subject", tutorHandler.GetStudentSubjectProgress)
 	teacherGroup.Get("/monitoring/:subject", tutorHandler.GetMonitoringData)
 	teacherGroup.Post("/students/:studentId/re-diagnostic", tutorHandler.RequestReDiagnostic)

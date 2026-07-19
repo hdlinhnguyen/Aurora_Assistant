@@ -16,24 +16,46 @@ export default function ExamBuilderTab({ subjects, selectedSubject }: { subjects
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ title: "", subject: subjects[0] || "", gradeLevel: "Lớp 5", durationMinutes: 45, totalPoints: "10.00" });
+  const [form, setForm] = useState({ title: "", subject: selectedSubject || "", gradeLevel: "Lớp 5", durationMinutes: 45, totalPoints: "10.00" });
   const [manual, setManual] = useState({ type: "single_choice", content: "", points: "1.00", choices: ["", "", "", ""] });
   const [selectedQuestionId, setSelectedQuestionId] = useState("");
   const [rubric, setRubric] = useState({ description: "", points: "1.00" });
 
-  const loadExams = async () => setExams(await apiFetch("/teacher/exams"));
+  const newExamForm = () => ({
+    title: "",
+    subject: selectedSubject || "",
+    gradeLevel: "Lớp 5",
+    durationMinutes: 45,
+    totalPoints: "10.00",
+  });
+
+  const loadExams = async () => {
+    if (!selectedSubject) {
+      setExams([]);
+      setDetail(null);
+      return;
+    }
+    setExams(await apiFetch(`/teacher/exams?subject=${encodeURIComponent(selectedSubject)}`));
+  };
   const selectExam = async (id: string) => {
     setBusy("detail");
     setCreating(false);
     try { setDetail(await apiFetch(`/teacher/exams/${id}`)); setSelectedQuestionId(""); }
     finally { setBusy(""); }
   };
-  useEffect(() => { loadExams().catch((e) => setNotice(e.message)); }, []);
   useEffect(() => {
-    const subject = detail?.subject || form.subject;
+    setDetail(null);
+    setCreating(false);
+    setForm(newExamForm());
+    loadExams().catch((e) => setNotice(e.message));
+  }, [selectedSubject]);
+  useEffect(() => {
+    const subject = detail?.subject || selectedSubject;
     if (subject) apiFetch(`/teacher/exam-bank/questions?subject=${encodeURIComponent(subject)}`).then(setBank).catch(() => setBank([]));
-  }, [detail?.subject, form.subject]);
-  useEffect(() => { if (!form.subject && subjects[0]) setForm((v) => ({ ...v, subject: subjects[0] })); }, [subjects, form.subject]);
+  }, [detail?.subject, selectedSubject]);
+  useEffect(() => {
+    setForm((value) => (value.subject === selectedSubject ? value : { ...value, subject: selectedSubject || "" }));
+  }, [selectedSubject]);
 
   const filteredBank = useMemo(() => {
     return bank
@@ -80,7 +102,7 @@ export default function ExamBuilderTab({ subjects, selectedSubject }: { subjects
     finally { setBusy(""); }
   };
 
-  const createExam = () => mutate("create", () => apiFetch("/teacher/exams", { method: "POST", body: JSON.stringify(form) }), "Đã tạo đề nháp.").then((exam) => { if (exam) { setCreating(false); selectExam(exam.id); } });
+  const createExam = () => mutate("create", () => apiFetch("/teacher/exams", { method: "POST", body: JSON.stringify({ ...form, subject: selectedSubject }) }), "Đã tạo đề nháp.").then((exam) => { if (exam) { setCreating(false); selectExam(exam.id); } });
   const addBank = (questionId: string) => {
     if (!detail) return;
     const pointsToAdd = 1.00;
@@ -170,10 +192,10 @@ export default function ExamBuilderTab({ subjects, selectedSubject }: { subjects
           </div>
           <div className="grid sm:grid-cols-2 gap-4">
             {[["Tên đề","title"],["Khối lớp","gradeLevel"],["Thời lượng (phút)","durationMinutes"],["Tổng điểm","totalPoints"]].map(([label,key]) => <label key={key} className="space-y-1.5 text-xs font-bold"><span>{label}</span><input value={(form as any)[key]} type={key === "durationMinutes" ? "number" : "text"} onChange={(e) => setForm({ ...form, [key]: key === "durationMinutes" ? Number(e.target.value) : e.target.value })} className="w-full rounded-xl border bg-background px-3 py-3"/></label>)}
-            <label className="sm:col-span-2 space-y-1.5 text-xs font-bold"><span>Môn học</span><select value={form.subject} onChange={(e) => setForm({...form,subject:e.target.value})} className="w-full rounded-xl border bg-background px-3 py-3">{subjects.map(s=><option key={s}>{s}</option>)}</select></label>
+            <label className="sm:col-span-2 space-y-1.5 text-xs font-bold"><span>Môn học</span><input value={selectedSubject || "Chưa chọn môn"} readOnly className="w-full rounded-xl border bg-muted px-3 py-3 text-muted-foreground"/></label>
           </div>
           <div className="mt-6 flex items-center gap-3">
-            <button onClick={createExam} disabled={!form.title || busy === "create"} className="rounded-xl bg-foreground text-background px-5 py-3 text-xs font-black flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all">{busy === "create" ? <Loader2 className="animate-spin" size={15}/> : <Sparkles size={15}/>}Tạo đề nháp</button>
+            <button onClick={createExam} disabled={!selectedSubject || !form.title || busy === "create"} className="rounded-xl bg-foreground text-background px-5 py-3 text-xs font-black flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none">{busy === "create" ? <Loader2 className="animate-spin" size={15}/> : <Sparkles size={15}/>}Tạo đề nháp</button>
             {exams.length > 0 && (
               <button onClick={() => setCreating(false)} className="rounded-xl border border-border bg-background px-5 py-3 text-xs font-black cursor-pointer hover:bg-muted active:scale-95 transition-all">Quay lại</button>
             )}
@@ -196,7 +218,7 @@ export default function ExamBuilderTab({ subjects, selectedSubject }: { subjects
             <button
               onClick={() => {
                 setCreating(true);
-                setForm({ title: "", subject: subjects[0] || "", gradeLevel: "Lớp 5", durationMinutes: 45, totalPoints: "10.00" });
+                setForm(newExamForm());
               }}
               className="h-9 w-9 rounded-xl bg-slate-950 text-white grid place-items-center cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-sm"
               title="Tạo đề thi mới"
@@ -250,8 +272,8 @@ export default function ExamBuilderTab({ subjects, selectedSubject }: { subjects
 
   return <div data-testid="exam-workspace" className="flex-1 min-h-0 grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] animate-[fadeIn_0.3s_ease-out]">
     <main className="min-h-0 rounded-3xl border border-border bg-card shadow-sm overflow-auto">
-      {creating ? <div className="p-6"><div className="max-w-2xl mx-auto"><div className="mb-6 flex items-center gap-3"><div className="p-3 rounded-2xl bg-[var(--mint)]/20"><FilePenLine/></div><div><p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Khởi tạo</p><h2 className="text-xl font-black">Tạo một đề rõ ràng, vừa sức</h2></div></div><div className="grid sm:grid-cols-2 gap-4">{[["Tên đề","title"],["Khối lớp","gradeLevel"],["Thời lượng (phút)","durationMinutes"],["Tổng điểm","totalPoints"]].map(([label,key]) => <label key={key} className="space-y-1.5 text-xs font-bold"><span>{label}</span><input value={(form as any)[key]} type={key === "durationMinutes" ? "number" : "text"} onChange={(e) => setForm({ ...form, [key]: key === "durationMinutes" ? Number(e.target.value) : e.target.value })} className="w-full rounded-xl border bg-background px-3 py-3"/></label>)}<label className="sm:col-span-2 space-y-1.5 text-xs font-bold"><span>Môn học</span><select value={form.subject} onChange={(e) => setForm({...form,subject:e.target.value})} className="w-full rounded-xl border bg-background px-3 py-3">{subjects.map(s=><option key={s}>{s}</option>)}</select></label></div><div className="mt-6 flex items-center gap-3">
-            <button onClick={createExam} disabled={!form.title || busy === "create"} className="rounded-xl bg-foreground text-background px-5 py-3 text-xs font-black flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all">{busy === "create" ? <Loader2 className="animate-spin" size={15}/> : <Sparkles size={15}/>}Tạo đề nháp</button>
+      {creating ? <div className="p-6"><div className="max-w-2xl mx-auto"><div className="mb-6 flex items-center gap-3"><div className="p-3 rounded-2xl bg-[var(--mint)]/20"><FilePenLine/></div><div><p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground">Khởi tạo</p><h2 className="text-xl font-black">Tạo một đề rõ ràng, vừa sức</h2></div></div><div className="grid sm:grid-cols-2 gap-4">{[["Tên đề","title"],["Khối lớp","gradeLevel"],["Thời lượng (phút)","durationMinutes"],["Tổng điểm","totalPoints"]].map(([label,key]) => <label key={key} className="space-y-1.5 text-xs font-bold"><span>{label}</span><input value={(form as any)[key]} type={key === "durationMinutes" ? "number" : "text"} onChange={(e) => setForm({ ...form, [key]: key === "durationMinutes" ? Number(e.target.value) : e.target.value })} className="w-full rounded-xl border bg-background px-3 py-3"/></label>)}<label className="sm:col-span-2 space-y-1.5 text-xs font-bold"><span>Môn học</span><input value={selectedSubject || "Chưa chọn môn"} readOnly className="w-full rounded-xl border bg-muted px-3 py-3 text-muted-foreground"/></label></div><div className="mt-6 flex items-center gap-3">
+            <button onClick={createExam} disabled={!selectedSubject || !form.title || busy === "create"} className="rounded-xl bg-foreground text-background px-5 py-3 text-xs font-black flex items-center gap-2 cursor-pointer hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none">{busy === "create" ? <Loader2 className="animate-spin" size={15}/> : <Sparkles size={15}/>}Tạo đề nháp</button>
             <button onClick={() => setCreating(false)} className="rounded-xl border border-border bg-background px-5 py-3 text-xs font-black cursor-pointer hover:bg-muted active:scale-95 transition-all">Quay lại</button>
           </div></div></div>
       : !detail ? <div className="h-full grid place-items-center text-center py-16"><div><Clock3 className="mx-auto text-muted-foreground"/><p className="mt-3 text-sm font-black">Chọn một đề từ danh sách bên trái</p><p className="text-xs text-muted-foreground">Hoặc bấm nút + để tạo đề mới.</p></div></div>
