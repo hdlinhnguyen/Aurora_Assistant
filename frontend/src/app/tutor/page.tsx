@@ -40,6 +40,7 @@ import {
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
 import KnowledgeTree from "@/app/components/KnowledgeTree";
 import GuidedTour from "@/app/components/GuidedTour";
+import QuickRoleSwitcher from "@/app/components/QuickRoleSwitcher";
 import { computeTracePath } from "@/lib/rootCauseTrace";
 import { SafeHtml } from "@/components/ui/safe-html";
 
@@ -168,6 +169,21 @@ export default function TutorHubPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const isDemoTour = localStorage.getItem("aurora_tour_demo_session") === "true";
+    if (isDemoTour) {
+      setSkipDiagnostic(true);
+      setActiveTab("chat");
+    }
+
+    const handleTourTab = (event: Event) => {
+      const tab = (event as CustomEvent<"chat" | "practice">).detail;
+      setActiveTab(tab);
+    };
+    window.addEventListener("aurora-tour-switch-student-tab", handleTourTab);
+    return () => window.removeEventListener("aurora-tour-switch-student-tab", handleTourTab);
+  }, []);
+
   async function loadAll() {
     setLoading(true);
     setLoadError(null);
@@ -214,7 +230,7 @@ export default function TutorHubPage() {
       setStudentState(stateRes);
       setExamsList(examsRes);
       const isDiag = stateRes === null || stateRes?.needsDiagnostic;
-      if (isDiag) {
+      if (isDiag && localStorage.getItem("aurora_tour_demo_session") !== "true") {
         setActiveTab("exams");
       }
       const cur = rm.find((s) => s.status === "current") ?? rm[0];
@@ -999,7 +1015,7 @@ export default function TutorHubPage() {
         </aside>
 
         {/* ============ WORKSPACE ============ */}
-        <main
+      <main
           style={{
             flex: 1,
             overflowY: "auto",
@@ -1008,6 +1024,10 @@ export default function TutorHubPage() {
               "radial-gradient(680px 320px at 100% -6%, rgba(124,70,232,.09), transparent 62%), radial-gradient(560px 300px at -5% 0%, rgba(20,217,192,.10), transparent 60%)",
           }}
         >
+          <div style={{ position: "fixed", top: 18, right: 18, zIndex: 70 }}>
+            <QuickRoleSwitcher />
+          </div>
+
           {/* lesson hero */}
           <div
             style={{
@@ -1166,6 +1186,7 @@ export default function TutorHubPage() {
           {/* ===== PRACTICE PANEL ===== */}
           {activeTab === "practice" && (
             <div
+              data-tour="feynman-notebook"
               className="ah-panel"
               style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: "24px 26px", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 820 }}
             >
@@ -1492,6 +1513,7 @@ export default function TutorHubPage() {
           {activeTab === "chat" && (
             <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap", width: "100%" }}>
               <div
+                data-tour="socratic-chat"
                 className="ah-panel"
                 style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flex: "1 1 480px", maxWidth: 760, minWidth: 320, display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
               >

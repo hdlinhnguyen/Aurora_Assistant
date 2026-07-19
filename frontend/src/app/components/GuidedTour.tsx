@@ -195,6 +195,19 @@ export default function GuidedTour() {
     };
   }, [updateTargetRect]);
 
+  useEffect(() => {
+    if (!isActive || !currentStep) return;
+    if (currentStep.id === "socratic-chat" || currentStep.id === "feynman-notebook") {
+      const tab = currentStep.id === "socratic-chat" ? "chat" : "practice";
+      window.dispatchEvent(new CustomEvent("aurora-tour-switch-student-tab", { detail: tab }));
+    }
+
+    const target = currentStep.targetSelector
+      ? document.querySelector(currentStep.targetSelector)
+      : null;
+    target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }, [isActive, currentStep]);
+
   const clearDemoTourSession = () => {
     localStorage.removeItem("aurora_token");
     localStorage.removeItem("aurora_user");
@@ -413,6 +426,7 @@ export default function GuidedTour() {
       {/* Spotlight highlight box around target element */}
       {targetRect && (
         <div
+          data-tour-spotlight
           style={{
             top: `${targetRect.top - 6}px`,
             left: `${targetRect.left - 6}px`,

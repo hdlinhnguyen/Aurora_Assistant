@@ -37,3 +37,15 @@ def test_student_page_mounts_the_guided_tour() -> None:
 
     assert 'import GuidedTour from "@/app/components/GuidedTour"' in source
     assert "<GuidedTour />" in source
+    assert 'data-tour="socratic-chat"' in source
+    assert 'data-tour="feynman-notebook"' in source
+    assert 'localStorage.getItem("aurora_tour_demo_session") !== "true"' in source
+    assert 'window.addEventListener("aurora-tour-switch-student-tab"' in source
+
+
+def test_guided_tour_switches_to_and_scrolls_to_each_student_target() -> None:
+    source = GUIDED_TOUR.read_text(encoding="utf-8")
+
+    assert 'new CustomEvent("aurora-tour-switch-student-tab"' in source
+    assert 'currentStep.id === "socratic-chat" ? "chat" : "practice"' in source
+    assert "scrollIntoView" in source
