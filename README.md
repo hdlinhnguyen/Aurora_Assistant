@@ -60,41 +60,124 @@ cd Aurora_Assistant
 ./run.sh    # Trên Mac/Linux (Terminal)
 
 # 3. Trải nghiệm
-# Mở trình duyệt truy cập: 
-# - Tài khoản Học sinh Demo: student@aurora.edu.vn / demo123
+# Mở trình duyệt truy cập: http://localhost:3000
+# - Tài khoản Học sinh Demo:  student@aurora.edu.vn / demo123
 # - Tài khoản Giáo viên Demo: teacher@aurora.edu.vn / demo123
+# - Tài khoản Quản trị Demo:  admin@aurora.edu.vn   / demo123
 ```
+
+Các cổng dịch vụ khi chạy local:
+
+| Dịch vụ | URL |
+|---------|-----|
+| Frontend (Next.js) | http://localhost:3000 |
+| Go Backend | http://localhost:8081/api/health |
+| Python AI API (Swagger) | http://localhost:8000/docs |
+| PostgreSQL (Docker) | localhost:5436 |
 
 ## Project Structure
 
+Aurora là một **monorepo** gồm 3 phân hệ chạy song song (Go backend, Next.js frontend, Python AI service) cùng dữ liệu chương trình và tài liệu. Xem bản đồ tài liệu đầy đủ tại [`docs/INDEX.md`](docs/INDEX.md) và hướng dẫn cho người mới tại [`docs/ONBOARDING.md`](docs/ONBOARDING.md).
+
 ```
-├── src/
-│   ├── agents/          # LangGraph agent definitions
-│   │   ├── graph.py     # Main graph (nodes + edges)
-│   │   ├── state.py     # State schema
-│   │   ├── nodes/       # Individual nodes
-│   │   └── tools/       # Agent tools
-│   ├── api/             # FastAPI routes
-│   ├── models/          # Pydantic schemas
-│   ├── services/        # Business logic
-│   ├── config.py        # Settings
-│   └── main.py          # App entry point
-├── tests/               # Test suite
-├── docs/                # Documentation
-├── eval/                # Evaluation results
-├── presentation/        # Demo materials
-├── Dockerfile           # Multi-stage build
-├── docker-compose.yml   # Full stack
-└── .github/workflows/   # CI/CD pipelines
+Aurora_Assistant/
+├── backend/                    # Go API server (Fiber v3) — cổng :8081
+│   ├── cmd/
+│   │   ├── server/             # main.go: khởi tạo app + đăng ký route
+│   │   ├── seed/               # seed dữ liệu DB
+│   │   ├── import_bank/        # nạp ngân hàng câu hỏi
+│   │   └── ...                 # check_questions, dump_mock, telemetry_rebuild, ...
+│   ├── internal/
+│   │   ├── handler/            # HTTP handlers (auth, exam, admin, mastery, tutor, scoring...)
+│   │   ├── service/            # Business logic (ai_service, tutor_service, guardrail, tagging...)
+│   │   ├── exam/ scoring/ mastery/ telemetry/ gamification/ adminmetrics/   # domain packages
+│   │   ├── model/              # GORM models
+│   │   ├── middleware/         # JWT auth + phân quyền theo role
+│   │   ├── syntheticseed/      # dữ liệu demo tổng hợp (synthetic)
+│   │   └── config/ runtime/    # cấu hình DB & runtime
+│   └── docker/                 # docker-compose (PostgreSQL cổng 5436)
+├── frontend/                   # Next.js (App Router + Tailwind) — cổng :3000
+│   └── src/app/
+│       ├── login/  tutor/  teacher/  admin/   # route theo vai trò
+│       └── api/                # Next.js route handler (proxy hint)
+├── learning-path/              # Python FastAPI + LangGraph — cổng :8000
+│   └── src/learning_path/      # BKT mastery, planner, diagnosis, hints, ranking...
+├── knowledge-graph/            # Sơ đồ kiến thức chương trình (JSON) + công cụ review
+├── evals/                      # Bộ đánh giá (pytest) — bằng chứng chất lượng AI
+├── data/                       # Ngân hàng câu hỏi & nguồn chương trình (exam_bank.json, master_bank.json)
+├── design/                     # Design handoff & asset nhân vật (animation)
+├── docs/                       # Tài liệu — bắt đầu ở docs/INDEX.md
+├── presentation/               # Ghi chú pitch deck & bằng chứng nghiên cứu
+├── ai-log/                     # Log prompt AI theo từng thành viên (deliverable)
+├── tests/                      # Test tích hợp/smoke liên phân hệ (Python)
+├── artifacts/                  # Ảnh chụp E2E (desktop/mobile)
+├── architecture.md             # Tài liệu kiến trúc hệ thống
+├── run.sh / run.ps1            # Khởi chạy toàn bộ stack bằng 1 lệnh
+└── README.md
 ```
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /health | Health check |
-| POST | /api/v1/chat | Chat with agent |
-| POST | /api/v1/analyze | Analyze input |
+Toàn bộ API nghiệp vụ do **Go backend** (`:8081`, tiền tố `/api`) phục vụ, bảo vệ bằng JWT và phân quyền theo vai trò. Dưới đây là các nhóm chính (danh sách đầy đủ xem `backend/cmd/server/main.go`):
+
+**Công khai (Public)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/api/health` | Health check |
+| POST | `/api/auth/register` | Đăng ký tài khoản |
+| POST | `/api/auth/login` | Đăng nhập, trả JWT |
+
+**Học sinh (role: `student`)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/api/student/mastery` · `/review-path` · `/badges` | Hồ sơ thành thạo (BKT), lộ trình ôn, huy hiệu |
+| GET · POST | `/api/student/exams` · `/exams/:examId/submit` | Danh sách & nộp bài thi |
+| GET | `/api/student/learning-path` · `/learning-path/live` | Lộ trình học cá nhân hoá |
+
+**Giáo viên (role: `teacher` / `admin`)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| CRUD | `/api/teacher/exams/**` | Soạn/sửa đề thi, câu hỏi, rubric, export DOCX |
+| CRUD | `/api/teacher/question-bank/**` | Ngân hàng câu hỏi + gán chủ đề (tagging) |
+| CRUD | `/api/teacher/students` · `/classrooms` | Quản lý học sinh & lớp |
+| GET | `/api/teacher/dashboard` · `/students-progress` · `/monitoring/:subject` | Bảng theo dõi & phân hoá lớp |
+| CRUD | `/api/teacher/grading-batches/**` · `/scoring-submissions/**` | Chấm điểm thủ công theo rubric |
+
+**Gia sư AI (mọi tài khoản đã đăng nhập)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| POST · GET | `/api/tutor/sessions/**` | Phiên chat Socratic + lưu axiom (Bản đồ Nguyên lý) |
+| GET | `/api/subjects/:subject/tree` · `/nodes/:nodeId/questions` | Cây kiến thức & câu hỏi theo node |
+| POST | `/api/feynman/score` · `/api/student/hints` | Chấm Clarity Score (Feynman) & thang gợi ý |
+
+**Quản trị (role: `admin`)**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| CRUD | `/api/admin/teachers` · `/classrooms` | Quản lý giáo viên & lớp |
+| GET | `/api/admin/telemetry-dashboard` | Bảng đo lường hệ thống |
+
+**Nội bộ (service-to-service, token riêng) & Telemetry**
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/api/internal/graph` | Cấp graph kiến thức cho Python service |
+| POST | `/internal/exams/:examId/first-submission` · `/grading-completed` | Callback chấm bài |
+| POST | `/api/telemetry/events` | Thu thập sự kiện học tập (ẩn danh) |
+
+### AI Service (Python FastAPI + LangGraph) — `:8000`, xem `/docs`
+
+| Method | Path | Mô tả |
+|--------|------|-------|
+| GET | `/health` | Health check |
+| POST | `/learning-path` · `/learning-path/live` | Sinh/cập nhật lộ trình học (LangGraph) |
+| POST | `/learning-path/{thread_id}/approve` · `/evidence` | Giáo viên duyệt lộ trình & nạp bằng chứng |
+| POST | `/hints` | Sinh thang gợi ý (hint ladder) |
+| POST | `/mastery/calculate` | Tính mức thành thạo bằng BKT |
 
 ## Deliverables Checklist
 
