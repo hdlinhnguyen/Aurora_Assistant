@@ -71,7 +71,10 @@ import {
   Library,
   Key,
   ArrowRight,
-  Check
+  Check,
+  Star,
+  Flag,
+  Map
 } from "lucide-react";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
@@ -1127,7 +1130,7 @@ export default function TutorHubPage() {
             {!needsDiagnostic ? (
               <>
                 <div onClick={() => setActiveTab("roadmap")} style={activeTab === "roadmap" ? tabOn : tabOff}>
-                  <span style={{ fontSize: 15 }}>🗺️</span> Lộ trình ôn tập
+                  <Map size={15} /> Lộ trình ôn tập
                   {reviewItems.length > 0 && (
                     <span
                       style={{
@@ -1189,7 +1192,7 @@ export default function TutorHubPage() {
                   marginLeft: "auto",
                   display: "flex",
                   alignItems: "center",
-                  gap: 6,
+                  gap: 8,
                   padding: "10px 16px",
                   borderRadius: 14,
                   fontSize: 13,
@@ -1201,7 +1204,7 @@ export default function TutorHubPage() {
                   boxShadow: "0 6px 14px -8px rgba(15,185,166,.4)",
                 }}
               >
-                📓 Tập Vở Feynman
+                <BookOpen size={15} /> Tập Vở Feynman
               </div>
             )}
           </div>
@@ -1210,7 +1213,9 @@ export default function TutorHubPage() {
           {activeTab === "roadmap" && (
             <div className="ah-panel" style={{ animation: "rr-fade .3s ease-out", border: "1px solid #eef1f4", borderRadius: 26, background: "linear-gradient(180deg,#fff7ef 0%,#fff 180px)", boxShadow: "0 20px 50px -28px rgba(194,86,15,.35)", padding: "26px 22px 34px", overflow: "hidden" }}>
               <div style={{ textAlign: "center", marginBottom: 6 }}>
-                <div style={{ ...BALOO, fontWeight: 800, fontSize: 23, color: "#c2560f" }}>🗺️ Lộ trình ôn tập của em</div>
+                <div style={{ ...BALOO, fontWeight: 800, fontSize: 23, color: "#c2560f", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <Map size={24} style={{ color: "#c2560f" }} /> Lộ trình ôn tập của em
+                </div>
                 <div style={{ fontSize: 13, color: "#5b6072", fontWeight: 600, marginTop: 4 }}>Ôn từ gốc lên — mỗi chặng là một trạm, chinh phục để mở đường lên đỉnh 🏔️</div>
               </div>
 
@@ -1235,7 +1240,7 @@ export default function TutorHubPage() {
                   {/* winding map */}
                   {(() => {
                     const rowH = 158, topPad = 92, CX = 350, OFF = 96, nodeR = 58;
-                    const EMOJIS = ["📊", "🔗", "✂️", "➕", "📝", "📐", "🔢", "🧮"];
+                    const ROADMAP_ICONS = [BarChart3, BookOpen, PenTool, Trophy, Sparkles, Rocket, Lightbulb, GraduationCap];
                     const colorOf = (p: number) => (p >= 70 ? "#0FB9A6" : p >= 40 ? "#e0912a" : "#e05a7a");
                     const pts = reviewItems.map((_, i) => ({ cx: CX + (i % 2 === 0 ? -OFF : OFF), cy: topPad + i * rowH }));
                     const lastCy = pts.length ? pts[pts.length - 1].cy : topPad;
@@ -1282,7 +1287,14 @@ export default function TutorHubPage() {
                                 style={{ position: "absolute", top: p.cy, left: cardLeft, width: cardW, transform: "translateY(-50%)", background: "#fff", border: isStart ? "2px solid #ffb877" : "1px solid #eef1f4", borderRadius: 18, padding: "15px 16px", cursor: "pointer", zIndex: 3, boxShadow: "0 14px 30px -18px rgba(0,0,0,.28)" }}
                               >
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
-                                  <span style={{ fontSize: 19 }}>{EMOJIS[i % EMOJIS.length]}</span>
+                                  {(() => {
+                                    const IconComp = ROADMAP_ICONS[i % ROADMAP_ICONS.length];
+                                    return (
+                                      <div style={{ display: "grid", placeItems: "center", background: `${color}15`, color, padding: 6, borderRadius: 10 }}>
+                                        <IconComp size={18} strokeWidth={2.5} />
+                                      </div>
+                                    );
+                                  })()}
                                   <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                       <span style={{ ...POPPINS, fontWeight: 800, fontSize: 14.5, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
@@ -1295,7 +1307,7 @@ export default function TutorHubPage() {
                                 <div style={{ height: 7, background: "#eef1f4", borderRadius: 7, marginBottom: 10, overflow: "hidden" }}>
                                   <div style={{ height: 7, borderRadius: 7, width: `${it.masteryPct}%`, background: color }} />
                                 </div>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                                   <span style={{ fontSize: 11, fontWeight: 700, color: "#c2560f", background: "#fff1e5", border: "1px solid #ffdcc0", borderRadius: 8, padding: "4px 9px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.reason}</span>
                                   <span style={{ ...POPPINS, fontWeight: 800, fontSize: 12.5, color: "#fff", background: "linear-gradient(135deg,#8B5CF6,#7C46E8)", borderRadius: 10, padding: "7px 14px", flexShrink: 0, boxShadow: "0 8px 16px -8px rgba(124,70,232,.6)" }}>Ôn ngay →</span>
                                 </div>
@@ -1319,14 +1331,16 @@ export default function TutorHubPage() {
                           })}
 
                           {/* start avatar */}
-                          <div style={{ position: "absolute", left: sp.cx - 4, top: sp.cy - 74, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, zIndex: 5, pointerEvents: "none", animation: "rr-bob 2.4s ease-in-out infinite" }}>
+                          <div style={{ position: "absolute", left: sp.cx, top: sp.cy - 68, transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, zIndex: 5, pointerEvents: "none", animation: "rr-bob 2.4s ease-in-out infinite" }}>
                             <div style={{ ...POPPINS, background: "#c2560f", color: "#fff", fontSize: 9.5, fontWeight: 800, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", boxShadow: "0 6px 12px -6px rgba(194,86,15,.6)", animation: "rr-flag 2.6s ease-in-out infinite" }}>Bắt đầu từ đây</div>
-                            <Character char="nam" mood="happy" size={48} face="right" />
+                            <Star size={34} fill="#ffd254" stroke="#c2560f" strokeWidth={2.5} style={{ filter: "drop-shadow(0 4px 10px rgba(255,157,77,0.5))" }} />
                           </div>
 
                           {/* finish */}
                           <div style={{ position: "absolute", left: finishPt.cx, top: finishPt.cy, transform: "translate(-50%,-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 4 }}>
-                            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", display: "grid", placeItems: "center", fontSize: 30, boxShadow: "0 14px 26px -10px rgba(15,185,166,.6)", border: "4px solid #fff" }}>🏁</div>
+                            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", display: "grid", placeItems: "center", color: "#fff", boxShadow: "0 14px 26px -10px rgba(15,185,166,.6)", border: "4px solid #fff" }}>
+                              <Flag size={30} fill="#fff" stroke="#fff" />
+                            </div>
                             <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13.5, color: "#0FB9A6", textAlign: "center", marginTop: 8, maxWidth: 200 }}>Đích — vững gốc, sẵn sàng chinh phục bài mới!</div>
                           </div>
                         </div>
