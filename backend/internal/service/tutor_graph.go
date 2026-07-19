@@ -38,6 +38,28 @@ type ParsedGraph struct {
 	Edges []ParsedEdge `json:"edges"`
 }
 
+func cleanupNodeScopedLearningData(tx *gorm.DB, nodeIDs []uuid.UUID) error {
+	if len(nodeIDs) == 0 {
+		return nil
+	}
+	if err := tx.Where("node_id IN ?", nodeIDs).Delete(&model.Question{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("node_id IN ?", nodeIDs).Delete(&model.ActivityLog{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("initial_level_node_id IN ? OR current_level_node_id IN ?", nodeIDs, nodeIDs).Delete(&model.StudentState{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("topic_id IN ?", nodeIDs).Delete(&model.StudentTopicMastery{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("topic_id IN ?", nodeIDs).Delete(&model.StudentTopicMasteryHistory{}).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *tutorService) CreateTopic(topic *model.Topic) error {
 	topic.ID = uuid.New()
 	return s.db.Create(topic).Error
@@ -211,30 +233,9 @@ func (s *tutorService) DeleteSubject(subject string) error {
 		var existingNodeIDs []uuid.UUID
 		tx.Model(&model.Node{}).Where("subject = ?", subject).Pluck("id", &existingNodeIDs)
 		log.Printf("[DEBUG DeleteSubject] Found %d nodes for subject=%q", len(existingNodeIDs), subject)
-		if len(existingNodeIDs) > 0 {
-			// Delete questions
-			res := tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.Question{})
-			if res.Error != nil {
-				log.Printf("[DEBUG DeleteSubject] ERROR deleting questions: %v", res.Error)
-				return res.Error
-			}
-			log.Printf("[DEBUG DeleteSubject] Deleted %d questions", res.RowsAffected)
-
-			// Delete student states
-			res = tx.Where("initial_level_node_id IN ? OR current_level_node_id IN ?", existingNodeIDs, existingNodeIDs).Delete(&model.StudentState{})
-			if res.Error != nil {
-				log.Printf("[DEBUG DeleteSubject] ERROR deleting student states: %v", res.Error)
-				return res.Error
-			}
-			log.Printf("[DEBUG DeleteSubject] Deleted %d student states", res.RowsAffected)
-
-			// Delete activity logs
-			res = tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.ActivityLog{})
-			if res.Error != nil {
-				log.Printf("[DEBUG DeleteSubject] ERROR deleting activity logs: %v", res.Error)
-				return res.Error
-			}
-			log.Printf("[DEBUG DeleteSubject] Deleted %d activity logs", res.RowsAffected)
+		if err := cleanupNodeScopedLearningData(tx, existingNodeIDs); err != nil {
+			log.Printf("[DEBUG DeleteSubject] ERROR deleting node-scoped learning data: %v", err)
+			return err
 		}
 		// Delete edges
 		res := tx.Where("subject = ?", subject).Delete(&model.Edge{})
@@ -442,11 +443,9 @@ func (s *tutorService) ParseAndBuildTree(subject string, fileContent string) err
 
 	var existingNodeIDs []uuid.UUID
 	tx.Model(&model.Node{}).Where("subject = ?", subject).Pluck("id", &existingNodeIDs)
-	if len(existingNodeIDs) > 0 {
-		if err := tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.Question{}).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
+	if err := cleanupNodeScopedLearningData(tx, existingNodeIDs); err != nil {
+		tx.Rollback()
+		return err
 	}
 	if err := tx.Where("subject = ?", subject).Delete(&model.Edge{}).Error; err != nil {
 		tx.Rollback()
@@ -610,11 +609,9 @@ func (s *tutorService) SaveTree(subject string, finalGraph ParsedGraph) error {
 
 	var existingNodeIDs []uuid.UUID
 	tx.Model(&model.Node{}).Where("subject = ?", subject).Pluck("id", &existingNodeIDs)
-	if len(existingNodeIDs) > 0 {
-		if err := tx.Where("node_id IN ?", existingNodeIDs).Delete(&model.Question{}).Error; err != nil {
-			tx.Rollback()
-			return err
-		}
+	if err := cleanupNodeScopedLearningData(tx, existingNodeIDs); err != nil {
+		tx.Rollback()
+		return err
 	}
 	if err := tx.Where("subject = ?", subject).Delete(&model.Edge{}).Error; err != nil {
 		tx.Rollback()
@@ -688,4 +685,3 @@ func (s *tutorService) SaveTree(subject string, finalGraph ParsedGraph) error {
 	fmt.Println("[CURRICULUM PARSER] HOÀN TẤT LƯU CÂY KIẾN THỨC THÀNH CÔNG!")
 	return nil
 }
-

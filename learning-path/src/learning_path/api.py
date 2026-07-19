@@ -20,6 +20,7 @@ import os
 import uuid
 import json
 from time import perf_counter
+import urllib.parse
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +51,7 @@ DEFAULT_GRAPH_JSON = Path(__file__).resolve().parents[3] / "knowledge-graph" / "
 
 
 class CreatePathBody(BaseModel):
+    subject: str | None = None
     request: LearningPathRequest
     raw_quiz: list[RawQuizEvidence] | None = Field(default_factory=list)
     raw_paper: list[RawPaperEvidence] | None = Field(default_factory=list)
@@ -76,8 +78,12 @@ class HintBody(BaseModel):
 DEFAULT_MINUTES_BY_CAP = {"TH": 25, "THCS": 35, "THPT": 45}
 
 
-def fetch_dynamic_graph() -> CurriculumGraph:
+def fetch_dynamic_graph(subject: str | None = None) -> CurriculumGraph:
     url = os.environ.get("GO_BACKEND_GRAPH_URL", "http://localhost:8081/api/internal/graph")
+    clean_subject = (subject or "").strip()
+    if clean_subject:
+        separator = "&" if "?" in url else "?"
+        url = f"{url}{separator}{urllib.parse.urlencode({'subject': clean_subject})}"
     try:
         headers = {"User-Agent": "Aurora-Learning-Path/1.0"}
         internal_token = os.environ.get("INTERNAL_SERVICE_TOKEN", "").strip()
@@ -106,6 +112,8 @@ def fetch_dynamic_graph() -> CurriculumGraph:
 
         return CurriculumGraph(topics, edges)
     except Exception as e:
+        if clean_subject:
+            raise RuntimeError(f"Failed to fetch subject-scoped dynamic graph for {clean_subject!r}: {e}") from e
         print(f"Failed to fetch dynamic graph from {url}: {e}. Falling back to static graph.json")
         from learning_path.adapters import load_chac_goc_graph
         from pathlib import Path
@@ -127,10 +135,10 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "learning-path"}
 
-    def get_curriculum() -> CurriculumGraph:
+    def get_curriculum(subject: str | None = None) -> CurriculumGraph:
         if initial_curriculum is not None:
             return initial_curriculum
-        return fetch_dynamic_graph()
+        return fetch_dynamic_graph(subject)
 
     def _config(thread_id: str) -> dict:
         return {"configurable": {"thread_id": thread_id}}
@@ -158,7 +166,7 @@ def create_app(
     def create_learning_path(body: CreatePathBody) -> dict:
         thread_id = uuid.uuid4().hex
         started = perf_counter()
-        curr = get_curriculum()
+        curr = get_curriculum(body.subject)
         pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
         result = pipeline.invoke(
             {
@@ -179,7 +187,7 @@ def create_app(
         Dùng cho lộ trình LIVE: học sinh tự sinh path từ mastery tươi của chính mình."""
         thread_id = uuid.uuid4().hex
         started = perf_counter()
-        curr = get_curriculum()
+        curr = get_curriculum(body.subject)
         pipeline = build_pipeline(curr, checkpointer=checkpointer_to_use)
         result = pipeline.invoke(
             {

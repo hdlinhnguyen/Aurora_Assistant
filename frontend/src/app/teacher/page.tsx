@@ -1044,6 +1044,7 @@ export default function TeacherDashboard() {
         method: "POST",
         body: JSON.stringify({
           classId: "class-demo",
+          subject: selectedSubject,
           targetTopicIds: selectedTargetTopics,
         }),
       });
