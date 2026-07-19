@@ -2425,7 +2425,8 @@ export default function TutorHubPage() {
             justifyContent: "center",
             background: "rgba(15, 23, 42, 0.75)",
             backdropFilter: "blur(10px)",
-            padding: 24,
+            padding: "clamp(12px, 3vw, 24px)",
+            overflowY: "auto",
           }}
         >
           {activeExam ? (
@@ -2701,7 +2702,9 @@ export default function TutorHubPage() {
                 borderRadius: 28,
                 maxWidth: 580,
                 width: "100%",
-                padding: "40px 36px 32px",
+                maxHeight: "calc(100dvh - 24px)",
+                overflowY: "auto",
+                padding: "clamp(24px, 4vh, 40px) clamp(18px, 4vw, 36px) clamp(20px, 3vh, 32px)",
                 boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
                 textAlign: "center",
                 animation: "ah-pop .45s cubic-bezier(.16,1,.3,1)",
@@ -2727,7 +2730,7 @@ export default function TutorHubPage() {
                     <div style={{ fontSize: 12, color: "#5b6072", marginBottom: 10, lineHeight: 1.5 }}>
                       Em chỉ cần hoàn thành <b>1 đề bất kỳ</b> trong danh sách dưới đây để mở khóa lộ trình học nhé!
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 320, overflowY: "auto", paddingRight: 4 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "min(320px, 32dvh)", overflowY: "auto", paddingRight: 4 }}>
                       {examsList.map((ex) => (
                         <div
                           key={ex.id}
@@ -2800,11 +2803,30 @@ export default function TutorHubPage() {
                 </div>
               </div>
 
-              <div style={{ textAlign: "center", marginTop: 32, borderTop: "1px solid #f2f4f7", paddingTop: 20 }}>
+              <div style={{ textAlign: "center", marginTop: 22, borderTop: "1px solid #f2f4f7", paddingTop: 16 }}>
                 <div style={{ fontSize: 12, color: "#9aa1b0", marginBottom: 12, lineHeight: 1.5 }}>
-                  Chưa sẵn sàng làm bài? Không sao, em có thể đăng xuất và quay lại làm sau nhé.
+                  Chưa sẵn sàng làm bài? Em có thể bỏ qua tạm thời và quay lại mục Đề thi sau nhé.
                 </div>
                 <button
+                  type="button"
+                  onClick={() => setSkipDiagnostic(true)}
+                  style={{
+                    ...POPPINS,
+                    border: "none",
+                    borderRadius: 14,
+                    padding: "11px 24px",
+                    marginRight: 8,
+                    background: "#f1ecfd",
+                    color: "#6D28D9",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Bỏ qua lúc này
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     localStorage.clear();
                     router.push("/");
