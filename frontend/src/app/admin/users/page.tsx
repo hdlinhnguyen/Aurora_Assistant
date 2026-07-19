@@ -228,22 +228,11 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Prototype banner */}
-      <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm">
-        <FlaskConical className="h-5 w-5 shrink-0 text-amber-600" />
-        <p>
-          <span className="font-bold text-amber-700 dark:text-amber-400">Prototype:</span>{" "}
-          <span className="text-muted-foreground">
-            Cây lớp học và danh sách học sinh đã được kết nối với API thực tế. Việc gán/sửa lớp học ở panel bên phải là dữ liệu minh hoạ tĩnh.
-          </span>
-        </p>
-      </div>
-
       {/* Header */}
       <div>
         <h1 className="text-4xl font-[var(--font-display)] font-extrabold tracking-tight">Người dùng & Chẩn đoán</h1>
         <p className="text-muted-foreground mt-2">
-          Quản lý tài khoản theo cấu trúc trường/khối/lớp và theo dõi chất lượng dữ liệu chẩn đoán.
+          Quản lý tài khoản theo lớp học (DB Realtime) và theo dõi chất lượng chẩn đoán (Mock).
         </p>
       </div>
 
@@ -265,17 +254,17 @@ export default function AdminUsersPage() {
           className="flex items-center gap-2 rounded-2xl bg-foreground px-4 py-2.5 text-sm font-semibold text-background hover:opacity-90 active:scale-95 transition-all"
         >
           <UserPlus className="h-4 w-4" />
-          Thêm người dùng
+          Thêm người dùng (Mock)
         </button>
-        <DisabledAction label="Bulk Import & Provisioning" icon={UploadCloud} />
-        <DisabledAction label="Role Permission Matrix (RBAC)" icon={ShieldCheck} />
+        <DisabledAction label="Bulk Import & Provisioning (Mock)" icon={UploadCloud} />
+        <DisabledAction label="Role Permission Matrix (RBAC) (Mock)" icon={ShieldCheck} />
         <div className="flex items-center gap-1 ml-auto">
           <IconOnlyButton icon={Download} label="Xuất dữ liệu" />
           <IconOnlyButton icon={Lock} label="Khóa hàng loạt" />
           <IconOnlyButton
             icon={Info}
             label="Về trang này"
-            onClick={() => toast.info("Trang prototype quản lý người dùng & chẩn đoán — xem README để biết chi tiết.")}
+            onClick={() => toast.info("Dữ liệu lớp học và học sinh được lấy từ DB. Các tác vụ sửa đổi, import, phân quyền hiện là Mock.")}
           />
           <IconOnlyButton icon={LayoutGrid} label="Đổi chế độ xem" />
         </div>
@@ -326,12 +315,12 @@ export default function AdminUsersPage() {
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/50 text-muted-foreground text-xs uppercase tracking-wider font-bold">
-                  <th className="p-4 pl-6 font-bold">User</th>
-                  <th className="p-4 font-bold">Avg Score</th>
-                  <th className="p-4 font-bold">Clarity</th>
-                  <th className="p-4 font-bold">Top Gap</th>
-                  <th className="p-4 font-bold">Class</th>
-                  <th className="p-4 font-bold">Status</th>
+                  <th className="p-4 pl-6 font-bold">User (Real)</th>
+                  <th className="p-4 font-bold">Avg Score (Mock)</th>
+                  <th className="p-4 font-bold">Clarity (Mock)</th>
+                  <th className="p-4 font-bold">Top Gap (Mock)</th>
+                  <th className="p-4 font-bold">Class (Real)</th>
+                  <th className="p-4 font-bold">Status (Mock)</th>
                   <th className="p-4 pr-6 text-right font-bold">Action</th>
                 </tr>
               </thead>
@@ -421,12 +410,12 @@ export default function AdminUsersPage() {
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Lớp: {selectedUser.name}</p>
             <p className="text-sm mt-1">
               <span className="text-muted-foreground">Vai trò: </span>
-              <span className="font-bold">Học sinh</span>
+              <span className="font-bold">Học sinh (Real)</span>
             </p>
           </div>
 
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">Lớp đã gán</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">Lớp đã gán (Mock)</p>
             <div className="rounded-2xl border border-border bg-muted/30 p-2 min-h-[64px] flex flex-wrap gap-1.5 content-start">
               {assigned.length ? (
                 assigned.map((id) => (
@@ -441,7 +430,7 @@ export default function AdminUsersPage() {
           </div>
 
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">Tùy chọn: Dual-listbox</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">Tùy chọn: Dual-listbox (Mock)</p>
             <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
               <select
                 multiple
