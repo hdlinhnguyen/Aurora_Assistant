@@ -173,11 +173,11 @@ export default function TutorHubPage() {
     const isDemoTour = localStorage.getItem("aurora_tour_demo_session") === "true";
     if (isDemoTour) {
       setSkipDiagnostic(true);
-      setActiveTab("chat");
+      setActiveTab("theory");
     }
 
     const handleTourTab = (event: Event) => {
-      const tab = (event as CustomEvent<"chat" | "practice">).detail;
+      const tab = (event as CustomEvent<"theory" | "practice" | "chat" | "exams">).detail;
       setActiveTab(tab);
     };
     window.addEventListener("aurora-tour-switch-student-tab", handleTourTab);
@@ -951,7 +951,13 @@ export default function TutorHubPage() {
                 ...(active ? { background: "#fff", color: "#7C46E8" } : { color: "#c2c8d2" }),
               };
               return (
-                <div key={st.id} onClick={() => selectStep(st)} style={rowStyle} title={st.name}>
+                <div
+                  key={st.id}
+                  data-tour={active ? "lesson-selector" : undefined}
+                  onClick={() => selectStep(st)}
+                  style={rowStyle}
+                  title={st.name}
+                >
                   <span style={badgeStyle}>{done ? "✓" : String(i + 1)}</span>
                   <span style={nameStyle}>{st.name}</span>
                   <span style={tagStyle}>{tag}</span>
@@ -1112,7 +1118,7 @@ export default function TutorHubPage() {
 
           {/* ===== THEORY PANEL ===== */}
           {activeTab === "theory" && (
-            <div className="ah-panel" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
+            <div data-tour="lesson-theory" className="ah-panel" style={{ display: "flex", gap: 20, alignItems: "stretch" }}>
               <div style={{ flex: 1.2, background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: 24, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
                 <div style={{ ...POPPINS, fontWeight: 700, fontSize: 17, marginBottom: 12 }}>Ý tưởng chính 🍰</div>
                 <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: "#4b5060", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
@@ -1186,7 +1192,7 @@ export default function TutorHubPage() {
           {/* ===== PRACTICE PANEL ===== */}
           {activeTab === "practice" && (
             <div
-              data-tour="feynman-notebook"
+              data-tour="lesson-practice"
               className="ah-panel"
               style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, padding: "24px 26px", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", maxWidth: 820 }}
             >
@@ -1513,7 +1519,7 @@ export default function TutorHubPage() {
           {activeTab === "chat" && (
             <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap", width: "100%" }}>
               <div
-                data-tour="socratic-chat"
+                data-tour="lesson-chat"
                 className="ah-panel"
                 style={{ background: "#fff", border: "1px solid #eef1f4", borderRadius: 22, boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", flex: "1 1 480px", maxWidth: 760, minWidth: 320, display: "flex", flexDirection: "column", height: 560, overflow: "hidden" }}
               >
@@ -1603,7 +1609,7 @@ export default function TutorHubPage() {
 
           {/* ===== EXAMS PANEL ===== */}
           {activeTab === "exams" && !needsDiagnostic && (
-            <div className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
+            <div data-tour="lesson-exams" className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
               {/* Nếu học sinh đang làm bài thi */}
               {activeExam ? (
                 (() => {

@@ -36,33 +36,54 @@ const TOUR_STEPS: TourStep[] = [
     actionText: "Bắt đầu Tour"
   },
   {
-    id: "socratic-chat",
-    title: "1. Gia Sư Phản Biện Socratic",
+    id: "lesson-selector",
+    title: "1. Chọn Bài Học",
     roleBadge: "student",
     badgeText: "Góc Học Sinh",
     targetPage: "/tutor",
-    targetSelector: '[data-tour="socratic-chat"]',
+    targetSelector: '[data-tour="lesson-selector"]',
     content:
-      "AI kiên quyết KHÔNG cho sẵn lời giải. Thay vào đó, AI chia nhỏ bài toán và đặt từng câu hỏi gợi mở để các em tự lập luận và tìm ra đáp án."
+      "Chọn một bài trong lộ trình bên trái để bắt đầu. Trạng thái từng bài cho biết nội dung đang học, đã hoàn thành hoặc còn khóa."
   },
   {
-    id: "feynman-notebook",
-    title: "2. Không Gian Luyện Tập Thích Ứng",
+    id: "lesson-theory",
+    title: "2. Học Lý Thuyết",
     roleBadge: "student",
     badgeText: "Góc Học Sinh",
     targetPage: "/tutor",
-    targetSelector: '[data-tour="feynman-notebook"]',
+    targetSelector: '[data-tour="lesson-theory"]',
     content:
-      "Nơi học sinh trả lời các câu hỏi trắc nghiệm thích ứng để đo lường mức độ hiểu sâu kiến thức. Hệ thống tự động tính toán Điểm thông thạo và Độ tự tin theo thời gian thực."
+      "Đọc ý tưởng chính và ví dụ của bài đang chọn. Khi đã hiểu, em có thể chuyển ngay sang luyện tập hoặc hỏi AI về phần còn vướng."
   },
   {
-    id: "role-switcher",
-    title: "3. Thanh Đổi Vai Trò Siêu Tốc",
-    roleBadge: "all",
-    badgeText: "Tính năng Chuyển Vai Trò",
-    targetSelector: '[data-tour="role-switcher"]',
+    id: "lesson-practice",
+    title: "3. Luyện Tập Thích Ứng",
+    roleBadge: "student",
+    badgeText: "Góc Học Sinh",
+    targetPage: "/tutor",
+    targetSelector: '[data-tour="lesson-practice"]',
     content:
-      "Dễ dàng nhảy từ tài khoản Học sinh sang Giáo viên 1-click ngay trên góc màn hình để kiểm tra dữ liệu vừa sinh ra mà không cần đăng xuất."
+      "Trả lời câu hỏi theo mức độ phù hợp với năng lực hiện tại. Kết quả được dùng để cập nhật tiến độ và điều chỉnh độ khó của các câu tiếp theo."
+  },
+  {
+    id: "lesson-chat",
+    title: "4. Hỏi Đáp Với AI",
+    roleBadge: "student",
+    badgeText: "Góc Học Sinh",
+    targetPage: "/tutor",
+    targetSelector: '[data-tour="lesson-chat"]',
+    content:
+      "Khi chưa hiểu, hãy hỏi Nova. AI sẽ đặt câu hỏi gợi mở và chia nhỏ vấn đề để em tự tìm ra đáp án thay vì đưa lời giải sẵn."
+  },
+  {
+    id: "lesson-exams",
+    title: "5. Đề Thi & Kiểm Tra",
+    roleBadge: "student",
+    badgeText: "Góc Học Sinh",
+    targetPage: "/tutor",
+    targetSelector: '[data-tour="lesson-exams"]',
+    content:
+      "Xem các bài kiểm tra được giao, nhập mã đề nếu có và theo dõi kết quả sau khi hoàn thành. Đây là bước giúp đánh giá mức độ nắm vững kiến thức."
   },
   {
     id: "concept-gaps",
@@ -197,8 +218,14 @@ export default function GuidedTour() {
 
   useEffect(() => {
     if (!isActive || !currentStep) return;
-    if (currentStep.id === "socratic-chat" || currentStep.id === "feynman-notebook") {
-      const tab = currentStep.id === "socratic-chat" ? "chat" : "practice";
+    const studentTabs: Record<string, "theory" | "practice" | "chat" | "exams"> = {
+      "lesson-theory": "theory",
+      "lesson-practice": "practice",
+      "lesson-chat": "chat",
+      "lesson-exams": "exams",
+    };
+    const tab = studentTabs[currentStep.id];
+    if (tab) {
       window.dispatchEvent(new CustomEvent("aurora-tour-switch-student-tab", { detail: tab }));
     }
 
