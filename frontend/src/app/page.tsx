@@ -77,13 +77,13 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background font-[var(--font-body)] text-foreground overflow-x-hidden relative">
+    <div className="min-h-screen bg-background font-[var(--font-body)] text-foreground relative">
       {/* Background Subtle Gradient Blobs */}
       <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-[var(--mint)]/30 blur-[120px] pointer-events-none" />
       <div className="absolute top-[30%] right-[-10%] h-[500px] w-[500px] rounded-full bg-[var(--purple)]/20 blur-[120px] pointer-events-none" />
 
       {/* Navigation Header */}
-      <div className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md py-3 border-b border-border/40 transition-all">
+      <div className="fixed top-0 left-0 right-0 z-50 w-full bg-background/85 backdrop-blur-md py-3 border-b border-border/40 transition-all">
         <nav className="max-w-6xl mx-auto px-6 py-2.5 flex justify-between items-center border border-border/80 bg-card/95 rounded-2xl shadow-md">
           <div className="flex items-center gap-8">
             <div 
@@ -140,7 +140,7 @@ export default function LandingPage() {
       </div>
 
       {/* Hero Section */}
-      <header className="relative z-10 max-w-6xl mx-auto px-6 pt-16 pb-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <header className="relative z-10 max-w-6xl mx-auto px-6 pt-28 pb-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
         {/* Left Column: Heading */}
         <div className="lg:col-span-6 space-y-6 text-center lg:text-left">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-[var(--mint)]/15 to-[var(--purple)]/15 text-xs font-bold text-foreground border border-[var(--mint)]/30 tracking-wide uppercase shadow-sm">
