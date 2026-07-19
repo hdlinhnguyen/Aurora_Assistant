@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"backend/internal/config"
 	"backend/internal/model"
+	"backend/internal/service"
 	"backend/internal/telemetry"
 )
 
@@ -88,6 +90,53 @@ func (h *TutorHandler) SubmitFeynmanEvent(c fiber.Ctx) error {
 		"ok":        true,
 		"sessionId": session.ID,
 		"messageId": message.ID,
+	})
+}
+
+type FeynmanScoreRequest struct {
+	NodeID      string `json:"nodeId"`
+	Explanation string `json:"explanation"`
+}
+
+// ScoreFeynmanExplanation chấm lời giảng bằng LLM thật. Trả 503 khi AI chưa cấu hình
+// để frontend rơi về heuristic local (offline vẫn dùng được Tập Vở).
+func (h *TutorHandler) ScoreFeynmanExplanation(c fiber.Ctx) error {
+	if _, ok := c.Locals("userID").(string); !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "invalid user id"})
+	}
+
+	var req FeynmanScoreRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+	req.Explanation = strings.TrimSpace(req.Explanation)
+	if req.Explanation == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "thiếu explanation"})
+	}
+
+	nodeID := uuid.Nil
+	if parsed, err := uuid.Parse(req.NodeID); err == nil {
+		nodeID = parsed
+	}
+
+	grade, topic, err := h.svc.ScoreFeynman(nodeID, req.Explanation)
+	if err != nil {
+		if errors.Is(err, service.ErrAINotConfigured) {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "AI chưa được cấu hình"})
+		}
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Không chấm được lời giảng: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"topic":        topic,
+		"clarityScore": grade.ClarityScore,
+		"subScores": fiber.Map{
+			"Rõ ràng":       grade.ScoreClear,
+			"Có ví dụ":      grade.ScoreExample,
+			"Đúng bản chất": grade.ScoreEssence,
+		},
+		"vagueSpots": grade.VagueSpots,
+		"followUps":  grade.FollowUpQuestions,
 	})
 }
 

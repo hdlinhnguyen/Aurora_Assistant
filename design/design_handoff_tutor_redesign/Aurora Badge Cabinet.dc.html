@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Inter", system-ui, sans-serif; background: #EAF3F1; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d7dee6; border-radius: 8px; }
+  @keyframes bc-float { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-5px);} }
+  @keyframes bc-spark { 0%,100% { opacity:.35; transform: scale(.8);} 50% { opacity:1; transform: scale(1.1);} }
+  @keyframes bc-pop { 0% { transform: scale(.85); opacity:0;} 60% { transform: scale(1.05);} 100% { transform: scale(1); opacity:1;} }
+  .bc-card { transition: transform .16s ease, box-shadow .16s ease; cursor:pointer; }
+  .bc-card:hover { transform: translateY(-5px); box-shadow: 0 26px 48px -26px rgba(31,26,60,.42); }
+</style>
+</helmet>
+
+<div style="height:100vh; min-height:720px; display:flex; overflow:hidden; background:#F4FBF9; font-family:'Inter',sans-serif; color:#16161F;">
+
+  <!-- ===== NAV RAIL ===== -->
+  <aside style="width:250px; background:#fff; border-right:1px solid #eef1f4; display:flex; flex-direction:column; flex-shrink:0;">
+    <div style="padding:20px 20px 18px; display:flex; align-items:center; gap:11px;">
+      <div style="height:38px;width:38px;border-radius:12px;background:linear-gradient(135deg,#14D9C0,#7C46E8);display:grid;place-items:center;color:#fff;font-weight:800;font-family:'Poppins';font-size:18px;">A</div>
+      <div><div style="font-family:'Poppins';font-weight:800;font-size:16px;line-height:1;">Aurora</div><div style="font-size:11px;color:#9aa1b0;margin-top:2px;">Học thật, hiểu thật</div></div>
+    </div>
+    <nav style="padding:8px 12px; display:flex; flex-direction:column; gap:4px;">
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;font-size:14px;font-weight:600;color:#5b6072;cursor:pointer;">🏠 Học hôm nay</div>
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;font-size:14px;font-weight:600;color:#5b6072;cursor:pointer;">🗺️ Lộ trình</div>
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;font-size:14px;font-weight:800;color:#5b2fc0;background:linear-gradient(135deg,#EFE9FD,#f6f1ff);box-shadow:inset 0 0 0 2px #7C46E8;cursor:pointer;">🏆 Tủ huy hiệu</div>
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;font-size:14px;font-weight:600;color:#5b6072;cursor:pointer;">📊 Tiến bộ của em</div>
+    </nav>
+    <div style="margin-top:auto;padding:14px;border-top:1px solid #f2f4f7;display:flex;align-items:center;gap:11px;">
+      <div style="height:38px;width:38px;border-radius:50%;background:linear-gradient(135deg,#ffd76f,#ff9f43);display:grid;place-items:center;font-weight:800;color:#7a4b00;font-family:'Poppins';">B</div>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">Bảo Bi</div><div style="font-size:11px;color:#9aa1b0;">🔥 5 ngày · ⭐ 290</div></div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main style="flex:1; overflow-y:auto; padding:26px 34px 44px; background:
+        radial-gradient(680px 320px at 100% -6%, rgba(124,70,232,.09), transparent 62%),
+        radial-gradient(560px 300px at -5% 0%, rgba(20,217,192,.10), transparent 60%);">
+
+    <!-- hero -->
+    <div style="background:linear-gradient(120deg,#7C46E8,#8B5CF6 55%,#14D9C0); border-radius:24px; padding:24px 28px; color:#fff; display:flex; align-items:center; justify-content:space-between; box-shadow:0 24px 46px -26px rgba(90,50,180,.6); position:relative; overflow:hidden;">
+      <div style="position:absolute;right:-30px;top:-40px;height:170px;width:170px;border-radius:50%;background:rgba(255,255,255,.12);"></div>
+      <div style="position:relative;z-index:1;display:flex;align-items:center;gap:18px;">
+        <div style="height:76px;width:76px;border-radius:22px;background:rgba(255,255,255,.18);backdrop-filter:blur(5px);display:grid;place-items:center;font-size:40px;border:2px solid rgba(255,255,255,.3);">🏆</div>
+        <div>
+          <div style="font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;opacity:.9;font-family:'Poppins';">Tủ huy hiệu của Bảo Bi</div>
+          <div style="font-family:'Baloo 2';font-weight:800;font-size:27px;margin:3px 0 8px;">Đã sưu tầm {{ earnedCount }}/{{ totalCount }} huy hiệu 🎉</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:12px;">
+            <span style="background:rgba(255,255,255,.2);padding:4px 11px;border-radius:999px;font-weight:700;">⭐ Cấp {{ level }} · Nhà thám hiểm</span>
+            <div style="width:150px;height:7px;background:rgba(255,255,255,.28);border-radius:7px;"><div style="height:7px;width:{{ xpPct }};background:#fff;border-radius:7px;"></div></div>
+            <span style="opacity:.9;">{{ xpText }}</span>
+          </div>
+        </div>
+      </div>
+      <div style="position:relative;z-index:1;display:flex;gap:12px;">
+        <div style="text-align:center;background:rgba(255,255,255,.16);border-radius:16px;padding:12px 18px;"><div style="font-family:'Poppins';font-weight:800;font-size:22px;">🔥 5</div><div style="font-size:10px;opacity:.9;">ngày liền</div></div>
+        <div style="text-align:center;background:rgba(255,255,255,.16);border-radius:16px;padding:12px 18px;"><div style="font-family:'Poppins';font-weight:800;font-size:22px;">⭐ 290</div><div style="font-size:10px;opacity:.9;">tổng sao</div></div>
+      </div>
+    </div>
+
+    <!-- filter tabs -->
+    <div style="display:flex;gap:9px;margin:22px 0 20px;">
+      <div onClick="{{ fAll }}" style="{{ tabAll }}">Tất cả <span style="opacity:.7;">{{ totalCount }}</span></div>
+      <div onClick="{{ fEarned }}" style="{{ tabEarned }}">✓ Đã mở khóa <span style="opacity:.7;">{{ earnedCount }}</span></div>
+      <div onClick="{{ fProgress }}" style="{{ tabProgress }}">⏳ Đang tiến hành <span style="opacity:.7;">{{ progressCount }}</span></div>
+    </div>
+
+    <!-- badge grid -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(212px,1fr)); gap:20px;">
+      <sc-for list="{{ shownBadges }}" as="b" hint-placeholder-count="8">
+        <div class="bc-card" onClick="{{ b.onClick }}" style="background:#fff;border:1px solid #eef1f4;border-radius:22px;padding:22px 18px 18px;text-align:center;box-shadow:0 14px 32px -26px rgba(0,0,0,.28);">
+          <div style="{{ b.wrapStyle }}">
+            <div style="{{ b.outer }}"></div>
+            <div style="{{ b.inner }}"><span style="{{ b.glyphStyle }}">{{ b.glyph }}</span></div>
+            <span style="{{ b.sparkStyle }}">✨</span>
+            <span style="{{ b.lockStyle }}">🔒</span>
+          </div>
+          <div style="{{ b.nameStyle }}">{{ b.name }}</div>
+          <div style="font-size:12px;color:#9aa1b0;margin:4px 0 12px;line-height:1.4;min-height:34px;">{{ b.desc }}</div>
+          <div style="{{ b.footStyle }}">
+            <sc-if value="{{ b.earned }}" hint-placeholder-val="{{ true }}"><span>{{ b.foot }}</span></sc-if>
+            <sc-if value="{{ b.inProgress }}" hint-placeholder-val="{{ false }}">
+              <div style="width:100%;">
+                <div style="height:7px;background:#eef1f4;border-radius:7px;"><div style="height:7px;border-radius:7px;width:{{ b.pct }};background:{{ b.barColor }};"></div></div>
+                <div style="font-size:10.5px;font-weight:700;margin-top:6px;color:{{ b.barText }};">{{ b.foot }}</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </main>
+
+  <!-- ===== DETAIL MODAL ===== -->
+  <sc-if value="{{ hasDetail }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDetail }}" style="position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(20,30,45,.55);backdrop-filter:blur(6px);padding:24px;">
+      <div style="background:#fff;border-radius:28px;max-width:420px;width:100%;padding:34px 34px 28px;text-align:center;box-shadow:0 40px 80px -30px rgba(0,0,0,.55);animation:bc-pop .38s cubic-bezier(.16,1,.3,1);">
+        <div style="{{ detail.wrapBig }}">
+          <div style="{{ detail.outerBig }}"></div>
+          <div style="{{ detail.innerBig }}"><span style="{{ detail.glyphBig }}">{{ detail.glyph }}</span></div>
+        </div>
+        <div style="display:inline-block;{{ detail.catStyle }}">{{ detail.category }}</div>
+        <div style="font-family:'Baloo 2';font-weight:800;font-size:23px;margin:6px 0 6px;{{ detail.nameColor }}">{{ detail.name }}</div>
+        <div style="font-size:13.5px;color:#5b6072;line-height:1.55;margin-bottom:18px;">{{ detail.desc }}</div>
+        <div style="{{ detail.statusBox }}">{{ detail.statusText }}</div>
+        <div onClick="{{ closeDetail }}" style="margin-top:20px;background:#f4f6f9;border:1px solid #eef1f4;color:#5b6072;border-radius:13px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;">Đóng</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1180, &quot;height&quot;: 760}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: "all", detailId: null };
+    this.badges = [
+      { id: "b1", name: "Vua Phân Số", desc: "Hoàn thành trọn vẹn một chương học.", category: "Chương học", glyph: "👑", shape: "circle", status: "earned", foot: "Đạt: Hôm nay",
+        outer: "linear-gradient(150deg,#FFD76F,#FF9F43)", inner: "linear-gradient(140deg,#FFF3D6,#FFC24D)", glow: "rgba(255,159,67,.55)", accent: "#b7811f", chip: "#FFF7E8", chipBorder: "#ffe1a6" },
+      { id: "b2", name: "Ngọn Lửa Chăm Chỉ", desc: "Học đều 7 ngày liên tục không nghỉ.", category: "Thói quen", glyph: "🔥", shape: "hexagon", status: "earned", foot: "Đạt: 3 ngày trước",
+        outer: "linear-gradient(150deg,#FFB65C,#FF5F57)", inner: "linear-gradient(150deg,#FFE0B8,#FF8A5B)", glow: "rgba(255,95,87,.5)", accent: "#d1502f", chip: "#fff1ec", chipBorder: "#ffd3c6" },
+      { id: "b3", name: "Tia Chớp Thần Tốc", desc: "Trả lời đúng 5 câu liền không cần gợi ý.", category: "Kỹ năng", glyph: "⚡", shape: "star", status: "earned", foot: "Đạt: 1 tuần trước",
+        outer: "linear-gradient(150deg,#A78BFA,#6D28D9)", inner: "linear-gradient(140deg,#EDE7FE,#B79BF7)", glow: "rgba(124,70,232,.55)", accent: "#6d28d9", chip: "#f3eefe", chipBorder: "#ddd0fb" },
+      { id: "b4", name: "Trái Tim Kiên Trì", desc: "Làm lại và trả lời đúng sau khi từng sai.", category: "Tinh thần", glyph: "💪", shape: "shield", status: "progress", pct: 60, foot: "3/5 lần vượt khó",
+        barColor: "linear-gradient(90deg,#14D9C0,#0FB9A6)", barText: "#0FB9A6" },
+      { id: "b5", name: "Nhà Thông Thái", desc: "Hỏi thầy AI 10 câu để hiểu sâu bài học.", category: "Ham học", glyph: "💡", shape: "octagon", status: "progress", pct: 40, foot: "4/10 câu hỏi hay",
+        barColor: "linear-gradient(90deg,#5AC8FA,#2A7CC0)", barText: "#2A7CC0" },
+      { id: "b6", name: "Thánh Phép Tính", desc: "Hoàn thành trọn chương Phép tính.", category: "Chương học", glyph: "➗", shape: "circle", status: "locked", foot: "Chưa mở khóa" },
+      { id: "b7", name: "Bậc Thầy Hình Học", desc: "Hoàn thành trọn chương Hình học.", category: "Chương học", glyph: "📐", shape: "hexagon", status: "locked", foot: "Chưa mở khóa" },
+      { id: "b8", name: "Chúa Tể Số Học", desc: "Tích lũy tổng cộng 1000 ngôi sao.", category: "Cột mốc", glyph: "🔢", shape: "star", status: "locked", foot: "Chưa mở khóa" },
+    ];
+  }
+
+  clip(shape) {
+    switch (shape) {
+      case "hexagon": return "clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);";
+      case "star": return "clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);";
+      case "shield": return "clip-path:polygon(50% 0,100% 12%,100% 55%,50% 100%,0 55%,0 12%);";
+      case "octagon": return "clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%);";
+      default: return "border-radius:50%;";
+    }
+  }
+
+  medal(b, size) {
+    const clip = this.clip(b.shape);
+    const inset = Math.round(size * 0.093);
+    const earned = b.status === "earned";
+    const glyphSize = Math.round(size * 0.37);
+    const wrap = `position:relative;width:${size}px;height:${size}px;margin:0 auto ${Math.round(size*0.14)}px;` + (earned ? "animation:bc-float 3.4s ease-in-out infinite;" : "");
+    let outer, inner, glyphStyle;
+    if (earned) {
+      outer = `position:absolute;inset:0;${clip}background:${b.outer};box-shadow:0 14px 26px -12px ${b.glow};`;
+      inner = `position:absolute;inset:${inset}px;${clip}background:${b.inner};display:grid;place-items:center;box-shadow:inset 0 3px 8px rgba(255,255,255,.65),inset 0 -6px 11px rgba(120,70,10,.18);`;
+      glyphStyle = `font-size:${glyphSize}px;filter:drop-shadow(0 2px 3px rgba(80,50,10,.3));`;
+    } else {
+      outer = `position:absolute;inset:0;${clip}background:linear-gradient(150deg,#dfe6ea,#c3ccd4);opacity:.7;`;
+      inner = `position:absolute;inset:${inset}px;${clip}background:linear-gradient(150deg,#eef2f5,#dbe2e8);display:grid;place-items:center;`;
+      glyphStyle = `font-size:${glyphSize - 2}px;filter:grayscale(1);opacity:.5;`;
+    }
+    return { wrap, outer, inner, glyphStyle };
+  }
+
+  setFilter(f) { this.setState({ filter: f }); }
+  openDetail(id) { this.setState({ detailId: id }); }
+  closeDetail() { this.setState({ detailId: null }); }
+
+  renderVals() {
+    const s = this.state;
+    const earnedCount = this.badges.filter((b) => b.status === "earned").length;
+    const progressCount = this.badges.filter((b) => b.status === "progress").length;
+    const totalCount = this.badges.length;
+
+    const shown = this.badges.filter((b) => {
+      if (s.filter === "earned") return b.status === "earned";
+      if (s.filter === "progress") return b.status === "progress";
+      return true;
+    });
+
+    const shownBadges = shown.map((b) => {
+      const m = this.medal(b, 108);
+      const earned = b.status === "earned";
+      const inProgress = b.status === "progress";
+      let footStyle = "min-height:26px;display:flex;justify-content:center;align-items:center;";
+      let foot = b.foot;
+      if (earned) {
+        footStyle += "";
+        foot = "";
+      }
+      return {
+        name: b.name, desc: b.desc, glyph: b.glyph,
+        wrapStyle: m.wrap, outer: m.outer, inner: m.inner, glyphStyle: m.glyphStyle,
+        sparkStyle: earned ? "position:absolute;top:-2px;right:8px;font-size:18px;animation:bc-spark 2.4s infinite;" : "display:none;",
+        lockStyle: b.status === "locked" ? "position:absolute;bottom:16px;left:50%;transform:translateX(-50%);font-size:15px;" : "display:none;",
+        nameStyle: "font-family:'Baloo 2';font-weight:800;font-size:16.5px;color:" + (earned ? "#16161F" : "#8a90a0") + ";",
+        earned, inProgress,
+        pct: (b.pct || 0) + "%", barColor: b.barColor || "#14D9C0", barText: b.barText || "#0FB9A6",
+        foot: earned ? b.foot : (b.foot || ""),
+        footStyle: "min-height:30px;display:flex;flex-direction:column;justify-content:center;align-items:center;font-size:11px;font-weight:800;font-family:'Poppins';color:" + (earned ? b.accent : "#9aa1b0") + ";",
+        onClick: () => this.openDetail(b.id),
+      };
+    });
+
+    // detail
+    const db = this.badges.find((b) => b.id === s.detailId);
+    let detail = {};
+    if (db) {
+      const m = this.medal(db, 132);
+      const earned = db.status === "earned";
+      const inProgress = db.status === "progress";
+      let statusBox, statusText;
+      if (earned) {
+        statusBox = "background:#F0FCF8;border:1px solid #b8ede0;color:#0d7a6c;border-radius:13px;padding:12px 14px;font-size:13px;font-weight:800;";
+        statusText = "✓ " + db.foot;
+      } else if (inProgress) {
+        statusBox = "background:#faf7ff;border:1px solid #ece5fb;color:#7C46E8;border-radius:13px;padding:12px 14px;font-size:13px;font-weight:800;";
+        statusText = "⏳ Đang tiến hành · " + db.foot;
+      } else {
+        statusBox = "background:#f4f6f9;border:1px solid #e6eaef;color:#8a90a0;border-radius:13px;padding:12px 14px;font-size:13px;font-weight:800;";
+        statusText = "🔒 " + db.desc;
+      }
+      detail = {
+        name: db.name, desc: db.desc, glyph: db.glyph, category: db.category,
+        wrapBig: m.wrap, outerBig: m.outer, innerBig: m.inner, glyphBig: m.glyphStyle,
+        catStyle: "background:#EFE9FD;color:#7C46E8;font-size:10.5px;font-weight:800;font-family:'Poppins';text-transform:uppercase;letter-spacing:.05em;padding:4px 12px;border-radius:999px;",
+        nameColor: earned ? "" : "color:#8a90a0;",
+        statusBox, statusText,
+      };
+    }
+
+    const tabBase = "border-radius:13px;padding:10px 16px;font-size:13.5px;font-weight:700;font-family:'Poppins';cursor:pointer;display:flex;align-items:center;gap:7px;transition:all .15s;";
+    const on = tabBase + "background:#16161F;color:#fff;";
+    const off = tabBase + "background:#fff;color:#5b6072;border:1px solid #eef1f4;";
+
+    return {
+      earnedCount, progressCount, totalCount,
+      level: 4, xpPct: "62%", xpText: "620 / 1000 XP",
+      shownBadges,
+      fAll: () => this.setFilter("all"),
+      fEarned: () => this.setFilter("earned"),
+      fProgress: () => this.setFilter("progress"),
+      tabAll: s.filter === "all" ? on : off,
+      tabEarned: s.filter === "earned" ? on : off,
+      tabProgress: s.filter === "progress" ? on : off,
+      hasDetail: !!db, detail,
+      closeDetail: () => this.closeDetail(),
+    };
+  }
+}
+</script>
+</body>
+</html>

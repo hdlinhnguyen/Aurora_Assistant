@@ -74,6 +74,9 @@ type TutorService interface {
 	// Socratic RAG Chat
 	ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string, questionText string) (string, error)
 
+	// Feynman
+	ScoreFeynman(nodeID uuid.UUID, explanation string) (*FeynmanGrade, string, error)
+
 	// Guardrail
 	GetGuardrailEvents(severity string, limit int) ([]GuardrailEventView, error)
 	MarkGuardrailEventHandled(eventID uuid.UUID) error
@@ -312,12 +315,33 @@ func (s *tutorService) logGuardrailEvent(studentID uuid.UUID, sessionID *uuid.UU
 	}
 }
 
+// ScoreFeynman chấm lời giảng bằng LLM, kèm tên node làm topic và theory làm căn cứ.
+// Trả về (grade, topicName, error); error ErrAINotConfigured khi chưa có API key.
+func (s *tutorService) ScoreFeynman(nodeID uuid.UUID, explanation string) (*FeynmanGrade, string, error) {
+	topic := "chủ đề đang học"
+	theory := ""
+	if nodeID != uuid.Nil {
+		var node model.Node
+		if err := s.db.First(&node, "id = ?", nodeID).Error; err == nil {
+			if node.Name != "" {
+				topic = node.Name
+			}
+			theory = node.Theory
+		}
+	}
+	grade, err := s.aiSvc.ScoreFeynmanExplanation(topic, theory, explanation)
+	if err != nil {
+		return nil, topic, err
+	}
+	return grade, topic, nil
+}
+
 func (s *tutorService) GetGuardrailEvents(severity string, limit int) ([]GuardrailEventView, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
 	q := s.db.Table("guardrail_events").
-		Select("guardrail_events.id, guardrail_events.student_id, users.name as student_name, users.email as student_email, guardrail_events.session_id, guardrail_events.source, guardrail_events.category, guardrail_events.severity, guardrail_events.content_excerpt, guardrail_events.handled, guardrail_events.created_at").
+		Select("guardrail_events.id, guardrail_events.student_id, users.name as student_name, users.email as student_email, guardrail_events.session_id, guardrail_events.source, guardrail_events.category, guardrail_events.severity, guardrail_events.content_excerpt as message, guardrail_events.handled, guardrail_events.created_at").
 		Joins("join users on users.id = guardrail_events.student_id").
 		Order("guardrail_events.created_at desc").
 		Limit(limit)

@@ -284,6 +284,12 @@
   animation: pulseRed 1.5s infinite ease-in-out;
 }
 
+/* Knowledge tree — struggle-node attention glow (view-only focus redesign) */
+@keyframes struggle-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.3); }
+  50% { box-shadow: 0 0 0 7px rgba(225, 29, 72, 0); }
+}
+
 /* ===== Aurora Tutor Hub (redesign) animations ===== */
 @keyframes ah-pop {
   0% { transform: scale(0.8); opacity: 0; }

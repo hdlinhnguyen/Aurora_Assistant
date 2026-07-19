@@ -25,6 +25,23 @@ type AIService interface {
 	GenerateRAGResponse(theory string, history []map[string]string, message string) (string, error)
 	GenerateSocraticPracticeResponse(theory string, questionText string, history []map[string]string, message string) (string, error)
 	ParseCurriculum(content string) (string, error)
+	// ScoreFeynmanExplanation chấm lời giảng của học sinh (Tập Vở Feynman) bằng LLM.
+	// Trả ErrAINotConfigured khi thiếu API key để caller rơi về heuristic phía client.
+	ScoreFeynmanExplanation(topic string, theory string, explanation string) (*FeynmanGrade, error)
+}
+
+// ErrAINotConfigured báo hiệu chưa có API key — không phải lỗi hệ thống.
+var ErrAINotConfigured = errors.New("AI chưa được cấu hình (thiếu OPENAI_API_KEY)")
+
+// FeynmanGrade là kết quả LLM chấm một lời giảng theo kỹ thuật Feynman.
+type FeynmanGrade struct {
+	ClarityScore      int      `json:"clarity_score"`
+	ScoreClear        int      `json:"score_clear"`   // Rõ ràng
+	ScoreExample      int      `json:"score_example"` // Có ví dụ
+	ScoreEssence      int      `json:"score_essence"` // Đúng bản chất
+	VagueSpots        []string `json:"vague_spots"`
+	FollowUpQuestions []string `json:"follow_up_questions"`
+	SafetyFlag        string   `json:"safety_flag"`
 }
 
 type aiService struct {
@@ -190,6 +207,78 @@ QUY TẮC BẮT BUỘC:
 	}
 
 	return aiRes.ResponseMessage, aiRes.DetectedGap, aiRes.IsCorrectStep, aiRes.FeynmanScore, aiRes.SafetyFlag, nil
+}
+
+func (s *aiService) ScoreFeynmanExplanation(topic string, theory string, explanation string) (*FeynmanGrade, error) {
+	if os.Getenv("OPENAI_API_KEY") == "" {
+		return nil, ErrAINotConfigured
+	}
+
+	theoryBlock := ""
+	if strings.TrimSpace(theory) != "" {
+		theoryBlock = fmt.Sprintf("\nLÝ THUYẾT CHUẨN CỦA BÀI (dùng làm căn cứ chấm 'Đúng bản chất'):\n%s\n", theory)
+	}
+
+	systemPrompt := fmt.Sprintf(`Bạn là giám khảo chấm "Tập Vở Feynman": học sinh phổ thông Việt Nam vừa đóng vai thầy/cô
+giảng lại chủ đề '%s' cho một em bé 6 tuổi. Hãy chấm mức độ THẤU HIỂU BẢN CHẤT của lời giảng.
+%s
+TIÊU CHÍ (mỗi tiêu chí 0-100):
+- score_clear (Rõ ràng): câu chữ đơn giản, mạch lạc, trẻ 6 tuổi theo kịp; không thuật ngữ cao siêu bỏ lửng.
+- score_example (Có ví dụ): có ví dụ trực quan bằng số hoặc đồ vật đời thường (cái kẹo, quả táo, chiếc bánh...).
+- score_essence (Đúng bản chất): nội dung đúng kiến thức, nêu được VÌ SAO chứ không chỉ CÁCH LÀM; phát hiện học vẹt (lặp công thức máy móc, thiếu giải thích) thì chấm thấp.
+- clarity_score: điểm tổng hợp 0-100 (thiên về score_essence).
+
+%s
+
+Trả về DUY NHẤT JSON thô, không markdown:
+{
+  "clarity_score": <0-100>,
+  "score_clear": <0-100>,
+  "score_example": <0-100>,
+  "score_essence": <0-100>,
+  "vague_spots": ["<tối đa 3 chỗ em bé vẫn chưa hiểu, viết giọng nhẹ nhàng cho học sinh>"],
+  "follow_up_questions": ["<tối đa 3 câu hỏi ngây thơ của em bé để học sinh giảng tiếp>"],
+  "safety_flag": "<'' | 'jailbreak' | 'inappropriate' | 'distress' theo Quy tắc an toàn>"
+}`, topic, theoryBlock, safetyRules)
+
+	reqBody := map[string]interface{}{
+		"messages": []map[string]string{
+			{"role": "system", "content": systemPrompt},
+			{"role": "user", "content": explanation},
+		},
+		"temperature":     0.2,
+		"response_format": map[string]string{"type": "json_object"},
+	}
+
+	respContent, err := s.sendRequestWithFallback(reqBody)
+	if err != nil {
+		return nil, err
+	}
+
+	rawContent := strings.TrimSpace(respContent)
+	rawContent = strings.TrimPrefix(rawContent, "```json")
+	rawContent = strings.TrimPrefix(rawContent, "```")
+	rawContent = strings.TrimSuffix(rawContent, "```")
+	rawContent = strings.TrimSpace(rawContent)
+
+	var grade FeynmanGrade
+	if err := json.Unmarshal([]byte(rawContent), &grade); err != nil {
+		return nil, fmt.Errorf("phản hồi LLM không đúng định dạng JSON: %w", err)
+	}
+	clamp := func(v int) int {
+		if v < 0 {
+			return 0
+		}
+		if v > 100 {
+			return 100
+		}
+		return v
+	}
+	grade.ClarityScore = clamp(grade.ClarityScore)
+	grade.ScoreClear = clamp(grade.ScoreClear)
+	grade.ScoreExample = clamp(grade.ScoreExample)
+	grade.ScoreEssence = clamp(grade.ScoreEssence)
+	return &grade, nil
 }
 
 func (s *aiService) GenerateRAGResponse(theory string, history []map[string]string, message string) (string, error) {

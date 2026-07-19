@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"time"
 
@@ -333,26 +334,39 @@ func (s *tutorService) GetMonitoringData(subject string) ([]StudentStat, error) 
 
 		actualMastery := rate * 100
 
-		// Compute expected mastery: baseline 75% plus deterministic offset based on name hash for visual spread
-		hashVal := 0
-		for _, char := range student.Name {
-			hashVal += int(char)
-		}
-		expectedMastery := 75.0 + float64(hashVal%16)
-
-		// Outlier check: attempted at least 3 questions and actual score is more than 35% below expected score
-		isOutlier := total >= 3 && (expectedMastery-actualMastery) > 35.0
-
 		stats = append(stats, StudentStat{
-			StudentID:       student.ID.String(),
-			StudentName:     student.Name,
-			ExpectedMastery: expectedMastery,
-			ActualMastery:   actualMastery,
-			TotalAnswers:    int(total),
-			CorrectAnswers:  int(correct),
-			MasteryRate:     actualMastery,
-			IsOutlier:       isOutlier,
+			StudentID:      student.ID.String(),
+			StudentName:    student.Name,
+			ActualMastery:  actualMastery,
+			TotalAnswers:   int(total),
+			CorrectAnswers: int(correct),
+			MasteryRate:    actualMastery,
 		})
+	}
+
+	// Expected mastery = trung bình lớp trên các học sinh có evidence; outlier = tụt hơn 1.5 độ
+	// lệch chuẩn dưới trung bình lớp (cần >=3 câu để tránh kết luận từ quá ít dữ liệu).
+	classSum, classN := 0.0, 0
+	for _, st := range stats {
+		if st.TotalAnswers > 0 {
+			classSum += st.ActualMastery
+			classN++
+		}
+	}
+	if classN > 0 {
+		classMean := classSum / float64(classN)
+		variance := 0.0
+		for _, st := range stats {
+			if st.TotalAnswers > 0 {
+				d := st.ActualMastery - classMean
+				variance += d * d
+			}
+		}
+		stdDev := math.Sqrt(variance / float64(classN))
+		for i := range stats {
+			stats[i].ExpectedMastery = classMean
+			stats[i].IsOutlier = stats[i].TotalAnswers >= 3 && (classMean-stats[i].ActualMastery) > 1.5*stdDev
+		}
 	}
 	return stats, nil
 }

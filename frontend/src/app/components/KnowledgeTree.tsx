@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, MouseEvent } from "react";
 import { apiFetch } from "@/lib/api";
 import { BKT_INITIAL_MASTERY, TopicMastery, masteryPercent as toMasteryPercent } from "@/lib/mastery";
+import { computeMasteredChains, MasteredChain } from "@/lib/masteredChains";
 import { toast } from "sonner";
 import { Plus, Trash, Trash2, ZoomIn, ZoomOut, Move, Link2, Eye, Edit2, Folder, MinusCircle, PlusCircle, BookOpen, Undo, Redo, RefreshCw, Layers, LayoutGrid, CheckCircle2, AlertCircle, PlayCircle, Lock, Compass, X, Check, HelpCircle, AlertTriangle } from "lucide-react";
 
@@ -39,7 +40,12 @@ interface KnowledgeTreeProps {
   onRefresh?: () => void;
   focusedNodeId?: string | null;
   onFocusedNodeChange?: (nodeId: string) => void;
+  onClearFocus?: () => void;
   onShowContentClick?: (node: NodeItem) => void;
+  /** Truy vết gốc rễ: path = [nút vừa sai, ..., nút gốc rễ]. Kích hoạt animation lan màu + camera pan. */
+  traceHighlight?: { path: string[] } | null;
+  /** CTA "Ôn lại nút này" trên banner khi truy vết chạy xong. */
+  onTraceCta?: (rootId: string) => void;
 }
 
 export default function KnowledgeTree({
@@ -48,6 +54,7 @@ export default function KnowledgeTree({
   edges,
   mode,
   studentNodeStatus = {},
+  nodeAccuracy = {},
   masteryByTopic = {},
   initialNodeId,
   currentNodeId,
@@ -55,7 +62,10 @@ export default function KnowledgeTree({
   onRefresh,
   focusedNodeId,
   onFocusedNodeChange,
+  onClearFocus,
   onShowContentClick,
+  traceHighlight,
+  onTraceCta,
 }: KnowledgeTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -70,10 +80,58 @@ export default function KnowledgeTree({
   const [collapsedNodes, setCollapsedNodes] = useState<Record<string, boolean>>({});
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  
+
   const activeSelectedNodeId = selectedNodeId || focusedNodeId;
   const [isFocusedView, setIsFocusedView] = useState(false);
   const [showGroups, setShowGroups] = useState(false);
+
+  // "Điểm cần chú ý" focus view (view-only mode): mastered-chain auto-collapse
+  const viewOnlyMode = mode === "view-only";
+  const [expandedChainIds, setExpandedChainIds] = useState<Set<string>>(new Set());
+
+  // --- Truy vết gốc rễ: bước hiện tại trên path (-1 = không truy vết) ---
+  const [traceStep, setTraceStep] = useState(-1);
+  const tracePath = traceHighlight?.path ?? [];
+  const traceActive = tracePath.length > 0;
+  const traceDone = traceActive && traceStep >= tracePath.length - 1;
+  const traceRootId = traceActive ? tracePath[tracePath.length - 1] : null;
+
+  useEffect(() => {
+    if (!traceActive) {
+      setTraceStep(-1);
+      return;
+    }
+    setTraceStep(0);
+    let i = 0;
+    const iv = setInterval(() => {
+      i += 1;
+      if (i >= tracePath.length) {
+        clearInterval(iv);
+        return;
+      }
+      setTraceStep(i);
+    }, 900);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceHighlight]);
+
+  // Camera đi theo nút đang "cháy" trên đường truy vết
+  useEffect(() => {
+    if (!traceActive || traceStep < 0) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const node = localNodes.find((n) => n.id === tracePath[traceStep]);
+    if (!node) return;
+    const cw = container.clientWidth || 800;
+    const ch = container.clientHeight || 500;
+    const s = 0.95;
+    setScale(s);
+    setPan({
+      x: Math.round(cw / 2 - (node.posX + 115) * s),
+      y: Math.round(ch / 2 - (node.posY + 42.5) * s),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceStep, traceActive]);
   
   // Custom modal dialog states (replaces prompt, confirm & alert)
   const [treeModalState, setTreeModalState] = useState<{
@@ -278,25 +336,97 @@ export default function KnowledgeTree({
     setScale(newScale);
   };
 
-  // Auto-center on load
+  // Auto-center on load (view-only mode has its own fit effect below, which
+  // also runs on load — skip here so the two don't fight over pan/scale)
   useEffect(() => {
+    if (viewOnlyMode) return;
     if (nodes && nodes.length > 0 && containerRef.current) {
       const timer = setTimeout(() => {
         handleResetZoom();
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [nodes]);
+  }, [nodes, viewOnlyMode]);
+
+  // Fit a set of node boxes into the viewport: returns the scale + translate
+  // that centers them, given the ACTUAL measured container size (never a
+  // hardcoded constant, since the panel is flexibly sized).
+  const fitBoxes = (
+    boxes: { x: number; y: number; w: number; h: number }[],
+    containerWidth: number,
+    containerHeight: number,
+    padding: number,
+    maxScale: number,
+    minScale: number = 0.35,
+  ) => {
+    const minX = Math.min(...boxes.map((b) => b.x));
+    const minY = Math.min(...boxes.map((b) => b.y));
+    const maxX = Math.max(...boxes.map((b) => b.x + b.w));
+    const maxY = Math.max(...boxes.map((b) => b.y + b.h));
+    const w = Math.max(maxX - minX, 1);
+    const h = Math.max(maxY - minY, 1);
+    let newScale = Math.min((containerWidth - padding * 2) / w, (containerHeight - padding * 2) / h, maxScale);
+    newScale = Math.max(newScale, minScale);
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    return { scale: newScale, tx: containerWidth / 2 - cx * newScale, ty: containerHeight / 2 - cy * newScale };
+  };
 
   // Re-center when switching between focused/overview mode
   useEffect(() => {
     if (!containerRef.current || localNodes.length === 0) return;
+    if (traceActive) return; // camera đang thuộc về animation truy vết gốc rễ
 
     const timer = setTimeout(() => {
       const container = containerRef.current;
       if (!container) return;
+      const containerWidth = container.clientWidth || 800;
+      const containerHeight = container.clientHeight || 500;
+      const nodeWidth = 230;
+      const nodeHeight = 85;
+
+      if (viewOnlyMode) {
+        // Neighbor-only focus (sidebar/tree click) vs. fit-all ("Xem toàn cảnh")
+        const focusBoxes = activeSelectedNodeId
+          ? displayNodes.filter((n) => neighborFocusSet.has(n.id)).map((n) => ({ x: n.posX, y: n.posY, w: nodeWidth, h: nodeHeight }))
+          : [];
+        const boxes = focusBoxes.length > 0
+          ? focusBoxes
+          : displayNodes.map((n) => ({ x: n.posX, y: n.posY, w: nodeWidth, h: nodeHeight }));
+        if (boxes.length === 0) return;
+        const padding = focusBoxes.length > 0 ? 110 : 70;
+        const maxScale = focusBoxes.length > 0 ? 1.15 : 1;
+        // Fit-all must be able to shrink a lot further than the focused case —
+        // a subject with many top-level branches can be very wide/bushy.
+        // The focused case keeps a high floor so it always reads as "zoomed
+        // in": a node with several widely-separated prerequisite parents can
+        // otherwise force a huge neighbor bounding box and end up zoomed OUT
+        // instead — better to let distant neighbors extend past the viewport
+        // (pannable) than to lose the "zoomed in" feel entirely.
+        const minScale = focusBoxes.length > 0 ? 0.65 : 0.1;
+        const fitted = fitBoxes(boxes, containerWidth, containerHeight, padding, maxScale, minScale);
+        setScale(fitted.scale);
+
+        const focusNode = activeSelectedNodeId ? displayNodes.find((n) => n.id === activeSelectedNodeId) : null;
+        if (focusNode) {
+          // Center on the clicked node itself, not the neighbor group's bbox
+          // centroid — a node with far-flung neighbors would otherwise pull
+          // the pan toward the group's average position, potentially pushing
+          // the actual focused node off-screen.
+          const nodeCenterX = focusNode.posX + nodeWidth / 2;
+          const nodeCenterY = focusNode.posY + nodeHeight / 2;
+          setPan({
+            x: Math.round(containerWidth / 2 - nodeCenterX * fitted.scale),
+            y: Math.round(containerHeight / 2 - nodeCenterY * fitted.scale),
+          });
+        } else {
+          setPan({ x: Math.round(fitted.tx), y: Math.round(fitted.ty) });
+        }
+        return;
+      }
 
       if (isFocusedView && activeSelectedNodeId) {
+        // Center the selected node in the viewport
         // Find the selected node from displayNodes (which has focused-view coords)
         const selectedNode = displayNodes.find(n => n.id === activeSelectedNodeId);
         if (!selectedNode) {
@@ -304,13 +434,8 @@ export default function KnowledgeTree({
           return;
         }
 
-        const nodeWidth = 230;
-        const nodeHeight = 85;
         const nodeCenterX = selectedNode.posX + nodeWidth / 2;
         const nodeCenterY = selectedNode.posY + nodeHeight / 2;
-
-        const containerWidth = container.clientWidth || 800;
-        const containerHeight = container.clientHeight || 500;
 
         const targetScale = 1.0;
         const panX = containerWidth / 2 - nodeCenterX * targetScale;
@@ -341,7 +466,7 @@ export default function KnowledgeTree({
       }
     }, 50);
     return () => clearTimeout(timer);
-  }, [isFocusedView, activeSelectedNodeId]);
+  }, [isFocusedView, activeSelectedNodeId, viewOnlyMode, expandedChainIds, localNodes, traceActive]);
 
   // Auto-layout: matches backend algorithm (global topological levels, centered)
   const handleAutoLayout = async () => {
@@ -665,8 +790,8 @@ export default function KnowledgeTree({
       return { stroke: "#cbd5e1", strokeWidth: 3, strokeDasharray: "none", isFlow: false };
     }
 
-    const srcStatus = studentNodeStatus[edge.sourceId] || "locked";
-    const tgtStatus = studentNodeStatus[edge.targetId] || "locked";
+    const srcStatus = chainById.has(edge.sourceId) ? "mastered" : (studentNodeStatus[edge.sourceId] || "locked");
+    const tgtStatus = chainById.has(edge.targetId) ? "mastered" : (studentNodeStatus[edge.targetId] || "locked");
 
     if (srcStatus === "mastered" && tgtStatus === "mastered") {
       return { stroke: "#10b981", strokeWidth: 4, isFlow: true };
@@ -678,9 +803,9 @@ export default function KnowledgeTree({
   };
 
   const isNodeSelectable = (node: NodeItem) => {
-    if (mode === "teacher" || mode === "view-only") return true;
+    if (mode === "teacher") return true;
     if (node.isRoot) return true;
-    
+
     const status = studentNodeStatus[node.id];
     return status && status !== "locked";
   };
@@ -698,12 +823,16 @@ export default function KnowledgeTree({
     if (!status) {
       status = "locked";
     }
+    // mastered-chain summary nodes are synthetic (no studentNodeStatus entry) but always read as "mastered"
+    if (chainById.has(node.id)) {
+      status = "mastered";
+    }
 
     switch (status) {
       case "mastered":
         return "border-emerald-400/80 bg-gradient-to-br from-emerald-50 via-white to-emerald-100 text-emerald-950 shadow-md shadow-emerald-100/40 hover:shadow-emerald-200/50 font-bold";
       case "struggle":
-        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-100 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold animate-pulse";
+        return "border-rose-400/80 bg-gradient-to-br from-rose-50 via-white to-rose-100 text-rose-950 shadow-md shadow-rose-100/40 hover:shadow-rose-200/50 font-bold animate-[struggle-glow_2s_infinite]";
       case "learning":
         return "border-orange-400/80 bg-gradient-to-br from-amber-50 via-white to-orange-100 text-orange-950 shadow-md shadow-orange-100/40 hover:shadow-orange-200/50 ring-2 ring-orange-300/60 font-bold";
       case "initial":
@@ -785,9 +914,140 @@ export default function KnowledgeTree({
     });
   }
 
+  // --- MASTERED-CHAIN AUTO-COLLAPSE (view-only mode) ---
+  // Consecutive mastered topics (a simple linear run, no branching) collapse
+  // into one "N chủ đề đã hoàn thành" summary node by default, decluttering
+  // the tree. Expanding a summary node reveals its real member nodes again.
+  const nodeByIdMap = new Map(localNodes.map((n) => [n.id, n]));
+  const accuracyPctOf = (id: string): number | null => {
+    const acc = nodeAccuracy[id];
+    if (!acc || acc.total <= 0) return null;
+    return Math.round((acc.correct / acc.total) * 100);
+  };
+  // Khi truy vết gốc rễ, không gộp chuỗi mastered — nút trên path phải luôn hiện
+  const masteredChains: MasteredChain[] = viewOnlyMode && !traceActive
+    ? computeMasteredChains(localNodes, edges, (id) => studentNodeStatus[id] || "locked", accuracyPctOf)
+    : [];
+  const expandedChains = masteredChains.filter((c) => expandedChainIds.has(c.id));
+  const totalExpandedChainMembers = expandedChains.reduce((sum, c) => sum + c.memberIds.length, 0);
+
+  let chainNodes: NodeItem[] = localNodes;
+  let chainEdges: EdgeItem[] = edges;
+
+  if (viewOnlyMode && masteredChains.length > 0) {
+    const hiddenMemberIds = new Set<string>();
+    const summaryNodes: NodeItem[] = [];
+    const summaryEdges: EdgeItem[] = [];
+
+    masteredChains.forEach((chain) => {
+      if (expandedChainIds.has(chain.id)) return; // expanded: show real members, no synthetic node/edges
+
+      chain.memberIds.forEach((id) => hiddenMemberIds.add(id));
+      const headNode = nodeByIdMap.get(chain.memberIds[0]);
+      summaryNodes.push({
+        id: chain.id,
+        subject,
+        name: `${chain.memberIds.length} chủ đề đã hoàn thành`,
+        theory: "",
+        posX: headNode?.posX ?? 0,
+        posY: headNode?.posY ?? 0,
+        isRoot: false,
+      });
+      if (chain.parentId) {
+        summaryEdges.push({ id: `${chain.id}::in`, subject, sourceId: chain.parentId, targetId: chain.id });
+      }
+      chain.childIds.forEach((childId) => {
+        summaryEdges.push({ id: `${chain.id}::out::${childId}`, subject, sourceId: chain.id, targetId: childId });
+      });
+    });
+
+    chainNodes = localNodes.filter((n) => !hiddenMemberIds.has(n.id)).concat(summaryNodes);
+    chainEdges = edges.filter((e) => !hiddenMemberIds.has(e.sourceId) && !hiddenMemberIds.has(e.targetId)).concat(summaryEdges);
+  }
+
+  // --- VIEW-ONLY LAYOUT: recompute a clean, generously-spaced layout ---
+  // The teacher's saved posX/posY reflect their own editor layout, which can
+  // be tightly packed (nodes are often added with only ~35px of clearance).
+  // View-only never allows dragging, so it's safe to lay out fresh purely
+  // for display — nothing here is persisted — giving edges room to read.
+  if (viewOnlyMode && chainNodes.length > 0) {
+    const VO_NODE_SPACING = 420;
+    const VO_LEVEL_HEIGHT = 320;
+    const VO_LEFT_MARGIN = 60;
+    const VO_TOP_MARGIN = 60;
+
+    const voAdj: Record<string, string[]> = {};
+    const voInDegree: Record<string, number> = {};
+    chainNodes.forEach((n) => { voAdj[n.id] = []; voInDegree[n.id] = 0; });
+    chainEdges.forEach((e) => {
+      if (voAdj[e.sourceId] !== undefined && voInDegree[e.targetId] !== undefined) {
+        voAdj[e.sourceId].push(e.targetId);
+        voInDegree[e.targetId]++;
+      }
+    });
+
+    const voQueue: string[] = [];
+    const voLevels: Record<string, number> = {};
+    Object.keys(voInDegree).forEach((id) => {
+      if (voInDegree[id] === 0) { voQueue.push(id); voLevels[id] = 0; }
+    });
+    let voHead = 0;
+    while (voHead < voQueue.length) {
+      const curr = voQueue[voHead++];
+      voAdj[curr].forEach((child) => {
+        voLevels[child] = Math.max(voLevels[child] ?? 0, (voLevels[curr] ?? 0) + 1);
+        voInDegree[child]--;
+        if (voInDegree[child] === 0) voQueue.push(child);
+      });
+    }
+    chainNodes.forEach((n) => { if (voLevels[n.id] === undefined) voLevels[n.id] = 0; });
+
+    const voByLevel: Record<number, string[]> = {};
+    let voMaxLevel = 0;
+    Object.entries(voLevels).forEach(([id, lvl]) => {
+      if (!voByLevel[lvl]) voByLevel[lvl] = [];
+      voByLevel[lvl].push(id);
+      if (lvl > voMaxLevel) voMaxLevel = lvl;
+    });
+
+    const voPositions: Record<string, { x: number; y: number }> = {};
+    for (let lvl = 0; lvl <= voMaxLevel; lvl++) {
+      const levelNodes = voByLevel[lvl] || [];
+      const count = levelNodes.length;
+      const totalWidth = VO_NODE_SPACING * count;
+      levelNodes.forEach((id, idx) => {
+        const x = count === 1
+          ? VO_LEFT_MARGIN + totalWidth / 2 - 100
+          : VO_LEFT_MARGIN + idx * VO_NODE_SPACING;
+        voPositions[id] = { x, y: VO_TOP_MARGIN + lvl * VO_LEVEL_HEIGHT };
+      });
+    }
+
+    chainNodes = chainNodes.map((n) => ({
+      ...n,
+      posX: voPositions[n.id]?.x ?? n.posX,
+      posY: voPositions[n.id]?.y ?? n.posY,
+    }));
+  }
+
+  const chainById = new Map(masteredChains.map((c) => [c.id, c]));
+
   // --- DYNAMIC FOCUSED VIEW LAYOUT REARRANGEMENT ---
-  let displayNodes = localNodes.filter(n => !isNodeHidden(n.id));
-  let displayEdges = edges.filter(e => !isNodeHidden(e.sourceId) && !isNodeHidden(e.targetId));
+  let displayNodes = chainNodes.filter(n => !isNodeHidden(n.id));
+  let displayEdges = chainEdges.filter(e => !isNodeHidden(e.sourceId) && !isNodeHidden(e.targetId));
+
+  // --- NEIGHBOR-ONLY FOCUS (view-only mode "Điểm cần chú ý" sidebar) ---
+  // Unlike isFocusedView's full ancestor/descendant closure below (teacher
+  // mode), this dims everything except the focused node's immediate
+  // parent(s)/child(ren) in the CURRENT (possibly chain-collapsed) graph.
+  const neighborFocusSet = new Set<string>();
+  if (viewOnlyMode && activeSelectedNodeId) {
+    neighborFocusSet.add(activeSelectedNodeId);
+    displayEdges.forEach((e) => {
+      if (e.sourceId === activeSelectedNodeId) neighborFocusSet.add(e.targetId);
+      if (e.targetId === activeSelectedNodeId) neighborFocusSet.add(e.sourceId);
+    });
+  }
 
   if (isFocusedView && activeSelectedNodeId) {
     const focusedNodeItems = localNodes.filter((n) => highlightedNodes.has(n.id));
@@ -925,8 +1185,23 @@ export default function KnowledgeTree({
     const controlPointY = startY + (endY - startY) / 2;
     const pathD = `M ${startX} ${startY} C ${startX} ${controlPointY}, ${endX} ${controlPointY}, ${endX} ${endY}`;
 
-    const isHighlighted = highlightedEdges.has(edge.id);
-    const opacity = isFocusedView ? (isHighlighted ? 1 : 0.45) : 1;
+    // Edge nằm trên đường truy vết gốc rễ và đã được "thắp sáng" tới bước hiện tại?
+    // path[i] = con, path[i+1] = cha; edge cha→con sáng khi traceStep đạt tới cha (i+1).
+    const traceChildIdx = traceActive ? tracePath.indexOf(edge.targetId) : -1;
+    const isTraceEdgeLit =
+      traceChildIdx !== -1 &&
+      tracePath[traceChildIdx + 1] === edge.sourceId &&
+      traceStep >= traceChildIdx + 1;
+
+    const isNeighborHighlightVO = viewOnlyMode && neighborFocusSet.has(edge.sourceId) && neighborFocusSet.has(edge.targetId);
+    const isHighlighted = viewOnlyMode ? isNeighborHighlightVO : highlightedEdges.has(edge.id);
+    // View-only mode never recolors edges purple (that's the teacher-mode ancestor/descendant path highlight)
+    const recolorPurple = isHighlighted && !viewOnlyMode;
+    const opacity = isTraceEdgeLit
+      ? 1
+      : viewOnlyMode
+        ? (activeSelectedNodeId ? (isNeighborHighlightVO ? 0.9 : 0.15) : 0.9)
+        : (isFocusedView ? (isHighlighted ? 1 : 0.45) : 1);
 
     return (
       <g key={edge.id} className="group/edge" style={{ opacity, transition: "opacity 0.2s" }}>
@@ -945,13 +1220,25 @@ export default function KnowledgeTree({
         <path
           d={pathD}
           fill="none"
-          stroke={isHighlighted ? "var(--color-secondary)" : style.stroke}
+          stroke={recolorPurple ? "var(--color-secondary)" : style.stroke}
           strokeWidth={isHighlighted ? style.strokeWidth + 1.5 : style.strokeWidth}
           strokeDasharray={style.strokeDasharray}
-          markerEnd={style.strokeDasharray ? "" : `url(#arrow-${isHighlighted ? "purple" : (style.stroke === "#10b981" ? "green" : style.stroke === "#f97316" ? "orange" : "gray")})`}
+          markerEnd={style.strokeDasharray ? "" : `url(#arrow-${recolorPurple ? "purple" : (style.stroke === "#10b981" ? "green" : style.stroke === "#f97316" ? "orange" : "gray")})`}
           className={style.isFlow || isHighlighted ? "animate-flow-line" : ""}
           style={{ strokeDashoffset: style.isFlow || isHighlighted ? 0 : undefined }}
         />
+
+        {/* Lớp phủ đỏ chạy ngược cây khi truy vết gốc rễ */}
+        {isTraceEdgeLit && (
+          <path
+            d={pathD}
+            fill="none"
+            stroke="#ef4444"
+            strokeWidth={style.strokeWidth + 2.5}
+            className="animate-flow-line"
+            style={{ filter: "drop-shadow(0 0 6px rgba(239,68,68,.6))" }}
+          />
+        )}
 
         {mode === "teacher" && !isFocusedView && (
           <foreignObject
@@ -995,13 +1282,15 @@ export default function KnowledgeTree({
             >
               <ZoomOut size={14} />
             </button>
-            <button
-              onClick={handleResetZoom}
-              className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
-              title="Căn giữa"
-            >
-              <Move size={14} />
-            </button>
+            {!viewOnlyMode && (
+              <button
+                onClick={handleResetZoom}
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm active:scale-95 transition-all cursor-pointer"
+                title="Căn giữa"
+              >
+                <Move size={14} />
+              </button>
+            )}
             <button
               onClick={() => setShowGroups(!showGroups)}
               className={`h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
@@ -1044,7 +1333,7 @@ export default function KnowledgeTree({
             </div>
           )}
 
-          {!isFocusedView && (
+          {mode === "teacher" && !isFocusedView && (
             <div className="flex items-center gap-1.5 ml-2">
               <button
                 onClick={handleAutoLayout}
@@ -1059,7 +1348,7 @@ export default function KnowledgeTree({
         </div>
 
         {/* Right Side: Overall vs Focused Map Selectors */}
-        {activeSelectedNodeId && (
+        {activeSelectedNodeId && !viewOnlyMode && (
           <div className="flex border border-border bg-muted rounded-xl p-0.5 shadow-sm">
             <button
               onClick={() => setIsFocusedView(false)}
@@ -1100,6 +1389,82 @@ export default function KnowledgeTree({
         className="flex-1 cursor-grab active:cursor-grabbing w-full h-full relative"
         style={{ overflow: "hidden" }}
       >
+        {viewOnlyMode && (
+          <button
+            onClick={() => {
+              setSelectedNodeId(null);
+              if (onClearFocus) onClearFocus();
+            }}
+            className="absolute top-4 left-4 z-20 rounded-xl bg-foreground text-background px-4 py-2.5 text-xs font-bold whitespace-nowrap shadow-lg cursor-pointer active:scale-95 transition-all"
+          >
+            Xem toàn cảnh
+          </button>
+        )}
+
+        {viewOnlyMode && expandedChainIds.size > 0 && (
+          <button
+            onClick={() => {
+              setExpandedChainIds(new Set());
+              setSelectedNodeId(null);
+              if (onClearFocus) onClearFocus();
+            }}
+            className="absolute top-4 right-4 z-20 rounded-xl bg-card border border-border px-4 py-2.5 text-xs font-bold whitespace-nowrap shadow-sm cursor-pointer active:scale-95 transition-all text-foreground/80"
+          >
+            ▲ Thu gọn {totalExpandedChainMembers} chủ đề nền tảng
+          </button>
+        )}
+
+        {viewOnlyMode && !traceActive && (
+          <div className="absolute bottom-4 left-4 z-20 flex items-center gap-3.5 bg-card/90 backdrop-blur border border-border rounded-2xl px-4 py-2 shadow-sm">
+            {[
+              { color: "bg-emerald-500", label: "Đã xong" },
+              { color: "bg-orange-500", label: "Đang học" },
+              { color: "bg-rose-600", label: "Cần lưu ý" },
+              { color: "bg-slate-400", label: "Đang khóa" },
+            ].map((l) => (
+              <span key={l.label} className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground whitespace-nowrap">
+                <span className={`h-2 w-2 rounded-full shrink-0 ${l.color}`} />
+                {l.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Banner truy vết gốc rễ */}
+        {traceActive && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+            {!traceDone ? (
+              <div className="flex items-center gap-2 bg-red-600/95 text-white px-4 py-2 rounded-2xl shadow-lg text-xs font-black">
+                <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                Đang truy vết gốc rễ lỗ hổng...
+              </div>
+            ) : (
+              (() => {
+                const rootNode = localNodes.find((n) => n.id === traceRootId);
+                return (
+                  <div className="flex flex-col items-center gap-2 bg-card/95 backdrop-blur border-2 border-red-500 px-5 py-3 rounded-2xl shadow-xl pointer-events-auto animate-[fadeIn_0.3s_ease-out]">
+                    <div className="text-sm font-black text-red-600 text-center">
+                      🔍 Gốc rễ: {rootNode?.name ?? "Nút nền tảng"}
+                      {rootNode?.topicGroup ? <span className="text-slate-500 font-bold"> · {rootNode.topicGroup}</span> : null}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-bold text-center max-w-xs">
+                      Lỗ hổng ở bài này khiến em gặp khó ở bài đang học. Củng cố lại nhé!
+                    </div>
+                    {onTraceCta && traceRootId && (
+                      <button
+                        onClick={() => onTraceCta(traceRootId)}
+                        className="mt-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-xs font-black transition-all active:scale-95"
+                      >
+                        Ôn lại nút này
+                      </button>
+                    )}
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        )}
+
         <svg
           width="100%"
           height="100%"
@@ -1126,6 +1491,8 @@ export default function KnowledgeTree({
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
               transformOrigin: "0 0",
+              // Camera lướt mượt theo từng bước truy vết; pan/zoom tay thì tức thời
+              transition: traceActive ? "transform 0.75s ease-in-out" : undefined,
             }}
           >
             {/* Group Clustering Boundaries - Pass 1: Dashed rectangles (behind edges) */}
@@ -1189,27 +1556,32 @@ export default function KnowledgeTree({
             {/* Nodes rendering */}
             <g style={{ pointerEvents: "auto" }}>
               {displayNodes.map((node) => {
-                const selectable = isNodeSelectable(node);
+                const summaryChain = chainById.get(node.id);
+                const isSummary = !!summaryChain;
+                const selectable = isSummary ? true : isNodeSelectable(node);
                 const isHighlighted = highlightedNodes.has(node.id);
                 const isActiveNode = node.id === activeSelectedNodeId;
                 const colorClass = getNodeColorClass(node, isHighlighted || isActiveNode);
                 const nodeWidth = 230;
                 const nodeHeight = 85;
 
-                const opacity = isFocusedView ? (isHighlighted ? 1 : 0.6) : 1;
+                const opacity = viewOnlyMode
+                  ? (activeSelectedNodeId ? (neighborFocusSet.has(node.id) ? 1 : 0.3) : 1)
+                  : (isFocusedView ? (isHighlighted ? 1 : 0.6) : 1);
 
                 const isCollapsed = collapsedNodes[node.id];
                 const childrenEdges = edges.filter(e => e.sourceId === node.id);
                 const hasChildren = childrenEdges.length > 0;
 
-                const status = studentNodeStatus[node.id] || "locked";
+                const status = isSummary ? "mastered" : (studentNodeStatus[node.id] || "locked");
+                const accuracyPct = isSummary ? null : accuracyPctOf(node.id);
 
-                // Mastery ring calculation
+                // Mastery ring calculation (not meaningful for the synthetic summary node)
                 const bktState = masteryByTopic[node.id];
                 const displayedMasteryPercent = toMasteryPercent(
                   bktState?.masteryProbability ?? BKT_INITIAL_MASTERY,
                 );
-                const showMastery = mode !== "teacher";
+                const showMastery = mode !== "teacher" && !isSummary;
                 const ringPad = 6;
                 const ringW = nodeWidth + ringPad * 2;
                 const ringH = nodeHeight + ringPad * 2;
@@ -1228,14 +1600,19 @@ export default function KnowledgeTree({
                       : "#ef4444";
 
                 const isHovered = hoveredNodeId === node.id;
+                // Truy vết gốc rễ: vị trí của node trên path (-1 nếu không thuộc path)
+                const traceIdx = traceActive ? tracePath.indexOf(node.id) : -1;
+                const traceLit = traceIdx !== -1 && traceIdx <= traceStep;
+                const isTraceRoot = traceLit && node.id === traceRootId;
+                const traceColor = isTraceRoot ? "#dc2626" : traceIdx === 0 ? "#f97316" : "#ef4444";
                 return (
-                  <g 
-                    key={node.id} 
+                  <g
+                    key={node.id}
                     className="group/node transition-all duration-200"
                     onMouseEnter={() => setHoveredNodeId(node.id)}
                     onMouseLeave={() => setHoveredNodeId(null)}
                     style={{
-                      opacity,
+                      opacity: traceActive ? (traceLit ? 1 : 0.35) : opacity,
                       transform: isActiveNode 
                         ? "scale(1.06)" 
                         : isHovered 
@@ -1246,6 +1623,39 @@ export default function KnowledgeTree({
                       cursor: selectable ? "pointer" : "default"
                     }}
                   >
+                    {/* Vòng cháy truy vết gốc rễ */}
+                    {traceLit && (
+                      <g
+                        style={
+                          isTraceRoot && traceDone
+                            ? { animation: "shake 0.6s ease-in-out 2", transformOrigin: `${node.posX + nodeWidth / 2}px ${node.posY + nodeHeight / 2}px` }
+                            : undefined
+                        }
+                      >
+                        <rect
+                          x={node.posX - 10}
+                          y={node.posY - 10}
+                          width={nodeWidth + 20}
+                          height={nodeHeight + 20}
+                          rx={22}
+                          fill={`${traceColor}14`}
+                          stroke={traceColor}
+                          strokeWidth={isTraceRoot ? 5 : 3.5}
+                          strokeDasharray={isTraceRoot && traceDone ? undefined : "10 6"}
+                          className={isTraceRoot && traceDone ? "" : "animate-flow-line"}
+                          style={{ filter: `drop-shadow(0 0 10px ${traceColor}80)` }}
+                        />
+                        {isTraceRoot && traceDone && (
+                          <foreignObject x={node.posX - 10} y={node.posY - 44} width={nodeWidth + 20} height={30} className="overflow-visible">
+                            <div className="flex justify-center">
+                              <span className="bg-red-600 text-white text-[11px] font-black px-3 py-1 rounded-full shadow-lg whitespace-nowrap">
+                                🔍 Gốc rễ ở đây!
+                              </span>
+                            </div>
+                          </foreignObject>
+                        )}
+                      </g>
+                    )}
                     {/* Mastery Progress Ring */}
                     {showMastery && (
                       <rect
@@ -1291,9 +1701,29 @@ export default function KnowledgeTree({
                       className="overflow-visible"
                       style={{ pointerEvents: "auto" }}
                     >
-                      <div
+                      <div className="relative h-full w-full">
+                        {/* Decorative "stack of cards" backing — signals more is folded into the summary */}
+                        {isSummary && (
+                          <>
+                            <div
+                              className="absolute inset-0 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-100"
+                              style={{ transform: "translate(8px, 8px) rotate(1.4deg)" }}
+                            />
+                            <div
+                              className="absolute inset-0 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50"
+                              style={{ transform: "translate(4px, 4px) rotate(0.7deg)" }}
+                            />
+                          </>
+                        )}
+                        <div
                         onMouseDown={(e) => handleNodeDragStart(e, node.id, node.posX, node.posY)}
                         onClick={() => {
+                          if (isSummary) {
+                            setExpandedChainIds((prev) => new Set(prev).add(node.id));
+                            setSelectedNodeId(null);
+                            if (onClearFocus) onClearFocus();
+                            return;
+                          }
                           // Always select/highlight when clicked so it becomes opaque and readable
                           if (onFocusedNodeChange) {
                             onFocusedNodeChange(node.id);
@@ -1302,7 +1732,7 @@ export default function KnowledgeTree({
 
                           if (selectable) {
                             handleNodeClick(node);
-                          } else {
+                          } else if (mode !== "view-only") {
                             toast.warning(`Chủ đề "${node.name}" đang bị khóa. Em hãy học và hoàn thành các bài học tiên quyết trước nhé!`);
                           }
                         }}
@@ -1331,7 +1761,7 @@ export default function KnowledgeTree({
                               <Lock size={11} className="text-slate-400" />
                             )}
                             <span className="text-[8px] font-black uppercase tracking-wider">
-                              {node.isRoot ? "ĐIỂM GỐC" : {
+                              {node.isRoot ? "ĐIỂM GỐC" : isSummary ? "TÓM TẮT" : {
                                 mastered: "ĐÃ XONG",
                                 struggle: "CẦN LƯU Ý",
                                 learning: "ĐANG HỌC",
@@ -1340,7 +1770,13 @@ export default function KnowledgeTree({
                               }[status]}
                             </span>
                           </div>
-                          {showMastery && (
+                          {isSummary ? (
+                            summaryChain?.avgAccuracy !== null && summaryChain?.avgAccuracy !== undefined && (
+                              <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full border tabular-nums leading-none shrink-0 bg-emerald-50 text-emerald-700 border-emerald-300/60">
+                                TB {summaryChain.avgAccuracy}%
+                              </span>
+                            )
+                          ) : showMastery && (
                             <span
                               className="text-[8px] font-black px-1.5 py-0.5 rounded-full border tabular-nums leading-none shrink-0"
                               style={{
@@ -1355,12 +1791,19 @@ export default function KnowledgeTree({
                         </div>
 
                         {/* Title text */}
-                        <div className="text-[10px] font-black w-full text-left leading-snug uppercase tracking-tight line-clamp-2 overflow-hidden text-ellipsis flex-1 flex items-center pt-1.5">
+                        <div className="text-[10px] font-black w-full text-left leading-snug uppercase tracking-tight line-clamp-2 overflow-hidden text-ellipsis flex items-center pt-1.5">
                           {node.name}
                         </div>
 
-                        {/* Expand / Collapse Sub-tree trigger (hidden in focused view) */}
-                        {hasChildren && !isFocusedView && (
+                        {/* Metric line: accuracy for struggle/learning nodes, hint for the summary node */}
+                        {(isSummary || ((status === "struggle" || status === "learning") && accuracyPct !== null)) && (
+                          <div className="text-[8px] font-semibold w-full text-left leading-snug opacity-75">
+                            {isSummary ? "Bấm để xem lại chi tiết" : `${accuracyPct}% đúng`}
+                          </div>
+                        )}
+
+                        {/* Expand / Collapse Sub-tree trigger (hidden in focused view / summary nodes / view-only) */}
+                        {hasChildren && !isFocusedView && !isSummary && mode !== "view-only" && (
                           <button
                             onMouseDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
@@ -1416,6 +1859,7 @@ export default function KnowledgeTree({
                             </button>
                           </div>
                         )}
+                        </div>
                       </div>
                     </foreignObject>
                   </g>

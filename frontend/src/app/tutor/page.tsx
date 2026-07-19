@@ -29,13 +29,17 @@ import {
   submitAdaptiveAnswer,
   submitCantDo,
   submitAdaptiveDowngrade,
+  getReviewPath,
   type GameSummary,
   type HubNode,
+  type HubEdge,
   type HubQuestion,
   type MasteryProfile,
   type RoadmapStep,
+  type ReviewItem,
 } from "./hub/api";
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
+import { computeTracePath } from "@/lib/rootCauseTrace";
 import { SafeHtml } from "@/components/ui/safe-html";
 import KnowledgeTree from "../components/KnowledgeTree";
 import {
@@ -118,8 +122,13 @@ export default function TutorHubPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [subject, setSubject] = useState("");
   const [nodes, setNodes] = useState<HubNode[]>([]);
-  const [edges, setEdges] = useState<any[]>([]);
+  const [edges, setEdges] = useState<HubEdge[]>([]);
   const [mastery, setMastery] = useState<MasteryProfile>({ topics: {} });
+  // Truy vết gốc rễ: đường đi [nút sai → ... → nút gốc] hiển thị trên cây tri thức
+  const [traceModal, setTraceModal] = useState<{ path: string[]; rootId: string } | null>(null);
+  // Lộ trình ôn tập cá nhân hoá (dựa trên BKT mastery)
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [showReview, setShowReview] = useState(false);
   const [roadmap, setRoadmap] = useState<RoadmapStep[]>([]);
   const [summary, setSummary] = useState<GameSummary | null>(null);
   const router = useRouter();
@@ -229,6 +238,7 @@ export default function TutorHubPage() {
       setNodes(tree.nodes ?? []);
       setEdges(tree.edges ?? []);
       setMastery(masteryRes);
+      getReviewPath(subj).then((r) => setReviewItems(r.items ?? [])).catch(() => setReviewItems([]));
       setRoadmap(rm);
       setSummary(summaryRes);
       setStudentState(stateRes);
@@ -343,6 +353,7 @@ export default function TutorHubPage() {
     ]);
     if (m) setMastery(m);
     if (s) setSummary(s);
+    refreshReviewPath();
   }
 
   // ---- Exam & Adaptive Functions ----
@@ -530,6 +541,14 @@ export default function TutorHubPage() {
           { id: res.parentId, name: res.parentName },
         ]);
 
+        // Truy vết gốc rễ: từ bài học sinh đầu tiên bị kẹt (đáy traversalStack)
+        // đến nút cha vừa chẩn đoán — hiển thị animation lan màu trên cây tri thức.
+        const originFailedId = traversalStack.length > 0 ? traversalStack[0].id : nodeId;
+        const path = computeTracePath(originFailedId, res.parentId, edges);
+        if (path.length >= 2) {
+          setTraceModal({ path, rootId: res.parentId });
+        }
+
         if (parentNode) {
           setCurrentStepId(parentNode.id);
           setQIndex(0);
@@ -611,6 +630,21 @@ export default function TutorHubPage() {
     setReviewLeftSubTab("practice");
     resetChat(step.name);
     loadQuestions(step.id);
+  }
+
+  function goToReviewNode(nodeId: string, name: string) {
+    setShowReview(false);
+    setCurrentStepId(nodeId);
+    setActiveTab("review");
+    setReviewLeftSubTab("practice");
+    resetChat(name);
+    loadQuestions(nodeId);
+  }
+
+  // Làm mới lộ trình ôn tập sau khi mastery đổi (trả lời đúng/sai xong).
+  function refreshReviewPath() {
+    if (!subject) return;
+    getReviewPath(subject).then((r) => setReviewItems(r.items ?? [])).catch(() => {});
   }
 
   function selectOpt(i: number) {
@@ -938,6 +972,42 @@ export default function TutorHubPage() {
 
         {/* Right: Gamification Info & User profile & Logout */}
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {/* Personalized Review button */}
+          {!studentState?.needsDiagnostic && reviewItems.length > 0 && (
+            <button
+              onClick={() => setShowReview(true)}
+              style={{
+                ...POPPINS,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 12,
+                border: "1px solid #ffd9b8",
+                background: "linear-gradient(135deg,#fff5ec,#fff)",
+                color: "#c2560f",
+                fontWeight: 800,
+                fontSize: 12,
+                cursor: "pointer",
+                boxShadow: "0 4px 10px -4px rgba(194,86,15,0.2)",
+                transition: "all .15s",
+              }}
+            >
+              <span>🔄 Ôn tập ({reviewItems.length})</span>
+              <span
+                style={{
+                  background: "#ffe1c4",
+                  color: "#c2560f",
+                  borderRadius: 6,
+                  padding: "1px 5px",
+                  fontSize: 9.5,
+                  fontWeight: 800,
+                }}
+              >
+                cần củng cố
+              </span>
+            </button>
+          )}
           {/* Stats: Streak & Stars */}
           <div
             style={{
@@ -1113,7 +1183,7 @@ export default function TutorHubPage() {
                 <KnowledgeTree
                   subject={subject}
                   nodes={nodes}
-                  edges={edges}
+                  edges={edges.map(e => ({ ...e, subject }))}
                   masteryByTopic={mastery.topics as any}
                   mode="student"
                   studentNodeStatus={(() => {
@@ -2739,6 +2809,204 @@ export default function TutorHubPage() {
               }}
             />
           ))}
+        </div>
+      )}
+
+      {/* ============ MODAL LỘ TRÌNH ÔN TẬP ============ */}
+      {showReview && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(15,23,42,.5)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            animation: "fadeIn .2s ease-out",
+          }}
+          onClick={() => setShowReview(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(560px, 96vw)",
+              maxHeight: "88vh",
+              background: "#fff",
+              borderRadius: 22,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 30px 60px -20px rgba(0,0,0,.4)",
+            }}
+          >
+            <div style={{ padding: "18px 22px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ ...BALOO, fontWeight: 800, fontSize: 19, color: "#c2560f" }}>🔄 Lộ trình Ôn tập</div>
+                <div style={{ fontSize: 12.5, color: "#5b6072", fontWeight: 600, marginTop: 2 }}>
+                  Aurora chọn sẵn các chủ đề cần củng cố nhất cho em (dựa trên hồ sơ năng lực BKT)
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReview(false)}
+                style={{ background: "#f1f5f9", border: "none", borderRadius: 12, width: 34, height: 34, cursor: "pointer", fontWeight: 800, color: "#64748b", flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+              {reviewItems.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: "#9aa1b0", fontWeight: 700 }}>
+                  🎉 Tuyệt vời! Hiện chưa có chủ đề nào cần ôn lại.
+                </div>
+              ) : (
+                reviewItems.map((it, idx) => {
+                  const barColor = it.masteryPct >= 70 ? "#0FB9A6" : it.masteryPct >= 40 ? "#e0912a" : "#e05a7a";
+                  return (
+                    <div
+                      key={it.nodeId}
+                      onClick={() => goToReviewNode(it.nodeId, it.name)}
+                      style={{
+                        border: "1px solid #eef1f4",
+                        borderRadius: 15,
+                        padding: 14,
+                        cursor: "pointer",
+                        transition: "all .15s",
+                        background: idx === 0 ? "linear-gradient(135deg,#fff7ef,#fff)" : "#fff",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                        <span
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 8,
+                            background: idx === 0 ? "#c2560f" : "#eef1f4",
+                            color: idx === 0 ? "#fff" : "#5b6072",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {it.name}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600 }}>{it.topicGroup}</div>
+                        </div>
+                        <span style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: barColor, flexShrink: 0 }}>{it.masteryPct}%</span>
+                      </div>
+                      <div style={{ height: 6, background: "#eef1f4", borderRadius: 6, marginBottom: 8 }}>
+                        <div style={{ height: 6, background: barColor, borderRadius: 6, width: `${it.masteryPct}%` }} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "#c2560f",
+                            background: "#fff1e5",
+                            border: "1px solid #ffdcc0",
+                            borderRadius: 8,
+                            padding: "3px 8px",
+                          }}
+                        >
+                          {it.reason}
+                        </span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: "#7C46E8" }}>Ôn ngay →</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ MODAL TRUY VẾT GỐC RỄ ============ */}
+      {traceModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            background: "rgba(15,23,42,.55)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            animation: "fadeIn .2s ease-out",
+          }}
+          onClick={() => setTraceModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(920px, 96vw)",
+              height: "min(640px, 88vh)",
+              background: "#fff",
+              borderRadius: 24,
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 30px 60px -20px rgba(0,0,0,.4)",
+            }}
+          >
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #eef1f4", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ ...BALOO, fontWeight: 800, fontSize: 18, color: "#dc2626" }}>🔍 Truy vết gốc rễ lỗ hổng</div>
+                <div style={{ fontSize: 12, color: "#5b6072", fontWeight: 600 }}>
+                  Aurora lần theo cây tri thức để tìm bài học nền tảng đang khiến em gặp khó
+                </div>
+              </div>
+              <button
+                onClick={() => setTraceModal(null)}
+                style={{ background: "#f1f5f9", border: "none", borderRadius: 12, width: 34, height: 34, cursor: "pointer", fontWeight: 800, color: "#64748b" }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <KnowledgeTree
+                subject={subject}
+                nodes={nodes as any}
+                edges={edges as any}
+                mode="view-only"
+                studentNodeStatus={Object.fromEntries(
+                  nodes.map((n) => {
+                    const t = mastery.topics?.[n.id];
+                    const status = traceModal.path.includes(n.id)
+                      ? n.id === traceModal.rootId
+                        ? "struggle"
+                        : "learning"
+                      : t && (t.masteryStatus === "mastered" || t.masteryProbability >= 0.8)
+                        ? "mastered"
+                        : "locked";
+                    return [n.id, status];
+                  }),
+                ) as Record<string, "mastered" | "struggle" | "learning" | "locked" | "initial">}
+                traceHighlight={{ path: traceModal.path }}
+                onTraceCta={(rootId) => {
+                  const parentNode = nodes.find((n) => n.id === rootId);
+                  setTraceModal(null);
+                  if (parentNode) {
+                    setActiveTab("review");
+                    setReviewLeftSubTab("theory");
+                    toast.info(`Cùng ôn lại "${parentNode.name}" nhé!`);
+                  }
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

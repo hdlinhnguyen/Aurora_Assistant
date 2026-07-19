@@ -37,6 +37,7 @@ import StudentMasteryProfile from "./components/StudentMasteryProfile";
 import StudentActivityFeed from "./components/StudentActivityFeed";
 import ExamBuilderTab from "./components/ExamBuilderTab";
 import ExamScoringTab from "./components/ExamScoringTab";
+import GuardrailTab from "./components/GuardrailTab";
 import {
   Users,
   GitBranch,
@@ -77,7 +78,8 @@ import {
   Settings,
   Sun,
   LogOut,
-  Lightbulb
+  Lightbulb,
+  Shield
 } from "lucide-react";
 
 export interface NodeItem {
@@ -159,7 +161,7 @@ interface RubricDraft {
   points: string;
 }
 
-type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "student-mgmt" | "exam-builder" | "exam-scoring";
+type ActiveTab = "students" | "graph-designer" | "learning-path" | "question-bank" | "monitoring" | "student-mgmt" | "exam-builder" | "exam-scoring" | "guardrail";
 
 export default function TeacherDashboard() {
   const router = useRouter();
@@ -1943,6 +1945,26 @@ export default function TeacherDashboard() {
                   <span className="absolute right-0 top-2 bottom-2 w-1 bg-amber-600 rounded-l" />
                 )}
               </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab("guardrail");
+                  setSelectedStudent(null);
+                }}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-black transition-all border relative ${
+                  activeTab === "guardrail"
+                    ? "bg-slate-100 border-transparent text-slate-900 font-extrabold"
+                    : "border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Shield size={16} />
+                  <span>8. An toàn học sinh</span>
+                </div>
+                {activeTab === "guardrail" && (
+                  <span className="absolute right-0 top-2 bottom-2 w-1 bg-emerald-600 rounded-l" />
+                )}
+              </button>
             </>
           ) : (
             <div className="text-center py-8 px-4 border border-dashed border-border rounded-2xl text-muted-foreground text-[10px] font-black uppercase tracking-wider">
@@ -2205,6 +2227,7 @@ export default function TeacherDashboard() {
             {studentViewMode === "tree" ? (
               nodes.length > 0 ? (
                 <StudentMasteryProfile
+                  key={selectedStudent.studentId}
                   studentId={selectedStudent.studentId}
                   subject={selectedStudent.subject}
                   nodes={nodes}
@@ -2973,6 +2996,8 @@ export default function TeacherDashboard() {
                 formatDate={formatDate}
                 handleLoadDemoQuestions={handleLoadDemoQuestions}
               />
+            ) : activeTab === "guardrail" ? (
+              <GuardrailTab />
             ) : (
               <MonitoringTab
                 nodes={nodes}

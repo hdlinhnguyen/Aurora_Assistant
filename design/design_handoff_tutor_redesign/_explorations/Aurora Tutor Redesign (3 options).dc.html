@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #EAF3F1; font-family: "Inter", system-ui, sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d7dee6; border-radius: 8px; }
+  @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+  @keyframes pulseRing { 0%,100% { box-shadow: 0 0 0 0 rgba(20,217,192,.45); } 50% { box-shadow: 0 0 0 12px rgba(20,217,192,0); } }
+  @keyframes dashmove { to { stroke-dashoffset: -24; } }
+</style>
+</helmet>
+
+<section style="min-width: 3860px; padding: 56px 60px 100px; display: flex; flex-direction: column; gap: 40px; font-family: 'Inter', sans-serif;">
+
+  <div style="max-width: 760px; display: flex; flex-direction: column; gap: 14px;">
+    <div style="display: inline-flex; align-items: center; gap: 10px;">
+      <div style="height: 34px; width: 34px; border-radius: 11px; background: linear-gradient(135deg,#14D9C0,#7C46E8); display: grid; place-items: center; color: #fff; font-weight: 800;">A</div>
+      <span style="font-family: 'Poppins'; font-weight: 800; letter-spacing: -.01em; font-size: 18px; color: #16161F;">Aurora Tutor — Redesign màn hình Học sinh</span>
+    </div>
+    <p style="margin: 0; font-size: 15px; line-height: 1.65; color: #5b6072; text-wrap: pretty;">Ba hướng thiết kế lại không gian học của học sinh cấp 1 — giữ tông <b style="color:#0FB9A6;">mint</b> + <b style="color:#7C46E8;">tím</b>, tối giản số bước thao tác và làm việc học trở nên vui, rõ ràng, ít choáng ngợp hơn. Bấm chọn một bài là học ngay, không còn modal chọn chế độ hay biểu đồ rối mắt. Tham chiếu trong chat bằng mã <b>1a</b>, <b>1b</b>, <b>1c</b>.</p>
+  </div>
+
+  <div style="display: flex; gap: 56px; align-items: flex-start; flex-wrap: nowrap;">
+
+    <!-- ================= OPTION 1a : ADVENTURE PATH ================= -->
+    <div id="1a" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <span style="font-family:'Poppins'; font-weight:800; font-size: 13px; color:#fff; background:#16161F; padding: 5px 12px; border-radius: 999px;">1a</span>
+        <span style="font-family:'Poppins'; font-weight:700; font-size: 19px; color:#16161F;">Hành trình khám phá</span>
+        <span style="font-size: 13px; color:#7c8194;">Lộ trình dạng bản đồ phiêu lưu · một chạm để học tiếp</span>
+      </div>
+
+      <div style="width: 1180px; height: 820px; border-radius: 26px; overflow: hidden; box-shadow: 0 40px 80px -40px rgba(31,26,60,.4); background: #F4FBF9; display: flex; flex-direction: column; border: 1px solid #e4ece9;">
+        <!-- browser chrome -->
+        <div style="height: 40px; background: #fff; border-bottom: 1px solid #eef1f4; display: flex; align-items: center; gap: 8px; padding: 0 16px;">
+          <span style="height:11px;width:11px;border-radius:50%;background:#ff5f57;"></span>
+          <span style="height:11px;width:11px;border-radius:50%;background:#febc2e;"></span>
+          <span style="height:11px;width:11px;border-radius:50%;background:#28c840;"></span>
+          <div style="margin-left:14px; background:#f1f4f7; border-radius:8px; height:24px; flex:1; max-width:420px; display:flex; align-items:center; padding:0 12px; font-size:12px; color:#9aa1b0;">aurora.edu.vn/hoc</div>
+        </div>
+
+        <div style="flex:1; display:flex; overflow:hidden;">
+          <!-- slim rail -->
+          <div style="width: 76px; background:#fff; border-right:1px solid #eef1f4; display:flex; flex-direction:column; align-items:center; padding: 18px 0; gap: 22px;">
+            <div style="height:40px;width:40px;border-radius:13px;background:linear-gradient(135deg,#14D9C0,#7C46E8);display:grid;place-items:center;color:#fff;font-weight:800;font-family:'Poppins';">A</div>
+            <div style="display:flex;flex-direction:column;gap:14px;align-items:center;margin-top:6px;">
+              <div style="height:44px;width:44px;border-radius:14px;background:#E6FBF6;display:grid;place-items:center;font-size:20px;box-shadow:inset 0 0 0 2px #14D9C0;">📐</div>
+              <div style="height:44px;width:44px;border-radius:14px;background:#f4f6f9;display:grid;place-items:center;font-size:20px;opacity:.7;">📖</div>
+              <div style="height:44px;width:44px;border-radius:14px;background:#f4f6f9;display:grid;place-items:center;font-size:20px;opacity:.7;">🔬</div>
+              <div style="height:44px;width:44px;border-radius:14px;background:#f4f6f9;display:grid;place-items:center;font-size:20px;opacity:.7;">🌍</div>
+            </div>
+            <div style="margin-top:auto; height:42px;width:42px;border-radius:50%;background:linear-gradient(135deg,#ffd76f,#ff9f43);display:grid;place-items:center;font-weight:800;color:#7a4b00;font-family:'Poppins';">B</div>
+          </div>
+
+          <!-- main path area -->
+          <div style="flex:1; position:relative; overflow:hidden; background:
+                radial-gradient(680px 380px at 15% -8%, rgba(20,217,192,.14), transparent 60%),
+                radial-gradient(620px 420px at 100% 20%, rgba(124,70,232,.12), transparent 60%);">
+            <!-- greeting header -->
+            <div style="padding: 26px 34px 6px; display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-family:'Baloo 2'; font-weight:800; font-size:27px; color:#16161F;">Chào Bi! Hôm nay học gì nào? 🎒</div>
+                <div style="font-size:13.5px; color:#6b7180; margin-top:2px;">Môn Toán · Chương Phân số — em đang đi được <b style="color:#0FB9A6;">3/8</b> chặng</div>
+              </div>
+              <div style="display:flex; gap:10px;">
+                <div style="background:#fff; border:1px solid #eef1f4; border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; box-shadow:0 6px 16px -12px rgba(0,0,0,.2);">
+                  <span style="font-size:18px;">🔥</span>
+                  <div style="line-height:1;"><div style="font-family:'Poppins';font-weight:800;font-size:16px;color:#16161F;">5</div><div style="font-size:10px;color:#9aa1b0;">ngày liền</div></div>
+                </div>
+                <div style="background:#fff; border:1px solid #eef1f4; border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; box-shadow:0 6px 16px -12px rgba(0,0,0,.2);">
+                  <span style="font-size:18px;">⭐</span>
+                  <div style="line-height:1;"><div style="font-family:'Poppins';font-weight:800;font-size:16px;color:#16161F;">240</div><div style="font-size:10px;color:#9aa1b0;">sao</div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- winding path svg -->
+            <svg viewBox="0 0 760 560" style="position:absolute; top:96px; left:0; width:100%; height:560px;">
+              <path d="M 150 40 C 380 60, 380 150, 200 175 C 40 200, 60 285, 300 305 C 560 325, 560 415, 360 440 C 200 460, 250 530, 470 540"
+                fill="none" stroke="#DCE7E4" stroke-width="26" stroke-linecap="round"/>
+              <path d="M 150 40 C 380 60, 380 150, 200 175 C 40 200, 60 285, 300 305"
+                fill="none" stroke="#14D9C0" stroke-width="26" stroke-linecap="round" opacity=".9"/>
+              <path d="M 150 40 C 380 60, 380 150, 200 175 C 40 200, 60 285, 300 305 C 560 325, 560 415, 360 440 C 200 460, 250 530, 470 540"
+                fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 20" opacity=".9"/>
+            </svg>
+
+            <!-- lesson stops -->
+            <!-- done 1 -->
+            <div style="position:absolute; top:112px; left:118px; text-align:center;">
+              <div style="height:66px;width:66px;border-radius:50%;background:linear-gradient(135deg,#19E0C6,#0FB9A6);display:grid;place-items:center;box-shadow:0 12px 22px -8px rgba(15,185,166,.7);border:4px solid #fff;font-size:26px;">✓</div>
+            </div>
+            <!-- done 2 -->
+            <div style="position:absolute; top:246px; left:168px; text-align:center;">
+              <div style="height:60px;width:60px;border-radius:50%;background:linear-gradient(135deg,#19E0C6,#0FB9A6);display:grid;place-items:center;box-shadow:0 10px 20px -8px rgba(15,185,166,.7);border:4px solid #fff;font-size:24px;">✓</div>
+            </div>
+            <!-- done 3 -->
+            <div style="position:absolute; top:200px; left:26px; text-align:center;">
+              <div style="height:56px;width:56px;border-radius:50%;background:linear-gradient(135deg,#19E0C6,#0FB9A6);display:grid;place-items:center;box-shadow:0 10px 20px -8px rgba(15,185,166,.6);border:4px solid #fff;font-size:22px;">✓</div>
+            </div>
+            <!-- CURRENT -->
+            <div style="position:absolute; top:352px; left:250px; text-align:center; z-index:3;">
+              <div style="animation: floaty 3s ease-in-out infinite;">
+                <div style="height:88px;width:88px;border-radius:50%;background:linear-gradient(135deg,#8B5CF6,#7C46E8);display:grid;place-items:center;border:5px solid #fff;box-shadow:0 16px 30px -8px rgba(124,70,232,.6);animation:pulseRing 2.2s infinite;font-size:34px;">🧩</div>
+              </div>
+              <div style="margin-top:14px; background:#fff; border-radius:16px; padding:12px 14px 13px; box-shadow:0 18px 34px -16px rgba(31,26,60,.4); width:210px; border:1px solid #f0eefb;">
+                <div style="font-size:10px; font-weight:800; letter-spacing:.08em; color:#7C46E8; text-transform:uppercase; font-family:'Poppins';">Chặng tiếp theo</div>
+                <div style="font-family:'Poppins'; font-weight:700; font-size:14.5px; color:#16161F; margin:3px 0 10px; line-height:1.25;">Cộng phân số khác mẫu</div>
+                <div style="background:linear-gradient(135deg,#8B5CF6,#7C46E8); color:#fff; border-radius:12px; padding:11px; font-weight:800; font-size:14px; font-family:'Poppins'; box-shadow:0 10px 20px -8px rgba(124,70,232,.55);">▶  Học tiếp</div>
+              </div>
+            </div>
+            <!-- locked stops -->
+            <div style="position:absolute; top:400px; left:495px;">
+              <div style="height:58px;width:58px;border-radius:50%;background:#eef1f4;display:grid;place-items:center;border:4px solid #fff;font-size:22px;opacity:.7;">🔒</div>
+            </div>
+            <div style="position:absolute; top:498px; left:440px;">
+              <div style="height:54px;width:54px;border-radius:50%;background:#eef1f4;display:grid;place-items:center;border:4px solid #fff;font-size:20px;opacity:.6;">🔒</div>
+            </div>
+            <!-- mascot -->
+            <div style="position:absolute; bottom:22px; left:34px; display:flex; align-items:flex-end; gap:10px;">
+              <div style="height:64px;width:64px;border-radius:50%;background:linear-gradient(135deg,#FFE7A3,#FFC24D);display:grid;place-items:center;font-size:34px;box-shadow:0 12px 22px -10px rgba(255,159,67,.7);">🦊</div>
+              <div style="background:#fff;border:1px solid #eef1f4;border-radius:16px;border-bottom-left-radius:4px;padding:10px 14px;font-size:12.5px;color:#4b5060;font-weight:600;box-shadow:0 10px 22px -14px rgba(0,0,0,.3);max-width:210px;">Cố lên nhé! Chỉ còn 5 chặng là xong chương này 💪</div>
+            </div>
+          </div>
+
+          <!-- right panel -->
+          <div style="width: 288px; background:#fff; border-left:1px solid #eef1f4; padding: 22px 20px; display:flex; flex-direction:column; gap:18px;">
+            <div style="display:flex; align-items:center; gap:11px;">
+              <div style="height:42px;width:42px;border-radius:14px;background:linear-gradient(135deg,#14D9C0,#7C46E8);display:grid;place-items:center;color:#fff;font-weight:800;font-family:'Poppins';font-size:17px;">B</div>
+              <div><div style="font-family:'Poppins';font-weight:700;font-size:14px;color:#16161F;">Bảo Bi</div><div style="font-size:11px;color:#9aa1b0;">Lớp 5A · học sinh</div></div>
+            </div>
+
+            <!-- goal ring -->
+            <div style="background:linear-gradient(160deg,#F3FBF9,#EFE9FD); border-radius:20px; padding:18px; text-align:center; border:1px solid #eef1f4;">
+              <div style="font-size:11px;font-weight:800;color:#7c8194;text-transform:uppercase;letter-spacing:.06em;font-family:'Poppins';">Mục tiêu hôm nay</div>
+              <div style="position:relative; width:120px; height:120px; margin:12px auto 6px;">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="#e6ebf0" stroke-width="12"/>
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="#14D9C0" stroke-width="12" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="126" transform="rotate(-90 60 60)"/>
+                </svg>
+                <div style="position:absolute;inset:0;display:grid;place-items:center;">
+                  <div><div style="font-family:'Poppins';font-weight:800;font-size:26px;color:#16161F;">60%</div><div style="font-size:10px;color:#9aa1b0;">3/5 bài</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size:11px;font-weight:800;color:#7c8194;text-transform:uppercase;letter-spacing:.06em;font-family:'Poppins';margin-bottom:10px;">Nhiệm vụ vui</div>
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <div style="display:flex;align-items:center;gap:11px;background:#F3FBF9;border:1px solid #e2f3ef;border-radius:14px;padding:10px 12px;">
+                  <span style="font-size:20px;">🎯</span>
+                  <div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:#16161F;">Làm đúng 5 câu</div><div style="height:6px;background:#e0ece9;border-radius:6px;margin-top:5px;"><div style="height:6px;width:60%;background:#14D9C0;border-radius:6px;"></div></div></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;background:#faf7ff;border:1px solid #ece5fb;border-radius:14px;padding:10px 12px;">
+                  <span style="font-size:20px;">💬</span>
+                  <div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:#16161F;">Hỏi thầy AI 1 câu</div><div style="height:6px;background:#eadff9;border-radius:6px;margin-top:5px;"><div style="height:6px;width:100%;background:#7C46E8;border-radius:6px;"></div></div></div>
+                  <span style="font-size:15px;">✅</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:auto; background:#FFF7E8; border:1px solid #ffe9bf; border-radius:16px; padding:13px; display:flex; gap:10px; align-items:center;">
+              <span style="font-size:22px;">🏅</span>
+              <div style="font-size:11.5px;color:#8a6a1e;font-weight:600;line-height:1.4;">Học xong chương này em nhận huy hiệu <b>Vua Phân Số</b>!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= OPTION 1b : ONE-TAP FOCUS HUB ================= -->
+    <div id="1b" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <span style="font-family:'Poppins'; font-weight:800; font-size: 13px; color:#fff; background:#16161F; padding: 5px 12px; border-radius: 999px;">1b</span>
+        <span style="font-family:'Poppins'; font-weight:700; font-size: 19px; color:#16161F;">Không gian một chạm</span>
+        <span style="font-size: 13px; color:#7c8194;">Vào thẳng bài · lý thuyết & luyện tập gộp một màn, bỏ modal</span>
+      </div>
+
+      <div style="width: 1180px; height: 820px; border-radius: 26px; overflow: hidden; box-shadow: 0 40px 80px -40px rgba(31,26,60,.4); background: #F4FBF9; display: flex; flex-direction: column; border: 1px solid #e4ece9;">
+        <div style="height: 40px; background: #fff; border-bottom: 1px solid #eef1f4; display: flex; align-items: center; gap: 8px; padding: 0 16px;">
+          <span style="height:11px;width:11px;border-radius:50%;background:#ff5f57;"></span>
+          <span style="height:11px;width:11px;border-radius:50%;background:#febc2e;"></span>
+          <span style="height:11px;width:11px;border-radius:50%;background:#28c840;"></span>
+          <div style="margin-left:14px; background:#f1f4f7; border-radius:8px; height:24px; flex:1; max-width:420px; display:flex; align-items:center; padding:0 12px; font-size:12px; color:#9aa1b0;">aurora.edu.vn/hoc/cong-phan-so</div>
+        </div>
+
+        <div style="flex:1; display:flex; overflow:hidden;">
+          <!-- roadmap rail -->
+          <div style="width: 268px; background:#fff; border-right:1px solid #eef1f4; display:flex; flex-direction:column;">
+            <div style="padding:18px 18px 14px; border-bottom:1px solid #f2f4f7;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                <div style="height:34px;width:34px;border-radius:11px;background:linear-gradient(135deg,#14D9C0,#7C46E8);display:grid;place-items:center;color:#fff;font-weight:800;font-family:'Poppins';">A</div>
+                <span style="font-family:'Poppins';font-weight:800;font-size:15px;color:#16161F;">Aurora</span>
+              </div>
+              <div style="background:#f4f6f9;border:1px solid #eef1f4;border-radius:12px;padding:9px 12px;font-size:13px;font-weight:700;color:#16161F;display:flex;align-items:center;justify-content:space-between;">📐 Toán lớp 5 <span style="color:#9aa1b0;font-size:11px;">▾</span></div>
+            </div>
+            <div style="padding:16px 14px; overflow-y:auto; flex:1;">
+              <div style="font-size:10.5px;font-weight:800;color:#9aa1b0;text-transform:uppercase;letter-spacing:.07em;font-family:'Poppins';padding:0 6px 10px;">Lộ trình của em</div>
+              <!-- steps -->
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;background:#F3FBF9;">
+                  <span style="height:26px;width:26px;border-radius:50%;background:#14D9C0;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:800;">✓</span>
+                  <span style="font-size:12.5px;font-weight:600;color:#16161F;flex:1;">Phân số là gì</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;background:#F3FBF9;">
+                  <span style="height:26px;width:26px;border-radius:50%;background:#14D9C0;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:800;">✓</span>
+                  <span style="font-size:12.5px;font-weight:600;color:#16161F;flex:1;">Quy đồng mẫu số</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;padding:12px;border-radius:13px;background:linear-gradient(135deg,#EFE9FD,#f6f1ff);box-shadow:inset 0 0 0 2px #7C46E8;">
+                  <span style="height:26px;width:26px;border-radius:50%;background:#7C46E8;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:800;">3</span>
+                  <span style="font-size:12.5px;font-weight:800;color:#5b2fc0;flex:1;">Cộng phân số khác mẫu</span>
+                  <span style="font-size:10px;color:#7C46E8;font-weight:700;background:#fff;padding:2px 7px;border-radius:999px;">đang học</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;">
+                  <span style="height:26px;width:26px;border-radius:50%;background:#eef1f4;color:#b3b9c4;display:grid;place-items:center;font-size:12px;font-weight:800;">4</span>
+                  <span style="font-size:12.5px;font-weight:600;color:#a2a8b4;flex:1;">Trừ phân số khác mẫu</span>
+                  <span style="font-size:12px;">🔒</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;">
+                  <span style="height:26px;width:26px;border-radius:50%;background:#eef1f4;color:#b3b9c4;display:grid;place-items:center;font-size:12px;font-weight:800;">5</span>
+                  <span style="font-size:12.5px;font-weight:600;color:#a2a8b4;flex:1;">Nhân phân số</span>
+                  <span style="font-size:12px;">🔒</span>
+                </div>
+              </div>
+            </div>
+            <div style="padding:14px;border-top:1px solid #f2f4f7;display:flex;align-items:center;gap:10px;">
+              <div style="height:34px;width:34px;border-radius:50%;background:linear-gradient(135deg,#ffd76f,#ff9f43);display:grid;place-items:center;font-weight:800;color:#7a4b00;">B</div>
+              <div style="flex:1;"><div style="font-size:12.5px;font-weight:700;color:#16161F;">Bảo Bi</div><div style="font-size:10.5px;color:#9aa1b0;">🔥 5 ngày · ⭐ 240</div></div>
+            </div>
+          </div>
+
+          <!-- lesson workspace -->
+          <div style="flex:1; overflow-y:auto; padding: 24px 30px 30px; background:
+                radial-gradient(600px 300px at 100% -5%, rgba(124,70,232,.08), transparent 60%);">
+            <!-- lesson hero -->
+            <div style="background:linear-gradient(120deg,#14D9C0,#0FB9A6); border-radius:22px; padding:22px 24px; color:#fff; display:flex; align-items:center; justify-content:space-between; box-shadow:0 20px 40px -22px rgba(15,185,166,.7); position:relative; overflow:hidden;">
+              <div style="position:absolute;right:-30px;top:-30px;height:150px;width:150px;border-radius:50%;background:rgba(255,255,255,.14);"></div>
+              <div style="position:relative;z-index:1;">
+                <div style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.9;font-family:'Poppins';">Bài 3 · Chương Phân số</div>
+                <div style="font-family:'Baloo 2';font-weight:800;font-size:25px;margin:4px 0 3px;">Cộng phân số khác mẫu</div>
+                <div style="font-size:13px;opacity:.92;">Học cách "cắt bánh cùng cỡ" để cộng được hai phân số 🍰</div>
+              </div>
+              <div style="position:relative;z-index:1;text-align:center;background:rgba(255,255,255,.18);backdrop-filter:blur(4px);border-radius:18px;padding:14px 18px;">
+                <div style="font-family:'Poppins';font-weight:800;font-size:22px;">45%</div>
+                <div style="font-size:10px;opacity:.9;">đã hiểu</div>
+              </div>
+            </div>
+
+            <!-- tabs merged -->
+            <div style="display:flex;gap:8px;margin:20px 0 16px;">
+              <div style="background:#16161F;color:#fff;border-radius:13px;padding:10px 18px;font-size:13px;font-weight:700;font-family:'Poppins';display:flex;align-items:center;gap:7px;">📖 Học lý thuyết</div>
+              <div style="background:#fff;color:#5b6072;border:1px solid #eef1f4;border-radius:13px;padding:10px 18px;font-size:13px;font-weight:700;font-family:'Poppins';display:flex;align-items:center;gap:7px;">✏️ Luyện tập <span style="background:#EFE9FD;color:#7C46E8;font-size:10px;padding:1px 7px;border-radius:999px;">6</span></div>
+              <div style="margin-left:auto;background:#fff;color:#7C46E8;border:1px solid #ece5fb;border-radius:13px;padding:10px 16px;font-size:13px;font-weight:700;font-family:'Poppins';display:flex;align-items:center;gap:7px;">💬 Hỏi thầy AI</div>
+            </div>
+
+            <div style="display:flex;gap:18px;">
+              <!-- theory card -->
+              <div style="flex:1.15;background:#fff;border:1px solid #eef1f4;border-radius:20px;padding:22px;box-shadow:0 12px 30px -20px rgba(0,0,0,.25);">
+                <div style="display:flex;gap:14px;margin-bottom:16px;">
+                  <div style="width:120px;height:92px;border-radius:14px;background:repeating-linear-gradient(45deg,#eef6f4,#eef6f4 8px,#e4f1ee 8px,#e4f1ee 16px);display:grid;place-items:center;text-align:center;flex-shrink:0;">
+                    <span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:#8fa39d;line-height:1.4;">[ minh hoạ<br>cắt bánh ]</span>
+                  </div>
+                  <div>
+                    <div style="font-family:'Poppins';font-weight:700;font-size:16px;color:#16161F;margin-bottom:6px;">Ý tưởng chính</div>
+                    <p style="margin:0;font-size:13.5px;line-height:1.65;color:#4b5060;">Muốn cộng <b style="color:#0FB9A6;">1/2</b> và <b style="color:#7C46E8;">1/3</b> cái bánh, ta phải cắt chúng thành các miếng <b>cùng cỡ</b> trước — đó là quy đồng mẫu số!</p>
+                  </div>
+                </div>
+                <div style="background:#F3FBF9;border:1px solid #e2f3ef;border-radius:14px;padding:14px 16px;font-size:14px;color:#16161F;font-weight:600;text-align:center;">
+                  <span style="color:#0FB9A6;font-weight:800;">1</span>⁄<span style="color:#0FB9A6;">2</span> &nbsp;+&nbsp; <span style="color:#7C46E8;font-weight:800;">1</span>⁄<span style="color:#7C46E8;">3</span> &nbsp;=&nbsp; <span style="font-weight:800;">3⁄6 + 2⁄6</span> &nbsp;=&nbsp; <span style="background:#14D9C0;color:#fff;padding:2px 10px;border-radius:8px;font-weight:800;">5⁄6</span>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:16px;">
+                  <div style="flex:1;background:linear-gradient(135deg,#8B5CF6,#7C46E8);color:#fff;border-radius:13px;padding:12px;text-align:center;font-weight:800;font-size:14px;font-family:'Poppins';box-shadow:0 10px 20px -8px rgba(124,70,232,.5);">Mình hiểu rồi → Luyện tập</div>
+                  <div style="background:#fff;border:1px solid #eef1f4;color:#5b6072;border-radius:13px;padding:12px 16px;font-weight:700;font-size:13px;">🔊</div>
+                </div>
+              </div>
+
+              <!-- buddy quick card -->
+              <div style="width:250px;background:linear-gradient(160deg,#faf7ff,#f3f0fb);border:1px solid #ece5fb;border-radius:20px;padding:18px;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+                  <div style="height:40px;width:40px;border-radius:50%;background:linear-gradient(135deg,#FFE7A3,#FFC24D);display:grid;place-items:center;font-size:22px;">🦊</div>
+                  <div><div style="font-family:'Poppins';font-weight:700;font-size:13.5px;color:#16161F;">Thầy Cáo</div><div style="font-size:10.5px;color:#7C46E8;font-weight:600;">● đang lắng nghe</div></div>
+                </div>
+                <div style="background:#fff;border:1px solid #f0eafc;border-radius:14px;border-top-left-radius:4px;padding:12px;font-size:12.5px;color:#4b5060;line-height:1.55;">Nếu cắt 1 cái bánh làm 2 và cái kia làm 3, ta có cộng thẳng mẫu số (2+3) được không nhỉ? 🤔</div>
+                <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:14px;">
+                  <div style="background:#fff;border:1px solid #ece5fb;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:600;color:#5b2fc0;">Em chưa hiểu chỗ này</div>
+                  <div style="background:#fff;border:1px solid #ece5fb;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:600;color:#5b2fc0;">Cho em một ví dụ khác</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= OPTION 1c : CHAT COMPANION ================= -->
+    <div id="1c" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <span style="font-family:'Poppins'; font-weight:800; font-size: 13px; color:#fff; background:#16161F; padding: 5px 12px; border-radius: 999px;">1c</span>
+        <span style="font-family:'Poppins'; font-weight:700; font-size: 19px; color:#16161F;">Người bạn đồng hành</span>
+        <span style="font-size: 13px; color:#7c8194;">Học qua trò chuyện · câu hỏi hiện ngay trong khung chat</span>
+      </div>
+
+      <div style="width: 1180px; height: 820px; border-radius: 26px; overflow: hidden; box-shadow: 0 40px 80px -40px rgba(31,26,60,.4); background: #F4FBF9; display: flex; flex-direction: column; border: 1px solid #e4ece9;">
+        <div style="height: 40px; background: #fff; border-bottom: 1px solid #eef1f4; display: flex; align-items: center; gap: 8px; padding: 0 16px;">
+          <span style="height:11px;width:11px;border-radius:50%;background:#ff5f57;"></span>
+          <span style="height:11px;width:11px;border-radius:50%;background:#febc2e;"></span>
+          <span style="height:11px;width:11px;border-radius:50%;background:#28c840;"></span>
+          <div style="margin-left:14px; background:#f1f4f7; border-radius:8px; height:24px; flex:1; max-width:420px; display:flex; align-items:center; padding:0 12px; font-size:12px; color:#9aa1b0;">aurora.edu.vn/hoc/cung-thay-cao</div>
+        </div>
+
+        <div style="flex:1; display:flex; overflow:hidden;">
+          <!-- slim progress rail -->
+          <div style="width: 220px; background:#fff; border-right:1px solid #eef1f4; padding:20px 16px; display:flex; flex-direction:column; gap:18px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="height:34px;width:34px;border-radius:11px;background:linear-gradient(135deg,#14D9C0,#7C46E8);display:grid;place-items:center;color:#fff;font-weight:800;font-family:'Poppins';">A</div>
+              <span style="font-family:'Poppins';font-weight:800;font-size:15px;color:#16161F;">Aurora</span>
+            </div>
+            <div style="background:linear-gradient(160deg,#F3FBF9,#EFE9FD);border:1px solid #eef1f4;border-radius:18px;padding:16px;text-align:center;">
+              <div style="height:56px;width:56px;border-radius:50%;background:linear-gradient(135deg,#FFE7A3,#FFC24D);display:grid;place-items:center;font-size:30px;margin:0 auto 8px;box-shadow:0 10px 18px -8px rgba(255,159,67,.6);">🦊</div>
+              <div style="font-family:'Poppins';font-weight:700;font-size:14px;color:#16161F;">Thầy Cáo</div>
+              <div style="font-size:11px;color:#7C46E8;font-weight:600;margin-top:1px;">bạn học của Bi</div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;font-weight:800;color:#9aa1b0;text-transform:uppercase;letter-spacing:.07em;font-family:'Poppins';padding:0 4px 10px;">Đang học</div>
+              <div style="background:#F3FBF9;border:1px solid #e2f3ef;border-radius:14px;padding:12px;">
+                <div style="font-size:12px;font-weight:700;color:#16161F;">Cộng phân số khác mẫu</div>
+                <div style="height:7px;background:#e0ece9;border-radius:7px;margin-top:9px;"><div style="height:7px;width:45%;background:linear-gradient(90deg,#14D9C0,#0FB9A6);border-radius:7px;"></div></div>
+                <div style="font-size:10.5px;color:#0FB9A6;font-weight:700;margin-top:6px;">Hiểu 45% · làm đúng 2/5</div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;font-weight:800;color:#9aa1b0;text-transform:uppercase;letter-spacing:.07em;font-family:'Poppins';padding:0 4px 10px;">Hôm nay</div>
+              <div style="display:flex;gap:8px;">
+                <div style="flex:1;background:#fff;border:1px solid #eef1f4;border-radius:13px;padding:10px;text-align:center;"><div style="font-size:18px;">🔥</div><div style="font-family:'Poppins';font-weight:800;font-size:15px;color:#16161F;">5</div><div style="font-size:9.5px;color:#9aa1b0;">ngày</div></div>
+                <div style="flex:1;background:#fff;border:1px solid #eef1f4;border-radius:13px;padding:10px;text-align:center;"><div style="font-size:18px;">⭐</div><div style="font-family:'Poppins';font-weight:800;font-size:15px;color:#16161F;">240</div><div style="font-size:9.5px;color:#9aa1b0;">sao</div></div>
+              </div>
+            </div>
+            <div style="margin-top:auto;display:flex;align-items:center;gap:9px;padding:8px 4px;">
+              <div style="height:32px;width:32px;border-radius:50%;background:linear-gradient(135deg,#ffd76f,#ff9f43);display:grid;place-items:center;font-weight:800;color:#7a4b00;font-size:13px;">B</div>
+              <div style="font-size:12px;font-weight:700;color:#16161F;">Bảo Bi</div>
+            </div>
+          </div>
+
+          <!-- chat main -->
+          <div style="flex:1; display:flex; flex-direction:column; background:
+                radial-gradient(560px 320px at 12% -6%, rgba(20,217,192,.12), transparent 60%),
+                radial-gradient(520px 340px at 100% 12%, rgba(124,70,232,.10), transparent 60%);">
+            <!-- chat header -->
+            <div style="padding:16px 26px; border-bottom:1px solid #eef1f4; background:rgba(255,255,255,.6); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:11px;">
+                <div style="height:40px;width:40px;border-radius:50%;background:linear-gradient(135deg,#FFE7A3,#FFC24D);display:grid;place-items:center;font-size:22px;">🦊</div>
+                <div><div style="font-family:'Poppins';font-weight:700;font-size:15px;color:#16161F;">Thầy Cáo</div><div style="font-size:11px;color:#0FB9A6;font-weight:600;">● Cùng học "Cộng phân số khác mẫu"</div></div>
+              </div>
+              <div style="background:#fff;border:1px solid #eef1f4;border-radius:12px;padding:7px 13px;font-size:12px;font-weight:700;color:#5b6072;">📖 Xem lý thuyết</div>
+            </div>
+
+            <!-- messages -->
+            <div style="flex:1; overflow-y:auto; padding:24px 26px; display:flex; flex-direction:column; gap:16px;">
+              <!-- ai -->
+              <div style="display:flex;gap:11px;align-items:flex-end;max-width:78%;">
+                <div style="height:34px;width:34px;border-radius:50%;background:linear-gradient(135deg,#FFE7A3,#FFC24D);display:grid;place-items:center;font-size:18px;flex-shrink:0;">🦊</div>
+                <div style="background:#fff;border:1px solid #eef1f4;border-radius:18px;border-bottom-left-radius:5px;padding:13px 16px;font-size:14px;color:#3a3f4d;line-height:1.6;box-shadow:0 8px 20px -16px rgba(0,0,0,.3);">Chào Bi! Thầy có câu đố nhé: <b style="color:#0FB9A6;">1/2</b> cái bánh cộng với <b style="color:#7C46E8;">1/3</b> cái bánh thì bằng bao nhiêu cái bánh nhỉ? 🍰</div>
+              </div>
+              <!-- student -->
+              <div style="align-self:flex-end;max-width:70%;">
+                <div style="background:#16161F;color:#fff;border-radius:18px;border-bottom-right-radius:5px;padding:12px 16px;font-size:14px;line-height:1.55;">Dạ bằng 2/5 đúng không ạ?</div>
+              </div>
+              <!-- ai -->
+              <div style="display:flex;gap:11px;align-items:flex-end;max-width:80%;">
+                <div style="height:34px;width:34px;border-radius:50%;background:linear-gradient(135deg,#FFE7A3,#FFC24D);display:grid;place-items:center;font-size:18px;flex-shrink:0;">🦊</div>
+                <div style="background:#fff;border:1px solid #eef1f4;border-radius:18px;border-bottom-left-radius:5px;padding:13px 16px;font-size:14px;color:#3a3f4d;line-height:1.6;box-shadow:0 8px 20px -16px rgba(0,0,0,.3);">Ồ! Bi thử nghĩ xem 🤔 Khi cộng hai miếng bánh khác cỡ, mình có cộng thẳng mẫu số (2+3=5) được không? Hay cần đưa về <b>cùng cỡ</b> trước nhỉ? Thử câu này xem nào 👇</div>
+              </div>
+              <!-- inline question card -->
+              <div style="align-self:flex-start;margin-left:45px;width:calc(100% - 45px);max-width:560px;background:#fff;border:1px solid #ece5fb;border-radius:20px;padding:18px;box-shadow:0 16px 34px -22px rgba(124,70,232,.5);">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                  <span style="background:#EFE9FD;color:#7C46E8;font-size:10px;font-weight:800;padding:3px 10px;border-radius:999px;font-family:'Poppins';text-transform:uppercase;letter-spacing:.05em;">Câu đố nhỏ</span>
+                  <span style="font-size:11px;color:#9aa1b0;">Chọn 1 đáp án</span>
+                </div>
+                <div style="font-size:15px;font-weight:700;color:#16161F;margin-bottom:14px;">Muốn cộng 1/2 + 1/3, bước đầu tiên em làm gì?</div>
+                <div style="display:flex;flex-direction:column;gap:9px;">
+                  <div style="display:flex;align-items:center;gap:12px;border:1px solid #eef1f4;border-radius:13px;padding:11px 14px;font-size:13.5px;font-weight:600;color:#4b5060;">
+                    <span style="height:26px;width:26px;border-radius:8px;background:#f4f6f9;color:#9aa1b0;display:grid;place-items:center;font-weight:800;font-size:12px;">A</span> Cộng thẳng: 2/5
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;border:2px solid #7C46E8;background:#faf7ff;border-radius:13px;padding:10px 13px;font-size:13.5px;font-weight:800;color:#5b2fc0;box-shadow:0 0 0 4px #EFE9FD;">
+                    <span style="height:26px;width:26px;border-radius:8px;background:#7C46E8;color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px;">B</span> Quy đồng về mẫu số chung là 6
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;border:1px solid #eef1f4;border-radius:13px;padding:11px 14px;font-size:13.5px;font-weight:600;color:#4b5060;">
+                    <span style="height:26px;width:26px;border-radius:8px;background:#f4f6f9;color:#9aa1b0;display:grid;place-items:center;font-weight:800;font-size:12px;">C</span> Nhân hai tử số với nhau
+                  </div>
+                </div>
+                <div style="display:flex;gap:9px;margin-top:14px;">
+                  <div style="flex:1;background:linear-gradient(135deg,#8B5CF6,#7C46E8);color:#fff;border-radius:12px;padding:11px;text-align:center;font-weight:800;font-size:14px;font-family:'Poppins';box-shadow:0 10px 20px -8px rgba(124,70,232,.5);">Trả lời</div>
+                  <div style="background:#F3FBF9;border:1px solid #e2f3ef;color:#0FB9A6;border-radius:12px;padding:11px 16px;font-weight:700;font-size:13px;">💡 Gợi ý</div>
+                </div>
+              </div>
+              <!-- student short -->
+              <div style="align-self:flex-end;max-width:70%;">
+                <div style="background:#16161F;color:#fff;border-radius:18px;border-bottom-right-radius:5px;padding:12px 16px;font-size:14px;">À! Phải quy đồng mẫu số chung là 6 ạ!</div>
+              </div>
+            </div>
+
+            <!-- input -->
+            <div style="padding:14px 26px 20px; border-top:1px solid #eef1f4; background:rgba(255,255,255,.7); backdrop-filter:blur(6px);">
+              <div style="display:flex;gap:8px;margin-bottom:11px;">
+                <div style="background:#fff;border:1px solid #ece5fb;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;color:#5b2fc0;">🤔 Em chưa hiểu</div>
+                <div style="background:#fff;border:1px solid #e2f3ef;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;color:#0FB9A6;">💡 Cho em gợi ý</div>
+                <div style="background:#fff;border:1px solid #eef1f4;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;color:#5b6072;">➡️ Câu tiếp theo</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #eef1f4;border-radius:16px;padding:8px 8px 8px 18px;box-shadow:0 10px 26px -20px rgba(0,0,0,.3);">
+                <span style="font-size:13px;color:#a2a8b4;flex:1;">Nhắn cho thầy Cáo...</span>
+                <div style="height:40px;width:40px;border-radius:12px;background:linear-gradient(135deg,#14D9C0,#0FB9A6);display:grid;place-items:center;color:#fff;font-size:16px;box-shadow:0 8px 16px -6px rgba(15,185,166,.6);">➤</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+</body>
+</html>
