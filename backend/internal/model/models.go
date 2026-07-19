@@ -177,6 +177,33 @@ type ActivityLog struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+type TutorLearningState struct {
+	ID                   uuid.UUID  `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	StudentID            uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex:idx_tutor_learning_state" json:"studentId"`
+	TopicID              uuid.UUID  `gorm:"type:uuid;not null;uniqueIndex:idx_tutor_learning_state" json:"topicId"`
+	Phase                string     `gorm:"type:varchar(30);not null;default:'diagnose'" json:"phase"`
+	HintLevel            int        `gorm:"not null;default:0" json:"hintLevel"`
+	ConsecutiveErrors    int        `gorm:"not null;default:0" json:"consecutiveErrors"`
+	VerificationRequired bool       `gorm:"not null;default:false" json:"verificationRequired"`
+	LastAction           string     `gorm:"type:varchar(50);not null;default:'ASK_DIAGNOSTIC'" json:"lastAction"`
+	NextReviewAt         *time.Time `json:"nextReviewAt"`
+	CreatedAt            time.Time  `json:"createdAt"`
+	UpdatedAt            time.Time  `json:"updatedAt"`
+}
+
+type MisconceptionMemory struct {
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()" json:"id"`
+	StudentID      uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_misconception_memory" json:"studentId"`
+	TopicID        uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_misconception_memory" json:"topicId"`
+	Key            string    `gorm:"type:varchar(255);not null;uniqueIndex:idx_misconception_memory" json:"key"`
+	Occurrences    int       `gorm:"not null;default:1" json:"occurrences"`
+	Confidence     float64   `gorm:"not null;default:0.35" json:"confidence"`
+	Resolved       bool      `gorm:"not null;default:false" json:"resolved"`
+	LastObservedAt time.Time `gorm:"not null" json:"lastObservedAt"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
 type AICache struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	Hash      string    `gorm:"type:varchar(64);uniqueIndex" json:"hash"`

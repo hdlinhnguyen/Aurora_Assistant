@@ -39,7 +39,7 @@ func TestBuildRawQuizFromLogsPreservesQuestionAndAttemptIdentity(t *testing.T) {
 	now := time.Now().UTC()
 	logs := []model.ActivityLog{
 		{ID: uuid.New(), StudentID: studentID, NodeID: nodeID, Action: "answer_incorrect", Detail: fmt.Sprintf("[question_id=%s] [difficulty=hard] [inference_weight=0.35] first", questionID), CreatedAt: now},
-		{ID: uuid.New(), StudentID: studentID, NodeID: nodeID, Action: "answer_correct", Detail: fmt.Sprintf("[question_id=%s] [difficulty=hard] retry", questionID), CreatedAt: now.Add(time.Minute)},
+		{ID: uuid.New(), StudentID: studentID, NodeID: nodeID, Action: "answer_correct", Detail: fmt.Sprintf("[question_id=%s] [difficulty=hard] [hints_used=2] retry", questionID), CreatedAt: now.Add(time.Minute)},
 	}
 
 	evidence := buildRawQuizFromLogs(logs)
@@ -57,5 +57,8 @@ func TestBuildRawQuizFromLogsPreservesQuestionAndAttemptIdentity(t *testing.T) {
 	}
 	if evidence[0].Difficulty != "hard" || evidence[1].Difficulty != "hard" {
 		t.Fatalf("difficulties = %q, %q; want hard, hard", evidence[0].Difficulty, evidence[1].Difficulty)
+	}
+	if evidence[0].HintsUsed != 0 || evidence[1].HintsUsed != 2 {
+		t.Fatalf("hints used = %d, %d; want 0, 2", evidence[0].HintsUsed, evidence[1].HintsUsed)
 	}
 }

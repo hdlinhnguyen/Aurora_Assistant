@@ -32,6 +32,8 @@ func migrationModels() []any {
 		&model.QuestionTaggingState{},
 		&model.StudentState{},
 		&model.ActivityLog{},
+		&model.TutorLearningState{},
+		&model.MisconceptionMemory{},
 		&model.AICache{},
 		&model.LearningPath{},
 		&model.StudentTopicMastery{},

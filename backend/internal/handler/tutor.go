@@ -799,6 +799,10 @@ func (h *TutorHandler) SubmitAnswer(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+	learningState, policyErr := h.svc.RecordLearningAnswer(userID, question, req.SelectedOption, isCorrect)
+	if policyErr != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": policyErr.Error()})
+	}
 
 	// Cập nhật mastery ngay (async) → lộ trình + hero tươi theo tiến bộ, không cần giáo viên.
 	if h.masteryRecalc != nil {
@@ -813,8 +817,10 @@ func (h *TutorHandler) SubmitAnswer(c fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"isCorrect": isCorrect,
-		"question":  question,
+		"isCorrect":     isCorrect,
+		"question":      question,
+		"learningState": learningState,
+		"nextAction":    learningState.LastAction,
 	})
 }
 
@@ -1022,7 +1028,16 @@ func (h *TutorHandler) ChatNodeTheory(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"reply": reply})
+	learningState, policyErr := h.svc.RecordChatSignal(userID, nodeID, req.Message)
+	if policyErr != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": policyErr.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"reply":         reply,
+		"learningState": learningState,
+		"nextAction":    learningState.LastAction,
+	})
 }
 
 // ─── Guardrail Event Handlers (teacher-only) ─────────────────────────────────
@@ -1738,6 +1753,12 @@ func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
 		if match := difficultyMarker.FindStringSubmatch(lg.Detail); len(match) == 2 {
 			difficulty = strings.ToLower(strings.TrimSpace(match[1]))
 		}
+		hintsUsed := 0
+		if raw := activityMarkerValue(lg.Detail, "hints_used"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+				hintsUsed = parsed
+			}
+		}
 		rawQuiz = append(rawQuiz, RawQuizEvidence{
 			EvidenceID:      lg.ID.String(),
 			StudentID:       lg.StudentID.String(),
@@ -1746,7 +1767,7 @@ func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
 			TopicID:         lg.NodeID.String(),
 			Score:           score,
 			AttemptNumber:   attemptsByQuestion[attemptKey],
-			HintsUsed:       0,
+			HintsUsed:       hintsUsed,
 			GradingMethod:   "auto",
 			OccurredAt:      lg.CreatedAt.Format(time.RFC3339),
 			InferenceWeight: inferenceWeightFromDetail(lg.Detail),
@@ -1754,6 +1775,20 @@ func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
 		})
 	}
 	return rawQuiz
+}
+
+func activityMarkerValue(detail, name string) string {
+	marker := "[" + name + "="
+	start := strings.Index(detail, marker)
+	if start < 0 {
+		return ""
+	}
+	start += len(marker)
+	end := strings.Index(detail[start:], "]")
+	if end < 0 {
+		return ""
+	}
+	return strings.TrimSpace(detail[start : start+end])
 }
 
 func inferenceWeightFromDetail(detail string) float64 {
@@ -1940,11 +1975,20 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 
 	topicUUID, err := uuid.Parse(req.TopicID)
 	if err == nil {
+		learningState, stateErr := h.svc.RecordHint(studentID, topicUUID, req.PressCount)
+		if stateErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": stateErr.Error()})
+		}
 		logDetail := fmt.Sprintf("Topic: %s, Press: %d", req.TopicID, req.PressCount)
+		subject := ""
+		var node model.Node
+		if config.DB.Select("subject").First(&node, "id = ?", topicUUID).Error == nil {
+			subject = node.Subject
+		}
 		newLog := model.ActivityLog{
 			ID:        uuid.New(),
 			StudentID: studentID,
-			Subject:   "Toán Lớp 5",
+			Subject:   subject,
 			NodeID:    topicUUID,
 			Action:    "request_hint",
 			Detail:    logDetail,
@@ -1952,6 +1996,8 @@ func (h *TutorHandler) RequestHint(c fiber.Ctx) error {
 		}
 		config.DB.Create(&newLog)
 		h.publishHintTelemetry(studentID, topicUUID, req.PressCount, string(bodyBytes))
+		hintResult["learningState"] = learningState
+		hintResult["nextAction"] = learningState.LastAction
 	}
 
 	return c.JSON(hintResult)
