@@ -29,7 +29,14 @@ class CurriculumGraph:
     def to_networkx(self) -> nx.DiGraph:
         g = nx.DiGraph()
         g.add_nodes_from(self.topics)
-        g.add_edges_from((e.prerequisite_topic_id, e.dependent_topic_id) for e in self.edges)
+        g.add_edges_from(
+            (
+                e.prerequisite_topic_id,
+                e.dependent_topic_id,
+                {"strength": e.strength},
+            )
+            for e in self.edges
+        )
         return g
 
 
@@ -49,8 +56,13 @@ def load_chac_goc_graph(path: str | Path) -> CurriculumGraph:
             learning_outcomes=node.get("yccd", []),
         )
         for prereq_id in node["tienQuyet"]:
+            strengths = node.get("trongSoTienQuyet") or {}
             edges.append(
-                PrerequisiteEdge(prerequisite_topic_id=prereq_id, dependent_topic_id=node["id"])
+                PrerequisiteEdge(
+                    prerequisite_topic_id=prereq_id,
+                    dependent_topic_id=node["id"],
+                    strength=strengths.get(prereq_id, 0.7),
+                )
             )
 
     return CurriculumGraph(topics, edges)

@@ -255,6 +255,27 @@ func (s *tutorService) GetStudentSubjectProgress(studentID uuid.UUID, subject st
 			nodeStatus[nodeIDStr] = "mastered"
 		}
 	}
+	// Persisted BKT is the canonical state. Raw-log heuristics above are only a
+	// fallback for topics that have not been recalculated yet.
+	var masteryRows []model.StudentTopicMastery
+	if err := s.db.Table("student_topic_masteries AS mastery").
+		Select("mastery.*").
+		Joins("JOIN nodes ON nodes.id = mastery.topic_id").
+		Where("mastery.student_id = ? AND nodes.subject = ?", studentID, subject).
+		Find(&masteryRows).Error; err == nil {
+		for _, mastery := range masteryRows {
+			switch mastery.MasteryStatus {
+			case "confirmed_gap":
+				nodeStatus[mastery.TopicID.String()] = "struggle"
+			case "mastered":
+				nodeStatus[mastery.TopicID.String()] = "mastered"
+			case "learning", "uncertain":
+				nodeStatus[mastery.TopicID.String()] = "learning"
+			case "unknown":
+				delete(nodeStatus, mastery.TopicID.String())
+			}
+		}
+	}
 
 	// Build per-node accuracy map for mastery ring visualization
 	nodeAccuracy := map[string]map[string]int{}
@@ -432,6 +453,26 @@ func (s *tutorService) GetClassInterventionGroups(teacherID uuid.UUID, subject s
 			studentNodeStates[log.StudentID][log.NodeID] = false
 		} else if log.Action == "answer_incorrect" || log.Action == "click_cant_do" || log.Action == "struggle" {
 			studentNodeStates[log.StudentID][log.NodeID] = true
+		}
+	}
+	// Override event-order heuristics with canonical BKT states when available.
+	var masteryRows []model.StudentTopicMastery
+	if len(studentIDs) > 0 {
+		_ = s.db.Table("student_topic_masteries AS mastery").
+			Select("mastery.*").
+			Joins("JOIN nodes ON nodes.id = mastery.topic_id").
+			Where("mastery.student_id IN ? AND nodes.subject = ?", studentIDs, subject).
+			Find(&masteryRows).Error
+	}
+	for _, mastery := range masteryRows {
+		if _, exists := studentNodeStates[mastery.StudentID]; !exists {
+			studentNodeStates[mastery.StudentID] = make(map[uuid.UUID]bool)
+		}
+		switch mastery.MasteryStatus {
+		case "confirmed_gap":
+			studentNodeStates[mastery.StudentID][mastery.TopicID] = true
+		case "mastered", "learning", "uncertain", "unknown":
+			delete(studentNodeStates[mastery.StudentID], mastery.TopicID)
 		}
 	}
 

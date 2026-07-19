@@ -13,16 +13,18 @@ import (
 )
 
 type QuizEvidence struct {
-	EvidenceID    string    `json:"evidence_id"`
-	StudentID     uuid.UUID `json:"student_id"`
-	SessionID     string    `json:"session_id"`
-	QuestionID    string    `json:"question_id"`
-	TopicID       uuid.UUID `json:"topic_id"`
-	Score         float64   `json:"score"`
-	AttemptNumber int       `json:"attempt_number"`
-	HintsUsed     int       `json:"hints_used"`
-	GradingMethod string    `json:"grading_method"`
-	OccurredAt    time.Time `json:"occurred_at"`
+	EvidenceID      string    `json:"evidence_id"`
+	StudentID       uuid.UUID `json:"student_id"`
+	SessionID       string    `json:"session_id"`
+	QuestionID      string    `json:"question_id"`
+	TopicID         uuid.UUID `json:"topic_id"`
+	Score           float64   `json:"score"`
+	AttemptNumber   int       `json:"attempt_number"`
+	HintsUsed       int       `json:"hints_used"`
+	GradingMethod   string    `json:"grading_method"`
+	OccurredAt      time.Time `json:"occurred_at"`
+	InferenceWeight float64   `json:"inference_weight,omitempty"`
+	Difficulty      string    `json:"difficulty,omitempty"`
 }
 
 type CalculateRequest struct {
