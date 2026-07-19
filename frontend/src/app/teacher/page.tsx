@@ -694,6 +694,16 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     if (selectedSubject) {
+      setNodes([]);
+      setEdges([]);
+      setSubjectQuestions([]);
+      setDiagnosticTopicIds([]);
+      setExamsCount(0);
+      setHasActiveExam(false);
+      setInsights(null);
+      setDraftPaths(null);
+      setActiveThreadId(null);
+      setSelectedTargetTopics([]);
       loadTreeData();
       if (selectedStudent) {
         loadStudentDetailProgress(selectedStudent.studentId);
@@ -2390,44 +2400,56 @@ export default function TeacherDashboard() {
               let stepDesc = "";
               let actionLabel = "";
               let targetTab: ActiveTab | null = null;
+              const subjectProgressRows = studentsProgress.filter((student) => student.subject === selectedSubject);
+              const hasStudentsForSubject = subjectProgressRows.length > 0;
+              const hasDiagnosticEvidence = diagnosticTopicIds.length > 0;
 
               if (nodes.length === 0) {
-                stepKey = "step1";
+                stepKey = "tree";
                 stepTitle = "Bước 1: Khởi tạo Cây kiến thức";
                 stepDesc = "Cây kiến thức môn học hiện đang trống. Thầy/cô vui lòng nạp nhanh cây mẫu hoặc tải tài liệu lên để hệ thống tự động trích xuất.";
                 actionLabel = "Mở Thiết kế sơ đồ cây";
                 targetTab = "graph-designer";
               } else if (subjectQuestions.length === 0) {
-                stepKey = "step2";
+                stepKey = "questions";
                 stepTitle = "Bước 2: Nạp ngân hàng câu hỏi";
-                stepDesc = "Cây kiến thức đã sẵn sàng! Thầy/cô hãy nạp ngân hàng câu hỏi mẫu nhanh (hoặc upload từ Excel) để chuẩn bị cho việc tạo đề.";
+                stepDesc = "Cây kiến thức đã sẵn sàng. Tiếp theo, hãy nạp hoặc tạo câu hỏi trắc nghiệm gắn với từng bài để hệ thống có dữ liệu tạo đề.";
                 actionLabel = "Đi tới Ngân hàng Câu hỏi ➔";
                 targetTab = "question-bank";
               } else if (examsCount === 0) {
-                stepKey = "step3";
-                stepTitle = "Bước 3: Tạo đề thi tổng quan";
-                stepDesc = "Đã có câu hỏi! Tiếp theo, thầy/cô hãy tạo đề thi tổng quan để phục vụ đánh giá trình độ ban đầu của học sinh.";
+                stepKey = "exam";
+                stepTitle = "Bước 3: Tạo đề trắc nghiệm tổng quan";
+                stepDesc = "Đã có câu hỏi. Tiếp theo, thầy/cô hãy tạo đề trắc nghiệm tổng quan để đánh giá trình độ ban đầu; bài trắc nghiệm sẽ được hệ thống tự chấm.";
                 actionLabel = "Đi tới Tạo đề Kiểm tra ➔";
                 targetTab = "exam-builder";
               } else if (!hasActiveExam) {
-                stepKey = "step3_publish";
-                stepTitle = "Bước 3.5: Xuất bản đề kiểm tra";
-                stepDesc = "Thầy/cô đã tạo đề kiểm tra nhưng chưa xuất bản. Hãy chuyển trạng thái đề thi sang 'Chuẩn bị thi' hoặc 'Xuất bản' để học sinh có thể truy cập.";
-                actionLabel = "Đi tới Thiết kế Đề thi ➔";
+                stepKey = "exam-ready";
+                stepTitle = "Bước 4: Mở đề cho học sinh làm";
+                stepDesc = "Đề đã được tạo nhưng chưa ở trạng thái sẵn sàng. Hãy hoàn tất/công bố đề trong màn tạo đề để học sinh có thể vào làm; không cần qua bước chấm thủ công với đề trắc nghiệm.";
+                actionLabel = "Mở Tạo đề Kiểm tra ➔";
                 targetTab = "exam-builder";
-              } else if (studentsProgress.length === 0) {
-                stepKey = "step4";
-                stepTitle = "Bước 4: Quản lý học sinh & lớp học";
-                stepDesc = "Đề thi tổng quan đã được xuất bản! Thầy/cô hãy tạo tài khoản cho học sinh (hoặc thêm nhanh học sinh Demo) để họ làm bài.";
+              } else if (!hasStudentsForSubject) {
+                stepKey = "students";
+                stepTitle = "Bước 5: Thêm học sinh";
+                stepDesc = "Đề trắc nghiệm đã sẵn sàng. Thầy/cô hãy tạo hoặc thêm học sinh vào lớp/môn học để các em có tài khoản làm bài.";
                 actionLabel = "Đi tới Quản lý học sinh ➔";
                 targetTab = "student-mgmt";
+              } else if (!hasDiagnosticEvidence) {
+                stepKey = "student-attempts";
+                stepTitle = "Bước 6: Chờ học sinh làm bài";
+                stepDesc = "Mọi thiết lập đã sẵn sàng. Khi học sinh nộp bài trắc nghiệm, hệ thống sẽ tự chấm và cập nhật dữ liệu chẩn đoán realtime; không cần chấm thủ công.";
+                actionLabel = "Kiểm tra đề đang mở ➔";
+                targetTab = "exam-builder";
               } else {
-                stepKey = "step5";
-                stepTitle = "Bước 5: Học sinh làm bài kiểm tra";
-                stepDesc = "Mọi thiết lập đã hoàn tất! Hãy hướng dẫn học sinh đăng nhập bằng tài khoản của họ và làm bài kiểm tra tổng quan để mở khóa tính năng tự ôn tập.";
+                stepKey = "insights";
+                stepTitle = "Bước 7: Xem phân tích & lập lộ trình";
+                stepDesc = "Đã có dữ liệu làm bài. Thầy/cô có thể xem giám sát lớp, lỗ hổng kiến thức và lập lộ trình phụ đạo cá nhân hóa.";
+                actionLabel = "Đi tới Giám sát lớp học ➔";
+                targetTab = "monitoring";
               }
 
-              if (dismissedSteps[stepKey]) return null;
+              const scopedStepKey = `setup:${selectedSubject}:${stepKey}`;
+              if (dismissedSteps[scopedStepKey]) return null;
 
               return (
                 <div className="mb-5 bg-gradient-to-br from-indigo-50 to-violet-50/50 border border-indigo-150 p-4.5 rounded-3xl flex items-start justify-between gap-4 shadow-sm animate-[fadeIn_0.3s_ease-out]">
@@ -2449,7 +2471,7 @@ export default function TeacherDashboard() {
                     </div>
                   </div>
                   <button
-                    onClick={() => dismissStep(stepKey)}
+                    onClick={() => dismissStep(scopedStepKey)}
                     className="text-slate-400 hover:text-slate-650 font-bold text-xs p-1 rounded-full hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
                     title="Đóng gợi ý này"
                   >

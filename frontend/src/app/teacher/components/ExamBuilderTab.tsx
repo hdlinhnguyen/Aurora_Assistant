@@ -6,7 +6,7 @@ import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileDown, FilePenLine, GripVertical, Library, Loader2, Plus, RotateCcw, Search, Sparkles, Trash2 } from "lucide-react";
 
 type Exam = { id: string; title: string; subject: string; gradeLevel: string; durationMinutes: number; totalPoints: string; status: string; version: number; questions?: any[] };
-const statusCopy: Record<string, string> = { drafting: "Bản nháp", preparing_exam: "Sẵn sàng chấm", done: "Hoàn tất" };
+const statusCopy: Record<string, string> = { drafting: "Bản nháp", preparing_exam: "Sẵn sàng làm bài", done: "Hoàn tất" };
 
 export default function ExamBuilderTab({ subjects, selectedSubject }: { subjects: string[]; selectedSubject: string }) {
   const [exams, setExams] = useState<Exam[]>([]);
