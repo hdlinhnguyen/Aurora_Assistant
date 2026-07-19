@@ -12,7 +12,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 type StudentStat struct {
 	StudentID       string  `json:"studentId"`
 	StudentName     string  `json:"studentName"`
@@ -27,11 +26,11 @@ type StudentStat struct {
 type TutorService interface {
 	CreateSession(studentID uuid.UUID, topic string, mode string) (*model.ChatSession, error)
 	GetStudentSessions(studentID uuid.UUID) ([]model.ChatSession, error)
-	GetSessionMessages(sessionID uuid.UUID) ([]model.Message, error)
+	GetSessionMessages(sessionID, studentID uuid.UUID) ([]model.Message, error)
 	SendMessage(sessionID uuid.UUID, senderID uuid.UUID, content string) (*model.Message, *model.Message, error)
-	SaveSessionAxioms(sessionID uuid.UUID, axiomsJSON string) error
-	GetSessionAxioms(sessionID uuid.UUID) (string, error)
-	GetTeacherDashboardData() ([]GapStat, []StudentNeedHelp, []FeynmanStudentStat, error)
+	SaveSessionAxioms(sessionID, studentID uuid.UUID, axiomsJSON string) error
+	GetSessionAxioms(sessionID, studentID uuid.UUID) (string, error)
+	GetTeacherDashboardData(teacherID uuid.UUID) ([]GapStat, []StudentNeedHelp, []FeynmanStudentStat, error)
 	// Topic CRUD
 	CreateTopic(topic *model.Topic) error
 	GetTeacherTopics(teacherID uuid.UUID) ([]model.Topic, error)
@@ -66,10 +65,11 @@ type TutorService interface {
 	AdaptiveDowngrade(studentID uuid.UUID, nodeID uuid.UUID) (map[string]interface{}, error)
 
 	// Teacher Dashboard Progress
-	GetStudentsProgress() ([]map[string]interface{}, error)
+	GetStudentsProgress(teacherID uuid.UUID) ([]map[string]interface{}, error)
+	TeacherOwnsStudent(teacherID, studentID uuid.UUID) (bool, error)
 	GetStudentSubjectProgress(studentID uuid.UUID, subject string) (map[string]interface{}, error)
-	GetMonitoringData(subject string) ([]StudentStat, error)
-	GetClassInterventionGroups(subject string) (map[string]interface{}, error)
+	GetMonitoringData(teacherID uuid.UUID, subject string) ([]StudentStat, error)
+	GetClassInterventionGroups(teacherID uuid.UUID, subject string) (map[string]interface{}, error)
 
 	// Socratic RAG Chat
 	ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string, questionText string) (string, error)
@@ -129,22 +129,21 @@ func NewTutorService(db *gorm.DB, aiSvc AIService, options ...TutorOption) Tutor
 	return service
 }
 
-
 // GuardrailEventView là bản ghi sự kiện kèm tên học sinh cho dashboard giáo viên.
 type GuardrailEventView struct {
-	ID             uuid.UUID  `json:"id"`
-	StudentID      uuid.UUID  `json:"studentId"`
-	StudentName    string     `json:"studentName"`
-	StudentEmail   string     `json:"studentEmail"`
-	SessionID      *uuid.UUID `json:"sessionId"`
-	Source         string     `json:"source"`
-	Category       string     `json:"category"`
-	Message        string     `json:"message"`
-	Severity       string     `json:"severity"`
-	Handled        bool       `json:"handled"`
-	HandledBy      *uuid.UUID `json:"handledBy"`
-	HandledAt      *time.Time `json:"handledAt"`
-	CreatedAt      time.Time  `json:"createdAt"`
+	ID           uuid.UUID  `json:"id"`
+	StudentID    uuid.UUID  `json:"studentId"`
+	StudentName  string     `json:"studentName"`
+	StudentEmail string     `json:"studentEmail"`
+	SessionID    *uuid.UUID `json:"sessionId"`
+	Source       string     `json:"source"`
+	Category     string     `json:"category"`
+	Message      string     `json:"message"`
+	Severity     string     `json:"severity"`
+	Handled      bool       `json:"handled"`
+	HandledBy    *uuid.UUID `json:"handledBy"`
+	HandledAt    *time.Time `json:"handledAt"`
+	CreatedAt    time.Time  `json:"createdAt"`
 }
 
 func (s *tutorService) CreateSession(studentID uuid.UUID, topic string, mode string) (*model.ChatSession, error) {
@@ -190,9 +189,12 @@ func (s *tutorService) GetStudentSessions(studentID uuid.UUID) ([]model.ChatSess
 	return sessions, err
 }
 
-func (s *tutorService) GetSessionMessages(sessionID uuid.UUID) ([]model.Message, error) {
+func (s *tutorService) GetSessionMessages(sessionID, studentID uuid.UUID) ([]model.Message, error) {
 	var messages []model.Message
-	err := s.db.Where("session_id = ?", sessionID).Order("created_at asc").Find(&messages).Error
+	err := s.db.Table("messages").
+		Joins("JOIN chat_sessions ON chat_sessions.id = messages.session_id").
+		Where("messages.session_id = ? AND chat_sessions.student_id = ?", sessionID, studentID).
+		Order("messages.created_at asc").Find(&messages).Error
 	return messages, err
 }
 
@@ -285,13 +287,22 @@ func (s *tutorService) SendMessage(sessionID uuid.UUID, senderID uuid.UUID, cont
 	return studentMsg, aiMsg, nil
 }
 
-func (s *tutorService) SaveSessionAxioms(sessionID uuid.UUID, axiomsJSON string) error {
-	return s.db.Model(&model.ChatSession{}).Where("id = ?", sessionID).Update("axioms_json", axiomsJSON).Error
+func (s *tutorService) SaveSessionAxioms(sessionID, studentID uuid.UUID, axiomsJSON string) error {
+	result := s.db.Model(&model.ChatSession{}).
+		Where("id = ? AND student_id = ?", sessionID, studentID).
+		Update("axioms_json", axiomsJSON)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
-func (s *tutorService) GetSessionAxioms(sessionID uuid.UUID) (string, error) {
+func (s *tutorService) GetSessionAxioms(sessionID, studentID uuid.UUID) (string, error) {
 	var session model.ChatSession
-	if err := s.db.Where("id = ?", sessionID).First(&session).Error; err != nil {
+	if err := s.db.Where("id = ? AND student_id = ?", sessionID, studentID).First(&session).Error; err != nil {
 		return "", err
 	}
 	return session.AxiomsJSON, nil
@@ -357,4 +368,3 @@ func (s *tutorService) GetGuardrailEvents(severity string, limit int) ([]Guardra
 func (s *tutorService) MarkGuardrailEventHandled(eventID uuid.UUID) error {
 	return s.db.Model(&model.GuardrailEvent{}).Where("id = ?", eventID).Update("handled", true).Error
 }
-

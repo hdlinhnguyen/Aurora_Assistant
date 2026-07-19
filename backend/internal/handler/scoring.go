@@ -17,7 +17,7 @@ import (
 
 type scoringService interface {
 	CreateBatch(uuid.UUID, scoring.CreateBatchInput) (*scoring.BatchDetail, error)
-	ListStudents(string) ([]model.User, error)
+	ListStudents(uuid.UUID, string) ([]model.User, error)
 	ListBatches(uuid.UUID, string, string) ([]model.GradingBatch, error)
 	GetBatch(uuid.UUID, uuid.UUID) (*scoring.BatchDetail, error)
 	GetSubmission(uuid.UUID, uuid.UUID) (*scoring.SubmissionDetail, error)
@@ -36,10 +36,11 @@ func NewScoringHandler(service scoringService) *ScoringHandler {
 }
 
 func (h *ScoringHandler) ListStudents(c fiber.Ctx) error {
-	if _, err := requireTeacherActor(c); err != nil {
+	actor, err := requireTeacherActor(c)
+	if err != nil {
 		return writeScoringError(c, err)
 	}
-	rows, err := h.service.ListStudents(c.Query("search"))
+	rows, err := h.service.ListStudents(actor, c.Query("search"))
 	if err != nil {
 		return writeScoringError(c, err)
 	}

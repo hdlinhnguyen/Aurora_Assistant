@@ -64,7 +64,9 @@ func (s *Service) CreateBatch(actor uuid.UUID, input CreateBatchInput) (*BatchDe
 			return err
 		}
 		var students []model.User
-		if err := tx.db.Where("id IN ? AND role = ?", input.StudentIDs, "student").Find(&students).Error; err != nil {
+		if err := tx.db.Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+			Where("users.id IN ? AND users.role = ? AND classrooms.teacher_id = ?", input.StudentIDs, "student", actor).
+			Find(&students).Error; err != nil {
 			return err
 		}
 		if len(students) != len(input.StudentIDs) {
@@ -133,13 +135,14 @@ func (s *Service) CreateBatch(actor uuid.UUID, input CreateBatchInput) (*BatchDe
 	return detail, err
 }
 
-func (s *Service) ListStudents(search string) ([]model.User, error) {
+func (s *Service) ListStudents(actor uuid.UUID, search string) ([]model.User, error) {
 	var users []model.User
-	query := s.repository.db.Where("role = ?", "student")
+	query := s.repository.db.Joins("JOIN classrooms ON classrooms.id = users.classroom_id").
+		Where("users.role = ? AND classrooms.teacher_id = ?", "student", actor)
 	if search = strings.TrimSpace(search); search != "" {
-		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("users.name ILIKE ? OR users.email ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}
-	return users, query.Order("name, id").Find(&users).Error
+	return users, query.Order("users.name, users.id").Find(&users).Error
 }
 
 func (s *Service) ListBatches(actor uuid.UUID, status, search string) ([]model.GradingBatch, error) {
