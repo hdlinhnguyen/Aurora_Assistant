@@ -86,24 +86,94 @@ const TOUR_STEPS: TourStep[] = [
       "Xem các bài kiểm tra được giao, nhập mã đề nếu có và theo dõi kết quả sau khi hoàn thành. Đây là bước giúp đánh giá mức độ nắm vững kiến thức."
   },
   {
-    id: "concept-gaps",
-    title: "4. Biểu Đồ Lỗ Hổng Kiến Thức",
+    id: "teacher-student-mgmt",
+    title: "1. Quản Lý Lớp & Học Sinh",
     roleBadge: "teacher",
     badgeText: "Góc Giáo Viên",
     targetPage: "/teacher",
-    targetSelector: '[data-tour="concept-gaps"]',
+    targetSelector: '[data-tour="teacher-tab-student-mgmt"]',
     content:
-      "Tự động thống kê chủ đề học sinh trong lớp hay làm sai hoặc mơ hồ nhất, giúp giáo viên điều chỉnh giáo án kịp thời."
+      "Tạo lớp, thêm học sinh, nhập danh sách và quản lý tài khoản học tập. Đây là nơi chuẩn bị dữ liệu lớp trước khi bắt đầu giảng dạy."
   },
   {
-    id: "inspect-drawer",
-    title: "5. Ngăn Kéo Kiểm Duyệt Học Sinh",
+    id: "teacher-graph-designer",
+    title: "2. Thiết Kế Cây Kiến Thức",
     roleBadge: "teacher",
     badgeText: "Góc Giáo Viên",
     targetPage: "/teacher",
-    targetSelector: '[data-tour="inspect-drawer"]',
+    targetSelector: '[data-tour="teacher-tab-graph-designer"]',
     content:
-      "Nhấp chuột vào bất kỳ học sinh nào để mở trích lục đoạn hội thoại thực tế và sơ đồ Nguyên lý gốc mà em đó đã thiết lập."
+      "Xây dựng các chủ đề, quan hệ tiên quyết và nội dung lý thuyết. Có thể dựng cây từ tài liệu, chỉnh sửa trên canvas hoặc xem dạng bảng."
+  },
+  {
+    id: "teacher-question-bank",
+    title: "3. Ngân Hàng Câu Hỏi",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-question-bank"]',
+    content:
+      "Quản lý câu hỏi theo chủ đề và độ khó, nhập nhanh từ Excel, chỉnh sửa barem và gắn nhãn kiến thức cho từng câu."
+  },
+  {
+    id: "teacher-exam-builder",
+    title: "4. Tạo Đề Kiểm Tra",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-exam-builder"]',
+    content:
+      "Tạo đề nháp, chọn câu từ ngân hàng hoặc soạn thủ công, cân đối điểm, sắp xếp câu hỏi và chuẩn bị đề để giao cho học sinh."
+  },
+  {
+    id: "teacher-exam-scoring",
+    title: "5. Chấm Bài Kiểm Tra",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-exam-scoring"]',
+    content:
+      "Mở bài nộp, chấm từng câu và barem, lưu tiến độ, duyệt điểm cuối cùng và xem lại lịch sử chỉnh sửa."
+  },
+  {
+    id: "teacher-students",
+    title: "6. Báo Cáo Tiến Độ Học Tập",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-students"]',
+    content:
+      "Theo dõi kết quả từng học sinh, mức độ chính xác, chủ đề còn yếu và mở hồ sơ chi tiết để xem hành trình học tập."
+  },
+  {
+    id: "teacher-learning-path",
+    title: "7. Lập Lộ Trình Cá Nhân",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-learning-path"]',
+    content:
+      "Phân tích lỗ hổng gốc rễ, tạo lộ trình phụ đạo theo học sinh, điều chỉnh thứ tự bước và phê duyệt lộ trình đề xuất."
+  },
+  {
+    id: "teacher-monitoring",
+    title: "8. Giám Sát Lớp Học",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-monitoring"]',
+    content:
+      "Quan sát phân bố năng lực, nhóm học sinh cần can thiệp và kích hoạt hành động phụ đạo từ dữ liệu lớp học hiện tại."
+  },
+  {
+    id: "teacher-guardrail",
+    title: "9. An Toàn Học Sinh",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-guardrail"]',
+    content:
+      "Theo dõi các cảnh báo an toàn trong hội thoại, phân loại mức độ nghiêm trọng và đánh dấu sự kiện đã được xử lý."
   },
   {
     id: "finish",
@@ -229,6 +299,22 @@ export default function GuidedTour() {
       window.dispatchEvent(new CustomEvent("aurora-tour-switch-student-tab", { detail: tab }));
     }
 
+    const teacherTabs: Record<string, string> = {
+      "teacher-student-mgmt": "student-mgmt",
+      "teacher-graph-designer": "graph-designer",
+      "teacher-question-bank": "question-bank",
+      "teacher-exam-builder": "exam-builder",
+      "teacher-exam-scoring": "exam-scoring",
+      "teacher-students": "students",
+      "teacher-learning-path": "learning-path",
+      "teacher-monitoring": "monitoring",
+      "teacher-guardrail": "guardrail",
+    };
+    const teacherTab = teacherTabs[currentStep.id];
+    if (teacherTab) {
+      window.dispatchEvent(new CustomEvent("aurora-tour-switch-tab", { detail: teacherTab }));
+    }
+
     const target = currentStep.targetSelector
       ? document.querySelector(currentStep.targetSelector)
       : null;
@@ -342,13 +428,6 @@ export default function GuidedTour() {
       } catch (e) {
         console.error("Auto switch to student failed:", e);
       }
-    }
-
-    // Dispatch custom tab-switch event if we target a specific teacher tab
-    if (targetStep.id === "concept-gaps") {
-      window.dispatchEvent(new CustomEvent("aurora-tour-switch-tab", { detail: "monitoring" }));
-    } else if (targetStep.id === "inspect-drawer") {
-      window.dispatchEvent(new CustomEvent("aurora-tour-switch-tab", { detail: "students" }));
     }
 
     // Check if step requires a specific page

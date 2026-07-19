@@ -316,38 +316,10 @@ export default function TeacherDashboard() {
       setSelectedSubject(savedSubject);
     }
     const isTourActive = localStorage.getItem("aurora_tour_active") === "true";
-    const savedStepIdxStr = localStorage.getItem("aurora_tour_step");
     let initialTab = savedTab || "student-mgmt";
 
-    if (isTourActive && savedStepIdxStr) {
-      const stepIdx = parseInt(savedStepIdxStr, 10);
-      const tourMode = localStorage.getItem("aurora_tour_mode") || "both";
-
-      const tourSteps = [
-        { id: "welcome" },
-        { id: "socratic-chat" },
-        { id: "feynman-notebook" },
-        { id: "role-switcher" },
-        { id: "concept-gaps" },
-        { id: "inspect-drawer" },
-        { id: "finish" }
-      ];
-
-      const activeSteps = tourSteps.filter((step, idx) => {
-        if (idx === 0 || idx === tourSteps.length - 1) return true;
-        if (tourMode === "student") return step.id === "socratic-chat" || step.id === "role-switcher";
-        if (tourMode === "teacher") return step.id === "concept-gaps" || step.id === "inspect-drawer" || step.id === "role-switcher";
-        return true;
-      });
-
-      const currentStep = activeSteps[stepIdx];
-      if (currentStep) {
-        if (currentStep.id === "concept-gaps") {
-          initialTab = "monitoring";
-        } else if (currentStep.id === "inspect-drawer") {
-          initialTab = "students";
-        }
-      }
+    if (isTourActive && localStorage.getItem("aurora_tour_mode") === "teacher") {
+      initialTab = "student-mgmt";
     }
 
     setActiveTab(initialTab);
@@ -2442,6 +2414,7 @@ export default function TeacherDashboard() {
             })()}
 
             {/* Split logic between Teacher tabs */}
+            <div data-tour={`teacher-tab-${activeTab}`} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             {activeTab === "student-mgmt" ? (
               <StudentMgmtTab />
             ) : activeTab === "exam-builder" ? (
@@ -3020,6 +2993,7 @@ export default function TeacherDashboard() {
                 }}
               />
             )}
+            </div>
           </div>
         )}
       </main>
