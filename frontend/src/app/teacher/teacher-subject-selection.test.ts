@@ -19,12 +19,19 @@ describe("resolveTeacherSubject", () => {
 });
 
 describe("Teacher Hub subject gate", () => {
-  it("shows the subject picker for every tab until a subject is selected", () => {
+  it("shows the subject picker for subject-dependent tabs", () => {
     const source = readFileSync(join(process.cwd(), "src/app/teacher/page.tsx"), "utf8");
 
-    expect(source).toContain('{!selectedSubject ? (');
-    expect(source).not.toContain(
-      '!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder" && activeTab !== "exam-scoring"',
+    expect(source).toContain(
+      '!selectedSubject && activeTab !== "student-mgmt" && activeTab !== "exam-builder"',
     );
+  });
+
+  it("defaults teacher demo tours to Số và Đại Số", () => {
+    const source = readFileSync(join(process.cwd(), "src/app/teacher/page.tsx"), "utf8");
+
+    expect(source).toContain('const tourSubject = "Số và Đại Số"');
+    expect(source).toContain('localStorage.getItem("aurora_tour_mode") === "teacher"');
+    expect(source).toContain('localStorage.getItem("aurora_tour_demo_session") === "true"');
   });
 });

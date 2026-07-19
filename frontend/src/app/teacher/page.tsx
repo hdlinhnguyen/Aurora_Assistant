@@ -730,14 +730,17 @@ export default function TeacherDashboard() {
     try {
       const data = await apiFetch("/subjects");
       let finalSubjects = data || [];
-      const tourActive = localStorage.getItem("aurora_tour_active") === "true";
-      if (tourActive) {
-        if (!finalSubjects.includes("Môn học Trải nghiệm (Demo)")) {
-          finalSubjects = ["Môn học Trải nghiệm (Demo)", ...finalSubjects];
-        }
+      const isTeacherTour =
+        localStorage.getItem("aurora_tour_active") === "true" &&
+        localStorage.getItem("aurora_tour_mode") === "teacher" &&
+        localStorage.getItem("aurora_tour_demo_session") === "true";
+      const tourSubject = "Số và Đại Số";
+      if (isTeacherTour && !finalSubjects.includes(tourSubject)) {
+        finalSubjects = [tourSubject, ...finalSubjects];
       }
+      const requestedSubject = selectSubjectName || (isTeacherTour ? tourSubject : undefined);
       setSubjects(finalSubjects);
-      setSelectedSubject(resolveTeacherSubject(finalSubjects, selectSubjectName));
+      setSelectedSubject(resolveTeacherSubject(finalSubjects, requestedSubject));
     } catch (err) {
       console.error("Failed to load subjects:", err);
     }
