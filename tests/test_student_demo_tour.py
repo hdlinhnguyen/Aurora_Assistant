@@ -7,14 +7,21 @@ GUIDED_TOUR = ROOT / "frontend" / "src" / "app" / "components" / "GuidedTour.tsx
 TUTOR = ROOT / "frontend" / "src" / "app" / "tutor" / "page.tsx"
 
 
-def test_landing_starts_a_student_only_demo_tour() -> None:
+def test_landing_offers_student_and_teacher_demo_tours() -> None:
     source = LANDING.read_text(encoding="utf-8")
 
+    assert "showTourRolePicker" in source
+    assert "startDemoTour" in source
+    assert "student@aurora.edu.vn" in source
+    assert "teacher@aurora.edu.vn" in source
+    assert 'route: "/tutor"' in source
+    assert 'route: "/teacher"' in source
     assert 'localStorage.setItem("aurora_tour_demo_session", "true")' in source
-    assert 'localStorage.setItem("aurora_tour_mode", "student")' in source
     assert 'localStorage.setItem("aurora_tour_step", "1")' in source
     assert 'if (!res.ok)' in source
     assert "setTourError" in source
+    assert "Học sinh" in source
+    assert "Giáo viên" in source
 
 
 def test_demo_tour_completion_and_early_exit_clear_the_demo_session() -> None:
