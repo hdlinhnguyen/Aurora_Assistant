@@ -83,59 +83,61 @@ export default function LandingPage() {
       <div className="absolute top-[30%] right-[-10%] h-[500px] w-[500px] rounded-full bg-[var(--purple)]/20 blur-[120px] pointer-events-none" />
 
       {/* Navigation Header */}
-      <nav className="sticky top-4 z-50 max-w-6xl mx-4 md:mx-auto px-6 py-3.5 flex justify-between items-center border border-border/80 bg-card/85 backdrop-blur-md rounded-2xl shadow-lg shadow-black/5 transition-all">
-        <div className="flex items-center gap-8">
-          <div 
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="flex items-center gap-3 cursor-pointer"
-          >
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300">
-              <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <span className="text-xl font-[var(--font-display)] font-extrabold bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent tracking-tight">
-              AURORA ASSISTANT
-            </span>
-          </div>
-
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center gap-6 text-sm font-semibold">
-            <button 
+      <div className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-md py-3 border-b border-border/40 transition-all">
+        <nav className="max-w-6xl mx-auto px-6 py-2.5 flex justify-between items-center border border-border/80 bg-card/95 rounded-2xl shadow-md">
+          <div className="flex items-center gap-8">
+            <div 
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="flex items-center gap-3 cursor-pointer"
             >
-              Home
-            </button>
-            <button 
-              onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[var(--mint)] to-[var(--purple)] shadow-[var(--shadow-card)] hover:-translate-y-1 hover:shadow-lg hover:shadow-[var(--purple)]/30 transition-all duration-300">
+                <svg className="h-5 w-5 text-white animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <span className="text-xl font-[var(--font-display)] font-extrabold bg-gradient-to-r from-[var(--mint)] to-[var(--purple)] bg-clip-text text-transparent tracking-tight">
+                AURORA ASSISTANT
+              </span>
+            </div>
+
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center gap-6 text-sm font-semibold">
+              <button 
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Home
+              </button>
+              <button 
+                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Tính Năng
+              </button>
+              <button 
+                onClick={() => document.getElementById("method")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Phương Pháp
+              </button>
+              <button 
+                onClick={() => document.getElementById("users")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Người Dùng
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <button
+              onClick={() => router.push("/login")}
+              className="border-2 border-slate-300/80 text-blue-700 hover:text-zinc-800 bg-transparent px-6 py-2 rounded-[14px] text-sm font-bold transition-colors"
             >
-              Tính Năng
-            </button>
-            <button 
-              onClick={() => document.getElementById("method")?.scrollIntoView({ behavior: "smooth" })}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Phương Pháp
-            </button>
-            <button 
-              onClick={() => document.getElementById("users")?.scrollIntoView({ behavior: "smooth" })}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Người Dùng
+              Đăng Nhập
             </button>
           </div>
-        </div>
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => router.push("/login")}
-            className="border-2 border-slate-300/80 text-blue-700 hover:text-zinc-800 bg-transparent px-6 py-2 rounded-[14px] text-sm font-bold transition-colors"
-          >
-            Đăng Nhập
-          </button>
-        </div>
-      </nav>
+        </nav>
+      </div>
 
       {/* Hero Section */}
       <header className="relative z-10 max-w-6xl mx-auto px-6 pt-16 pb-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -202,7 +204,7 @@ export default function LandingPage() {
       </header>
 
       {/* Interactive Socratic Demo Section */}
-      <section id="method" className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
+      <section id="method" className="scroll-mt-24 relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border bg-card/30 rounded-3xl my-12 backdrop-blur-sm">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-stretch">
           {/* Left Column: Explanation */}
           <div className="lg:col-span-5 flex flex-col justify-center space-y-6">
@@ -311,7 +313,7 @@ export default function LandingPage() {
       </section>
 
       {/* Core Features Section */}
-      <section id="features" className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
+      <section id="features" className="scroll-mt-24 relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
         <div className="text-left mb-12">
           <h2 className="text-3xl md:text-4xl font-[var(--font-display)] font-extrabold uppercase tracking-tight">
             <span className="text-foreground">Tính năng </span>
@@ -358,7 +360,7 @@ export default function LandingPage() {
       </section>
 
       {/* Target Audiences Sections */}
-      <section id="users" className="relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
+      <section id="users" className="scroll-mt-24 relative z-10 max-w-6xl mx-auto px-6 py-20 border-t border-border">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-[var(--font-display)] font-extrabold text-foreground">Giải pháp cho Cả Học sinh & Thầy cô</h2>
           <p className="text-muted-foreground text-sm mt-2">Được thiết kế thích ứng giúp việc tự học trở nên thú vị và việc giảng dạy nhẹ nhàng hơn</p>
