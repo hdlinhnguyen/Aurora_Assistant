@@ -39,6 +39,7 @@ import {
   type ReviewItem,
 } from "./hub/api";
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
+import Character from "@/app/tutor/components/Character";
 import GuidedTour from "@/app/components/GuidedTour";
 import { computeTracePath } from "@/lib/rootCauseTrace";
 import { SafeHtml } from "@/components/ui/safe-html";
@@ -1172,14 +1173,12 @@ export default function TutorHubPage() {
             </div>
           </div>
 
-          {/* ===== LỘ TRÌNH ÔN TẬP (ROADMAP game-hoá) PANEL ===== */}
+          {/* ===== LỘ TRÌNH ÔN TẬP (ROADMAP bản đồ uốn lượn — port từ design handoff) ===== */}
           {activeTab === "roadmap" && (
-            <div className="ah-panel" style={{ border: "1px solid #eef1f4", borderRadius: 22, background: "linear-gradient(180deg,#fff7ef 0%,#fff 120px)", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)", padding: "26px 22px 32px" }}>
-              <div style={{ textAlign: "center", marginBottom: 22 }}>
-                <div style={{ ...BALOO, fontWeight: 800, fontSize: 22, color: "#c2560f" }}>🗺️ Lộ trình ôn tập của em</div>
-                <div style={{ fontSize: 13, color: "#5b6072", fontWeight: 600, marginTop: 4 }}>
-                  Ôn từ gốc lên — chinh phục từng chặng, xong mới lên chặng sau 💪
-                </div>
+            <div className="ah-panel" style={{ animation: "rr-fade .3s ease-out", border: "1px solid #eef1f4", borderRadius: 26, background: "linear-gradient(180deg,#fff7ef 0%,#fff 180px)", boxShadow: "0 20px 50px -28px rgba(194,86,15,.35)", padding: "26px 22px 34px", overflow: "hidden" }}>
+              <div style={{ textAlign: "center", marginBottom: 6 }}>
+                <div style={{ ...BALOO, fontWeight: 800, fontSize: 23, color: "#c2560f" }}>🗺️ Lộ trình ôn tập của em</div>
+                <div style={{ fontSize: 13, color: "#5b6072", fontWeight: 600, marginTop: 4 }}>Ôn từ gốc lên — mỗi chặng là một trạm, chinh phục để mở đường lên đỉnh 🏔️</div>
               </div>
 
               {reviewItems.length === 0 ? (
@@ -1189,81 +1188,119 @@ export default function TutorHubPage() {
                   <div style={{ fontSize: 13, color: "#9aa1b0", fontWeight: 600, marginTop: 4 }}>Gốc của em đang rất vững — cứ tiến lên bài mới nhé!</div>
                 </div>
               ) : (
-                <div style={{ maxWidth: 640, margin: "0 auto" }}>
-                  {reviewItems.map((it, idx) => {
-                    const barColor = it.masteryPct >= 70 ? "#0FB9A6" : it.masteryPct >= 40 ? "#e0912a" : "#e05a7a";
-                    const isStart = it.isStart ?? idx === 0;
-                    return (
-                      <div key={it.nodeId} style={{ display: "flex", gap: 14 }}>
-                        {/* Cột chặng + đường nối */}
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                          <div
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: "50%",
-                              background: isStart ? "linear-gradient(135deg,#ff9d4d,#c2560f)" : "#fff",
-                              border: isStart ? "none" : `3px solid ${barColor}`,
-                              color: isStart ? "#fff" : barColor,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontWeight: 800,
-                              fontSize: 16,
-                              boxShadow: isStart ? "0 6px 14px -4px rgba(194,86,15,.5)" : "0 2px 6px -2px rgba(0,0,0,.15)",
-                              zIndex: 1,
-                            }}
-                          >
-                            {it.order ?? idx + 1}
-                          </div>
-                          <div style={{ width: 3, flex: 1, minHeight: 26, background: "repeating-linear-gradient(180deg,#ffd9b8 0 6px,transparent 6px 12px)", margin: "2px 0" }} />
-                        </div>
+                <>
+                  {/* legend */}
+                  <div style={{ display: "flex", justifyContent: "center", gap: 16, margin: "14px 0 6px", flexWrap: "wrap" }}>
+                    {([["#e05a7a", "Cần củng cố"], ["#e0912a", "Đang tiến bộ"], ["#0FB9A6", "Gần vững"]] as const).map(([c, label]) => (
+                      <span key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: "#7c8194" }}>
+                        <span style={{ width: 11, height: 11, borderRadius: "50%", background: c }} />
+                        {label}
+                      </span>
+                    ))}
+                  </div>
 
-                        {/* Thẻ chặng */}
-                        <div
-                          onClick={() => goToReviewNode(it.nodeId, it.name)}
-                          style={{
-                            flex: 1,
-                            marginBottom: 6,
-                            border: isStart ? "2px solid #ffb877" : "1px solid #eef1f4",
-                            borderRadius: 16,
-                            padding: 15,
-                            cursor: "pointer",
-                            background: isStart ? "linear-gradient(135deg,#fff7ef,#fff)" : "#fff",
-                            boxShadow: "0 6px 16px -12px rgba(0,0,0,.2)",
-                            transition: "transform .12s",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 15, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</div>
-                                {isStart && <span style={{ flexShrink: 0, background: "#c2560f", color: "#fff", borderRadius: 6, padding: "2px 7px", fontSize: 9.5, fontWeight: 800 }}>Bắt đầu từ đây</span>}
+                  {/* winding map */}
+                  {(() => {
+                    const rowH = 158, topPad = 92, CX = 350, OFF = 96, nodeR = 58;
+                    const EMOJIS = ["📊", "🔗", "✂️", "➕", "📝", "📐", "🔢", "🧮"];
+                    const colorOf = (p: number) => (p >= 70 ? "#0FB9A6" : p >= 40 ? "#e0912a" : "#e05a7a");
+                    const pts = reviewItems.map((_, i) => ({ cx: CX + (i % 2 === 0 ? -OFF : OFF), cy: topPad + i * rowH }));
+                    const lastCy = pts.length ? pts[pts.length - 1].cy : topPad;
+                    const finishPt = { cx: CX, cy: lastCy + rowH * 0.82 };
+                    const mapH = finishPt.cy + 90;
+                    const smooth = (arr: { cx: number; cy: number }[]) => {
+                      if (!arr.length) return "";
+                      let d = `M ${arr[0].cx} ${arr[0].cy}`;
+                      for (let i = 1; i < arr.length; i++) {
+                        const a = arr[i - 1], b = arr[i], my = (a.cy + b.cy) / 2;
+                        d += ` C ${a.cx} ${my} ${b.cx} ${my} ${b.cx} ${b.cy}`;
+                      }
+                      return d;
+                    };
+                    const trailPath = smooth([...pts, finishPt]);
+                    const sp = pts[0] || { cx: CX, cy: topPad };
+                    return (
+                      <div style={{ overflowX: "auto" }}>
+                        <div style={{ position: "relative", width: 700, maxWidth: "100%", margin: "12px auto 0", height: mapH }}>
+                          <svg width={700} height={mapH} viewBox={`0 0 700 ${mapH}`} style={{ position: "absolute", left: 0, top: 0, overflow: "visible", pointerEvents: "none" }}>
+                            <defs>
+                              <linearGradient id="rr-trail" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#ffb877" />
+                                <stop offset="1" stopColor="#14D9C0" />
+                              </linearGradient>
+                            </defs>
+                            <path d={trailPath} fill="none" stroke="#f0e2d2" strokeWidth={16} strokeLinecap="round" />
+                            <path d={trailPath} fill="none" stroke="url(#rr-trail)" strokeWidth={7} strokeLinecap="round" strokeDasharray="2 17" />
+                          </svg>
+
+                          {/* station cards */}
+                          {reviewItems.map((it, i) => {
+                            const p = pts[i];
+                            const color = colorOf(it.masteryPct);
+                            const isStart = it.isStart ?? i === 0;
+                            const nodeLeft = i % 2 === 0;
+                            const cardW = 322, gap = 78;
+                            const cardLeft = nodeLeft ? p.cx + gap : p.cx - gap - cardW;
+                            return (
+                              <div
+                                key={it.nodeId}
+                                className="rr-card"
+                                onClick={() => goToReviewNode(it.nodeId, it.name)}
+                                style={{ position: "absolute", top: p.cy, left: cardLeft, width: cardW, transform: "translateY(-50%)", background: "#fff", border: isStart ? "2px solid #ffb877" : "1px solid #eef1f4", borderRadius: 18, padding: "15px 16px", cursor: "pointer", zIndex: 3, boxShadow: "0 14px 30px -18px rgba(0,0,0,.28)" }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+                                  <span style={{ fontSize: 19 }}>{EMOJIS[i % EMOJIS.length]}</span>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span style={{ ...POPPINS, fontWeight: 800, fontSize: 14.5, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
+                                      {isStart && <span style={{ ...POPPINS, flexShrink: 0, background: "#c2560f", color: "#fff", borderRadius: 6, padding: "2px 7px", fontSize: 9, fontWeight: 800 }}>Bắt đầu</span>}
+                                    </div>
+                                    <div style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600, marginTop: 1 }}>{it.topicGroup}</div>
+                                  </div>
+                                  <span style={{ ...POPPINS, fontWeight: 800, fontSize: 15, color, flexShrink: 0 }}>{it.masteryPct}%</span>
+                                </div>
+                                <div style={{ height: 7, background: "#eef1f4", borderRadius: 7, marginBottom: 10, overflow: "hidden" }}>
+                                  <div style={{ height: 7, borderRadius: 7, width: `${it.masteryPct}%`, background: color }} />
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: "#c2560f", background: "#fff1e5", border: "1px solid #ffdcc0", borderRadius: 8, padding: "4px 9px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.reason}</span>
+                                  <span style={{ ...POPPINS, fontWeight: 800, fontSize: 12.5, color: "#fff", background: "linear-gradient(135deg,#8B5CF6,#7C46E8)", borderRadius: 10, padding: "7px 14px", flexShrink: 0, boxShadow: "0 8px 16px -8px rgba(124,70,232,.6)" }}>Ôn ngay →</span>
+                                </div>
                               </div>
-                              <div style={{ fontSize: 11.5, color: "#9aa1b0", fontWeight: 600, marginTop: 1 }}>{it.topicGroup}</div>
-                            </div>
-                            <span style={{ ...POPPINS, fontWeight: 800, fontSize: 16, color: barColor, flexShrink: 0 }}>{it.masteryPct}%</span>
+                            );
+                          })}
+
+                          {/* station medallions */}
+                          {reviewItems.map((it, i) => {
+                            const p = pts[i];
+                            const color = colorOf(it.masteryPct);
+                            const isStart = it.isStart ?? i === 0;
+                            return (
+                              <div key={it.nodeId} onClick={() => goToReviewNode(it.nodeId, it.name)} style={{ position: "absolute", left: p.cx, top: p.cy, width: nodeR, height: nodeR, transform: "translate(-50%,-50%)", cursor: "pointer", zIndex: 4 }}>
+                                {isStart && <div style={{ position: "absolute", inset: -7, borderRadius: "50%", border: "3px solid #ff9d4d", animation: "rr-pulse 1.9s ease-out infinite" }} />}
+                                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: `conic-gradient(${color} ${it.masteryPct}%, #f0e2d2 0)`, boxShadow: "0 10px 20px -8px rgba(0,0,0,.28)", border: "3px solid #fff" }}>
+                                  <div style={{ position: "absolute", inset: 5, borderRadius: "50%", background: "#fff", display: "grid", placeItems: "center", ...POPPINS, fontWeight: 800, fontSize: 21, color }}>{it.order ?? i + 1}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* start avatar */}
+                          <div style={{ position: "absolute", left: sp.cx - 4, top: sp.cy - 74, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, zIndex: 5, pointerEvents: "none", animation: "rr-bob 2.4s ease-in-out infinite" }}>
+                            <div style={{ ...POPPINS, background: "#c2560f", color: "#fff", fontSize: 9.5, fontWeight: 800, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap", boxShadow: "0 6px 12px -6px rgba(194,86,15,.6)", animation: "rr-flag 2.6s ease-in-out infinite" }}>Bắt đầu từ đây</div>
+                            <Character char="nam" mood="happy" size={48} face="right" />
                           </div>
-                          <div style={{ height: 7, background: "#eef1f4", borderRadius: 7, marginBottom: 10 }}>
-                            <div style={{ height: 7, background: barColor, borderRadius: 7, width: `${it.masteryPct}%`, transition: "width .4s" }} />
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                            <span style={{ fontSize: 11.5, fontWeight: 700, color: "#c2560f", background: "#fff1e5", border: "1px solid #ffdcc0", borderRadius: 8, padding: "3px 9px" }}>{it.reason}</span>
-                            <span style={{ ...POPPINS, fontWeight: 800, fontSize: 13, color: "#fff", background: "linear-gradient(135deg,#8B5CF6,#7C46E8)", borderRadius: 10, padding: "6px 14px", flexShrink: 0 }}>Ôn ngay →</span>
+
+                          {/* finish */}
+                          <div style={{ position: "absolute", left: finishPt.cx, top: finishPt.cy, transform: "translate(-50%,-50%)", display: "flex", flexDirection: "column", alignItems: "center", zIndex: 4 }}>
+                            <div style={{ width: 64, height: 64, borderRadius: "50%", background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", display: "grid", placeItems: "center", fontSize: 30, boxShadow: "0 14px 26px -10px rgba(15,185,166,.6)", border: "4px solid #fff" }}>🏁</div>
+                            <div style={{ ...POPPINS, fontWeight: 800, fontSize: 13.5, color: "#0FB9A6", textAlign: "center", marginTop: 8, maxWidth: 200 }}>Đích — vững gốc, sẵn sàng chinh phục bài mới!</div>
                           </div>
                         </div>
                       </div>
                     );
-                  })}
-
-                  {/* Đích */}
-                  <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                    <div style={{ width: 40, display: "flex", justifyContent: "center", flexShrink: 0 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,#14D9C0,#0FB9A6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, boxShadow: "0 6px 14px -4px rgba(15,185,166,.5)" }}>🏁</div>
-                    </div>
-                    <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#0FB9A6" }}>Đích — vững gốc, sẵn sàng đi tiếp!</div>
-                  </div>
-                </div>
+                  })()}
+                </>
               )}
             </div>
           )}
