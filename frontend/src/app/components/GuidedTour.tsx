@@ -36,53 +36,134 @@ const TOUR_STEPS: TourStep[] = [
     actionText: "Bắt đầu Tour"
   },
   {
-    id: "socratic-chat",
-    title: "1. Gia Sư Phản Biện Socratic",
+    id: "lesson-selector",
+    title: "1. Chọn Bài Học",
     roleBadge: "student",
     badgeText: "Góc Học Sinh",
     targetPage: "/tutor",
-    targetSelector: '[data-tour="socratic-chat"]',
+    targetSelector: '[data-tour="lesson-selector"]',
     content:
-      "AI kiên quyết KHÔNG cho sẵn lời giải. Thay vào đó, AI chia nhỏ bài toán và đặt từng câu hỏi gợi mở để các em tự lập luận và tìm ra đáp án."
+      "Chọn một bài trong lộ trình bên trái để bắt đầu. Trạng thái từng bài cho biết nội dung đang học, đã hoàn thành hoặc còn khóa."
   },
   {
-    id: "feynman-notebook",
-    title: "2. Không Gian Luyện Tập Thích Ứng",
+    id: "lesson-theory",
+    title: "2. Học Lý Thuyết",
     roleBadge: "student",
     badgeText: "Góc Học Sinh",
     targetPage: "/tutor",
-    targetSelector: '[data-tour="feynman-notebook"]',
+    targetSelector: '[data-tour="lesson-theory"]',
     content:
-      "Nơi học sinh trả lời các câu hỏi trắc nghiệm thích ứng để đo lường mức độ hiểu sâu kiến thức. Hệ thống tự động tính toán Điểm thông thạo và Độ tự tin theo thời gian thực."
+      "Đọc ý tưởng chính và ví dụ của bài đang chọn. Khi đã hiểu, em có thể chuyển ngay sang luyện tập hoặc hỏi AI về phần còn vướng."
   },
   {
-    id: "role-switcher",
-    title: "3. Thanh Đổi Vai Trò Siêu Tốc",
-    roleBadge: "all",
-    badgeText: "Tính năng Chuyển Vai Trò",
-    targetSelector: '[data-tour="role-switcher"]',
+    id: "lesson-practice",
+    title: "3. Luyện Tập Thích Ứng",
+    roleBadge: "student",
+    badgeText: "Góc Học Sinh",
+    targetPage: "/tutor",
+    targetSelector: '[data-tour="lesson-practice"]',
     content:
-      "Dễ dàng nhảy từ tài khoản Học sinh sang Giáo viên 1-click ngay trên góc màn hình để kiểm tra dữ liệu vừa sinh ra mà không cần đăng xuất."
+      "Trả lời câu hỏi theo mức độ phù hợp với năng lực hiện tại. Kết quả được dùng để cập nhật tiến độ và điều chỉnh độ khó của các câu tiếp theo."
   },
   {
-    id: "concept-gaps",
-    title: "4. Biểu Đồ Lỗ Hổng Kiến Thức",
+    id: "lesson-chat",
+    title: "4. Hỏi Đáp Với AI",
+    roleBadge: "student",
+    badgeText: "Góc Học Sinh",
+    targetPage: "/tutor",
+    targetSelector: '[data-tour="lesson-chat"]',
+    content:
+      "Khi chưa hiểu, hãy hỏi Nova. AI sẽ đặt câu hỏi gợi mở và chia nhỏ vấn đề để em tự tìm ra đáp án thay vì đưa lời giải sẵn."
+  },
+  {
+    id: "lesson-exams",
+    title: "5. Đề Thi & Kiểm Tra",
+    roleBadge: "student",
+    badgeText: "Góc Học Sinh",
+    targetPage: "/tutor",
+    targetSelector: '[data-tour="lesson-exams"]',
+    content:
+      "Xem các bài kiểm tra được giao, nhập mã đề nếu có và theo dõi kết quả sau khi hoàn thành. Đây là bước giúp đánh giá mức độ nắm vững kiến thức."
+  },
+  {
+    id: "teacher-student-mgmt",
+    title: "1. Quản Lý Lớp & Học Sinh",
     roleBadge: "teacher",
     badgeText: "Góc Giáo Viên",
     targetPage: "/teacher",
-    targetSelector: '[data-tour="concept-gaps"]',
+    targetSelector: '[data-tour="teacher-tab-student-mgmt"]',
     content:
-      "Tự động thống kê chủ đề học sinh trong lớp hay làm sai hoặc mơ hồ nhất, giúp giáo viên điều chỉnh giáo án kịp thời."
+      "Tạo lớp, thêm học sinh, nhập danh sách và quản lý tài khoản học tập. Đây là nơi chuẩn bị dữ liệu lớp trước khi bắt đầu giảng dạy."
   },
   {
-    id: "inspect-drawer",
-    title: "5. Ngăn Kéo Kiểm Duyệt Học Sinh",
+    id: "teacher-graph-designer",
+    title: "2. Thiết Kế Cây Kiến Thức",
     roleBadge: "teacher",
     badgeText: "Góc Giáo Viên",
     targetPage: "/teacher",
-    targetSelector: '[data-tour="inspect-drawer"]',
+    targetSelector: '[data-tour="teacher-tab-graph-designer"]',
     content:
-      "Nhấp chuột vào bất kỳ học sinh nào để mở trích lục đoạn hội thoại thực tế và sơ đồ Nguyên lý gốc mà em đó đã thiết lập."
+      "Xây dựng các chủ đề, quan hệ tiên quyết và nội dung lý thuyết. Có thể dựng cây từ tài liệu, chỉnh sửa trên canvas hoặc xem dạng bảng."
+  },
+  {
+    id: "teacher-question-bank",
+    title: "3. Ngân Hàng Câu Hỏi",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-question-bank"]',
+    content:
+      "Quản lý câu hỏi theo chủ đề và độ khó, nhập nhanh từ Excel, chỉnh sửa barem và gắn nhãn kiến thức cho từng câu."
+  },
+  {
+    id: "teacher-exam-builder",
+    title: "4. Tạo Đề Kiểm Tra",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-exam-builder"]',
+    content:
+      "Tạo đề nháp, chọn câu từ ngân hàng hoặc soạn thủ công, cân đối điểm, sắp xếp câu hỏi và chuẩn bị đề để giao cho học sinh."
+  },
+  {
+    id: "teacher-students",
+    title: "6. Báo Cáo Tiến Độ Học Tập",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-students"]',
+    content:
+      "Theo dõi kết quả từng học sinh, mức độ chính xác, chủ đề còn yếu và mở hồ sơ chi tiết để xem hành trình học tập."
+  },
+  {
+    id: "teacher-learning-path",
+    title: "7. Lập Lộ Trình Cá Nhân",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-learning-path"]',
+    content:
+      "Phân tích lỗ hổng gốc rễ, tạo lộ trình phụ đạo theo học sinh, điều chỉnh thứ tự bước và phê duyệt lộ trình đề xuất."
+  },
+  {
+    id: "teacher-monitoring",
+    title: "8. Giám Sát Lớp Học",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-monitoring"]',
+    content:
+      "Quan sát phân bố năng lực, nhóm học sinh cần can thiệp và kích hoạt hành động phụ đạo từ dữ liệu lớp học hiện tại."
+  },
+  {
+    id: "teacher-guardrail",
+    title: "9. An Toàn Học Sinh",
+    roleBadge: "teacher",
+    badgeText: "Góc Giáo Viên",
+    targetPage: "/teacher",
+    targetSelector: '[data-tour="teacher-tab-guardrail"]',
+    content:
+      "Theo dõi các cảnh báo an toàn trong hội thoại, phân loại mức độ nghiêm trọng và đánh dấu sự kiện đã được xử lý."
   },
   {
     id: "finish",
@@ -195,12 +276,90 @@ export default function GuidedTour() {
     };
   }, [updateTargetRect]);
 
+  useEffect(() => {
+    if (!isActive || !currentStep) return;
+    const studentTabs: Record<string, "graph" | "theory" | "practice" | "chat" | "exams"> = {
+      "lesson-selector": "graph",
+      "lesson-theory": "theory",
+      "lesson-practice": "practice",
+      "lesson-chat": "chat",
+      "lesson-exams": "exams",
+    };
+    const tab = studentTabs[currentStep.id];
+    if (tab) {
+      window.dispatchEvent(new CustomEvent("aurora-tour-switch-student-tab", { detail: tab }));
+    }
+
+    const teacherTabs: Record<string, string> = {
+      "teacher-student-mgmt": "student-mgmt",
+      "teacher-graph-designer": "graph-designer",
+      "teacher-question-bank": "question-bank",
+      "teacher-exam-builder": "exam-builder",
+      "teacher-students": "students",
+      "teacher-learning-path": "learning-path",
+      "teacher-monitoring": "monitoring",
+      "teacher-guardrail": "guardrail",
+    };
+    const teacherTab = teacherTabs[currentStep.id];
+    if (teacherTab) {
+      window.dispatchEvent(new CustomEvent("aurora-tour-switch-tab", { detail: teacherTab }));
+    }
+
+    const target = currentStep.targetSelector
+      ? document.querySelector(currentStep.targetSelector)
+      : null;
+    target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  }, [isActive, currentStep]);
+
+  const clearDemoTourSession = () => {
+    localStorage.removeItem("aurora_token");
+    localStorage.removeItem("aurora_user");
+    localStorage.removeItem("aurora_tour_active");
+    localStorage.removeItem("aurora_tour_step");
+    localStorage.removeItem("aurora_tour_mode");
+    localStorage.removeItem("aurora_tour_demo_session");
+    localStorage.removeItem("aurora_tour_completed");
+  };
+
+  const completeTour = () => {
+    setIsActive(false);
+
+    if (localStorage.getItem("aurora_tour_demo_session") === "true") {
+      clearDemoTourSession();
+      router.replace("/");
+      return;
+    }
+
+    localStorage.removeItem("aurora_tour_active");
+    localStorage.setItem("aurora_tour_completed", "true");
+    window.location.reload();
+  };
+
+  const requestExitTour = () => {
+    if (localStorage.getItem("aurora_tour_demo_session") === "true") {
+      const confirmed = window.confirm(
+        "Hướng dẫn chưa hoàn tất. Nếu thoát, phiên demo sẽ kết thúc và bạn sẽ được đăng xuất.",
+      );
+      if (!confirmed) return;
+
+      setIsActive(false);
+      clearDemoTourSession();
+      router.replace("/");
+      return;
+    }
+
+    setIsActive(false);
+    localStorage.removeItem("aurora_tour_active");
+    localStorage.setItem("aurora_tour_completed", "true");
+    window.location.reload();
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isActive) return;
       if (e.key === "Escape") {
-        closeTour();
+        requestExitTour();
       } else if (e.key === "ArrowRight") {
         nextStep();
       } else if (e.key === "ArrowLeft") {
@@ -210,15 +369,6 @@ export default function GuidedTour() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isActive, stepIndex, activeSteps]);
-
-  const closeTour = () => {
-    setIsActive(false);
-    localStorage.removeItem("aurora_tour_active");
-    localStorage.setItem("aurora_tour_completed", "true");
-    if (typeof window !== "undefined") {
-      window.location.reload();
-    }
-  };
 
   const goToStep = async (index: number) => {
     if (index < 0 || index >= activeSteps.length) return;
@@ -270,13 +420,6 @@ export default function GuidedTour() {
       }
     }
 
-    // Dispatch custom tab-switch event if we target a specific teacher tab
-    if (targetStep.id === "concept-gaps") {
-      window.dispatchEvent(new CustomEvent("aurora-tour-switch-tab", { detail: "monitoring" }));
-    } else if (targetStep.id === "inspect-drawer") {
-      window.dispatchEvent(new CustomEvent("aurora-tour-switch-tab", { detail: "students" }));
-    }
-
     // Check if step requires a specific page
     if (targetStep.targetPage && pathname !== targetStep.targetPage) {
       router.push(targetStep.targetPage);
@@ -287,7 +430,7 @@ export default function GuidedTour() {
     if (stepIndex < activeSteps.length - 1) {
       goToStep(stepIndex + 1);
     } else {
-      closeTour();
+      completeTour();
     }
   };
 
@@ -373,12 +516,13 @@ export default function GuidedTour() {
       {/* Dimmed Background Overlay */}
       <div
         className="fixed inset-0 bg-black/25 backdrop-blur-[0.5px] transition-all duration-300 pointer-events-auto"
-        onClick={closeTour}
+        onClick={requestExitTour}
       />
 
       {/* Spotlight highlight box around target element */}
       {targetRect && (
         <div
+          data-tour-spotlight
           style={{
             top: `${targetRect.top - 6}px`,
             left: `${targetRect.left - 6}px`,
@@ -412,7 +556,7 @@ export default function GuidedTour() {
               </h3>
             </div>
             <button
-              onClick={closeTour}
+              onClick={requestExitTour}
               title="Thoát Tour (Esc)"
               className="rounded-full p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >

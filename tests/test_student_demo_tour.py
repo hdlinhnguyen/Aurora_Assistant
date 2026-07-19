@@ -1,0 +1,67 @@
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+LANDING = ROOT / "frontend" / "src" / "app" / "page.tsx"
+GUIDED_TOUR = ROOT / "frontend" / "src" / "app" / "components" / "GuidedTour.tsx"
+TUTOR = ROOT / "frontend" / "src" / "app" / "tutor" / "page.tsx"
+
+
+def test_landing_offers_student_and_teacher_demo_tours() -> None:
+    source = LANDING.read_text(encoding="utf-8")
+
+    assert "showTourRolePicker" in source
+    assert "startDemoTour" in source
+    assert "student@aurora.edu.vn" in source
+    assert "teacher@aurora.edu.vn" in source
+    assert 'route: "/tutor"' in source
+    assert 'route: "/teacher"' in source
+    assert 'localStorage.setItem("aurora_tour_demo_session", "true")' in source
+    assert 'localStorage.setItem("aurora_tour_step", "1")' in source
+    assert 'if (!res.ok)' in source
+    assert "setTourError" in source
+    assert "Học sinh" in source
+    assert "Giáo viên" in source
+
+
+def test_demo_tour_completion_and_early_exit_clear_the_demo_session() -> None:
+    source = GUIDED_TOUR.read_text(encoding="utf-8")
+
+    assert "const clearDemoTourSession" in source
+    assert "const completeTour" in source
+    assert "const requestExitTour" in source
+    assert 'localStorage.removeItem("aurora_token")' in source
+    assert 'localStorage.removeItem("aurora_user")' in source
+    assert 'localStorage.removeItem("aurora_tour_demo_session")' in source
+    assert "window.confirm" in source
+    assert 'router.replace("/")' in source
+    assert 'onClick={requestExitTour}' in source
+    assert "completeTour();" in source
+
+
+def test_student_page_mounts_the_guided_tour() -> None:
+    source = TUTOR.read_text(encoding="utf-8")
+
+    assert 'import GuidedTour from "@/app/components/GuidedTour"' in source
+    assert "<GuidedTour />" in source
+    assert 'data-tour="lesson-selector"' in source
+    for target in ("lesson-theory", "lesson-practice", "lesson-chat", "lesson-exams"):
+        assert f'data-tour="{target}"' in source
+    assert 'localStorage.getItem("aurora_tour_demo_session") !== "true"' in source
+    assert 'window.addEventListener("aurora-tour-switch-student-tab"' in source
+
+
+def test_guided_tour_switches_to_and_scrolls_to_each_student_target() -> None:
+    source = GUIDED_TOUR.read_text(encoding="utf-8")
+
+    assert 'new CustomEvent("aurora-tour-switch-student-tab"' in source
+    assert '"lesson-selector": "graph"' in source
+    assert '"lesson-theory": "theory"' in source
+    assert '"lesson-practice": "practice"' in source
+    assert '"lesson-chat": "chat"' in source
+    assert '"lesson-exams": "exams"' in source
+    assert "scrollIntoView" in source
+
+    ordered_ids = ["lesson-selector", "lesson-theory", "lesson-practice", "lesson-chat", "lesson-exams"]
+    positions = [source.index(f'id: "{step_id}"') for step_id in ordered_ids]
+    assert positions == sorted(positions)

@@ -39,6 +39,7 @@ import {
   type ReviewItem,
 } from "./hub/api";
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
+import GuidedTour from "@/app/components/GuidedTour";
 import { computeTracePath } from "@/lib/rootCauseTrace";
 import { SafeHtml } from "@/components/ui/safe-html";
 import KnowledgeTree from "../components/KnowledgeTree";
@@ -164,6 +165,7 @@ export default function TutorHubPage() {
 
   // ---- diagnostic & exam states ----
   const [studentState, setStudentState] = useState<any | null>(null);
+  const [skipDiagnostic, setSkipDiagnostic] = useState(false);
   const [examsList, setExamsList] = useState<any[]>([]);
   const [activeExam, setActiveExam] = useState<any | null>(null);
   const [examQuestions, setExamQuestions] = useState<any[]>([]);
@@ -193,6 +195,11 @@ export default function TutorHubPage() {
       }
     } catch {
       /* ignore */
+    }
+    const isDemoTour = localStorage.getItem("aurora_tour_demo_session") === "true";
+    if (isDemoTour) {
+      setSkipDiagnostic(true);
+      setActiveTab("graph");
     }
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,7 +251,7 @@ export default function TutorHubPage() {
       setStudentState(stateRes);
       setExamsList(examsRes);
       const isDiag = stateRes === null || stateRes?.needsDiagnostic;
-      if (isDiag) {
+      if (isDiag && localStorage.getItem("aurora_tour_demo_session") !== "true") {
         setActiveTab("exams");
       }
       const cur = rm.find((s) => s.status === "current") ?? rm[0];
@@ -590,7 +597,20 @@ export default function TutorHubPage() {
   }
 
   // ---- derived ----
-  const needsDiagnostic = studentState === null || studentState?.needsDiagnostic;
+  const needsDiagnostic = !skipDiagnostic && (studentState === null || studentState?.needsDiagnostic);
+
+  useEffect(() => {
+    const handleTourTab = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      if (detail === "exams") setActiveTab("exams");
+      else if (detail === "theory" || detail === "practice" || detail === "chat") {
+        setActiveTab("review");
+        if (detail === "theory" || detail === "practice") setReviewLeftSubTab(detail);
+      } else if (detail === "graph") setActiveTab("graph");
+    };
+    window.addEventListener("aurora-tour-switch-student-tab", handleTourTab);
+    return () => window.removeEventListener("aurora-tour-switch-student-tab", handleTourTab);
+  }, []);
   const currentNode = nodes.find((n) => n.id === currentStepId);
   const filteredQuestions = difficultyFilter
     ? questions.filter((item) => item.tag === "Nhận biết")
@@ -1178,7 +1198,7 @@ export default function TutorHubPage() {
 
           {/* ===== GRAPH (KNOWLEDGE TREE) PANEL ===== */}
           {activeTab === "graph" && (
-            <div className="ah-panel" style={{ height: 600, position: "relative", border: "1px solid #eef1f4", borderRadius: 22, overflow: "hidden", background: "#fff", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
+            <div data-tour="lesson-selector" className="ah-panel" style={{ height: 600, position: "relative", border: "1px solid #eef1f4", borderRadius: 22, overflow: "hidden", background: "#fff", boxShadow: "0 14px 34px -24px rgba(0,0,0,.25)" }}>
               {nodes.length > 0 ? (
                 <KnowledgeTree
                   subject={subject}
@@ -1306,6 +1326,7 @@ export default function TutorHubPage() {
                 {/* Sub-tab Content */}
                 {reviewLeftSubTab === "practice" ? (
                   <div
+                    data-tour="lesson-practice"
                     className="ah-panel"
                     style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 22, padding: "24px 26px", flex: 1 }}
                   >
@@ -1705,7 +1726,7 @@ export default function TutorHubPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="ah-panel" style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 22, padding: 24, flex: 1 }}>
+                  <div data-tour="lesson-theory" className="ah-panel" style={{ background: "#fff", border: "1px solid #f1f5f9", borderRadius: 22, padding: 24, flex: 1 }}>
                     <div style={{ ...POPPINS, fontWeight: 700, fontSize: 17, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
                       <Key size={18} style={{ color: "#eab308" }} />
                       <span>Ý tưởng chính</span>
@@ -1768,6 +1789,7 @@ export default function TutorHubPage() {
                 
                 {/* Socratic Chat Companion & Mascot Frame */}
                 <div
+                  data-tour="lesson-chat"
                   className="ah-panel"
                   style={{
                     background: "#fff",
@@ -1888,7 +1910,7 @@ export default function TutorHubPage() {
 
           {/* ===== EXAMS PANEL ===== */}
           {activeTab === "exams" && !needsDiagnostic && (
-            <div className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
+            <div data-tour="lesson-exams" className="ah-panel" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 960 }}>
               {/* Nếu học sinh đang làm bài thi */}
               {activeExam ? (
                 (() => {
@@ -3029,6 +3051,7 @@ export default function TutorHubPage() {
           </div>
         </div>
       )}
+      <GuidedTour />
     </div>
   );
 }
