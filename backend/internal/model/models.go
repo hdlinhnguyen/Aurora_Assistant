@@ -94,6 +94,7 @@ type Edge struct {
 	Subject    string    `gorm:"type:varchar(255);not null;index" json:"subject"`
 	SourceID   uuid.UUID `gorm:"type:uuid;not null;index" json:"sourceId"`
 	TargetID   uuid.UUID `gorm:"type:uuid;not null;index" json:"targetId"`
+	Strength   float64   `gorm:"not null;default:0.7" json:"strength"`
 	Status     string    `gorm:"type:varchar(50);default:'active'" json:"status"`    // "active", "draft"
 	SourceType string    `gorm:"type:varchar(50);default:'human'" json:"sourceType"` // "human", "rule", "llm"
 	CreatedAt  time.Time `json:"createdAt"`
@@ -109,7 +110,7 @@ type Question struct {
 	QuestionType       string         `gorm:"type:varchar(20);not null;default:'multiple_choice'" json:"questionType"`
 	GradeLevel         string         `gorm:"type:varchar(50)" json:"gradeLevel"`
 	DistractorMappings string         `gorm:"type:text" json:"distractorMappings"` // JSON map, e.g. {"option_b": "node-uuid"}
-	Sig                string         `gorm:"type:varchar(255);index" json:"sig"` // Signature for dedup (from master_bank)
+	Sig                string         `gorm:"type:varchar(255);index" json:"sig"`  // Signature for dedup (from master_bank)
 	CreatedAt          time.Time      `json:"createdAt"`
 	UpdatedAt          time.Time      `json:"updatedAt"`
 	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`

@@ -25,9 +25,12 @@ class CalibrationConfig(BaseModel):
     source_reliability_paper: float = 1.00
     source_reliability_quiz: float = 0.85
     evaluation_reliability: float = 1.00
-    difficulty_informativeness: float = 1.00  # v1: chưa có dữ liệu độ khó
+    difficulty_easy: float = 0.75
+    difficulty_medium: float = 1.00
+    difficulty_hard: float = 1.10
+    difficulty_very_hard: float = 1.15
     hint_factor: float = 0.70  # đã dùng gợi ý
-    attempt_factor: float = 0.80  # từ lần thử thứ hai
+    attempt_decay: float = 0.60  # diminishing return theo từng lần lặp cùng question_id
     recency_half_life_days: float = 180.0  # trọng số giảm nửa sau ~1 học kỳ
 
 
@@ -42,12 +45,29 @@ def _recency_factor(occurred_at: datetime, as_of: datetime, half_life_days: floa
 def calibrate_quiz(
     e: RawQuizEvidence, *, as_of: datetime, config: CalibrationConfig = DEFAULT_CALIBRATION
 ) -> CalibratedMasteryEvidence:
+    difficulty = e.difficulty.strip().lower()
+    difficulty_factor = {
+        "easy": config.difficulty_easy,
+        "nb": config.difficulty_easy,
+        "nhận biết": config.difficulty_easy,
+        "medium": config.difficulty_medium,
+        "th": config.difficulty_medium,
+        "thông hiểu": config.difficulty_medium,
+        "hard": config.difficulty_hard,
+        "vd": config.difficulty_hard,
+        "vận dụng": config.difficulty_hard,
+        "very_hard": config.difficulty_very_hard,
+        "vdc": config.difficulty_very_hard,
+        "vận dụng cao": config.difficulty_very_hard,
+    }.get(difficulty, config.difficulty_medium)
+    attempt_factor = config.attempt_decay ** (e.attempt_number - 1)
     weight = (
         config.source_reliability_quiz
         * config.evaluation_reliability
-        * config.difficulty_informativeness
+        * difficulty_factor
         * (config.hint_factor if e.hints_used > 0 else 1.0)
-        * (config.attempt_factor if e.attempt_number >= 2 else 1.0)
+        * attempt_factor
+        * e.inference_weight
         * _recency_factor(e.occurred_at, as_of, config.recency_half_life_days)
     )
     return CalibratedMasteryEvidence(
@@ -59,6 +79,7 @@ def calibrate_quiz(
         evidence_weight=weight,
         occurred_at=e.occurred_at,
         question_id=e.question_id,
+        difficulty=difficulty,
         lineage=f"quiz:{e.session_id}:{e.question_id}",
         status="confirmed",  # quiz chấm tự động là chính thức (spec mục 3.3)
     )
@@ -70,7 +91,6 @@ def calibrate_paper(
     weight = (
         config.source_reliability_paper
         * config.evaluation_reliability
-        * config.difficulty_informativeness
         * _recency_factor(e.occurred_at, as_of, config.recency_half_life_days)
     )
     return CalibratedMasteryEvidence(

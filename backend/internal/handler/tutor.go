@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -547,14 +548,19 @@ func (h *TutorHandler) GetAdaptiveQuestions(c fiber.Ctx) error {
 
 	// Mastery nút này → tầng độ khó mục tiêu (0=NB, 1=TH, 2=VD).
 	prob := 0.30
+	confidence := 0.0
 	var stm model.StudentTopicMastery
 	if config.DB.Where("student_id = ? AND topic_id = ?", studentID, nodeID).First(&stm).Error == nil {
 		prob = stm.MasteryProbability
+		confidence = stm.ConfidenceScore
 	}
+	// Dùng lower-confidence bound đơn giản để tránh đẩy câu khó khi mastery cao
+	// nhưng bằng chứng còn mỏng.
+	adaptiveScore := prob - (1-confidence)*0.20
 	target := 0
-	if prob >= 0.70 {
+	if adaptiveScore >= 0.70 {
 		target = 2
-	} else if prob >= 0.40 {
+	} else if adaptiveScore >= 0.40 {
 		target = 1
 	}
 
@@ -568,7 +574,22 @@ func (h *TutorHandler) GetAdaptiveQuestions(c fiber.Ctx) error {
 			return 0 // easy / nb / nhận biết
 		}
 	}
+	var recentLogs []model.ActivityLog
+	_ = config.DB.Where("student_id = ? AND node_id = ? AND action IN ?", studentID, nodeID, []string{"answer_correct", "answer_incorrect"}).
+		Order("created_at DESC").Limit(200).Find(&recentLogs).Error
+	attempts := make(map[uuid.UUID]int, len(questions))
+	for _, q := range questions {
+		for _, activity := range recentLogs {
+			if strings.Contains(activity.Detail, "'"+q.Content+"'") {
+				attempts[q.ID]++
+			}
+		}
+	}
+
 	sort.SliceStable(questions, func(i, j int) bool {
+		if attempts[questions[i].ID] != attempts[questions[j].ID] {
+			return attempts[questions[i].ID] < attempts[questions[j].ID]
+		}
 		ri, rj := rank(questions[i].Difficulty), rank(questions[j].Difficulty)
 		di := ri - target
 		if di < 0 {
@@ -581,7 +602,10 @@ func (h *TutorHandler) GetAdaptiveQuestions(c fiber.Ctx) error {
 		if di != dj {
 			return di < dj // gần tầng mục tiêu nhất trước
 		}
-		return ri < rj // rồi tăng dần độ khó
+		if ri != rj {
+			return ri < rj // rồi tăng dần độ khó
+		}
+		return questions[i].ID.String() < questions[j].ID.String()
 	})
 	return c.JSON(questions)
 }
@@ -1346,21 +1370,31 @@ func (h *TutorHandler) GetInternalGraph(c fiber.Ctx) error {
 	}
 
 	prereqsMap := make(map[uuid.UUID][]string)
+	prereqStrengths := make(map[uuid.UUID]map[string]float64)
 	for _, edge := range dbEdges {
 		if subject != "" && (!nodeIDs[edge.SourceID] || !nodeIDs[edge.TargetID]) {
 			continue
 		}
 		prereqsMap[edge.TargetID] = append(prereqsMap[edge.TargetID], edge.SourceID.String())
+		if prereqStrengths[edge.TargetID] == nil {
+			prereqStrengths[edge.TargetID] = map[string]float64{}
+		}
+		strength := edge.Strength
+		if strength <= 0 || strength > 1 {
+			strength = 0.7
+		}
+		prereqStrengths[edge.TargetID][edge.SourceID.String()] = strength
 	}
 
 	type NodeResponse struct {
-		ID        string   `json:"id"`
-		Ten       string   `json:"ten"`
-		Lop       int      `json:"lop"`
-		Cap       string   `json:"cap"`
-		TienQuyet []string `json:"tienQuyet"`
-		Mo        bool     `json:"mo"`
-		Yccd      []string `json:"yccd"`
+		ID        string             `json:"id"`
+		Ten       string             `json:"ten"`
+		Lop       int                `json:"lop"`
+		Cap       string             `json:"cap"`
+		TienQuyet []string           `json:"tienQuyet"`
+		TrongSo   map[string]float64 `json:"trongSoTienQuyet"`
+		Mo        bool               `json:"mo"`
+		Yccd      []string           `json:"yccd"`
 	}
 
 	var nodes []NodeResponse
@@ -1422,6 +1456,7 @@ func (h *TutorHandler) GetInternalGraph(c fiber.Ctx) error {
 			Lop:       lop,
 			Cap:       capLevel,
 			TienQuyet: tienQuyet,
+			TrongSo:   prereqStrengths[node.ID],
 			Mo:        false,
 			Yccd:      yccd,
 		})
@@ -1442,16 +1477,18 @@ type CreatePathBodyRequest struct {
 }
 
 type RawQuizEvidence struct {
-	EvidenceID    string  `json:"evidence_id"`
-	StudentID     string  `json:"student_id"`
-	SessionID     string  `json:"session_id"`
-	QuestionID    string  `json:"question_id"`
-	TopicID       string  `json:"topic_id"`
-	Score         float64 `json:"score"`
-	AttemptNumber int     `json:"attempt_number"`
-	HintsUsed     int     `json:"hints_used"`
-	GradingMethod string  `json:"grading_method"`
-	OccurredAt    string  `json:"occurred_at"`
+	EvidenceID      string  `json:"evidence_id"`
+	StudentID       string  `json:"student_id"`
+	SessionID       string  `json:"session_id"`
+	QuestionID      string  `json:"question_id"`
+	TopicID         string  `json:"topic_id"`
+	Score           float64 `json:"score"`
+	AttemptNumber   int     `json:"attempt_number"`
+	HintsUsed       int     `json:"hints_used"`
+	GradingMethod   string  `json:"grading_method"`
+	OccurredAt      string  `json:"occurred_at"`
+	InferenceWeight float64 `json:"inference_weight,omitempty"`
+	Difficulty      string  `json:"difficulty,omitempty"`
 }
 
 type CreatePathFastAPIBody struct {
@@ -1609,7 +1646,8 @@ func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
 
 	// Evidence từ activity của chính học sinh (nhị phân ở P0; P1 thêm độ khó/hints/attempt).
 	var logs []model.ActivityLog
-	if err := config.DB.Where("student_id = ? AND subject = ?", studentID, subject).Find(&logs).Error; err != nil {
+	if err := config.DB.Where("student_id = ? AND subject = ?", studentID, subject).
+		Order("created_at ASC, id ASC").Find(&logs).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	rawQuiz := buildRawQuizFromLogs(logs)
@@ -1677,6 +1715,9 @@ func (h *TutorHandler) GetStudentLearningPathLive(c fiber.Ctx) error {
 // buildRawQuizFromLogs chuyển ActivityLog answer_correct/incorrect thành RawQuizEvidence.
 func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
 	rawQuiz := []RawQuizEvidence{}
+	attemptsByQuestion := map[string]int{}
+	questionMarker := regexp.MustCompile(`\[question_id=([0-9a-fA-F-]{36})\]`)
+	difficultyMarker := regexp.MustCompile(`\[difficulty=([^\]]+)\]`)
 	for _, lg := range logs {
 		score := 0.0
 		switch lg.Action {
@@ -1687,20 +1728,44 @@ func buildRawQuizFromLogs(logs []model.ActivityLog) []RawQuizEvidence {
 		default:
 			continue
 		}
+		questionID := lg.ID.String()
+		if match := questionMarker.FindStringSubmatch(lg.Detail); len(match) == 2 {
+			questionID = match[1]
+		}
+		attemptKey := lg.StudentID.String() + ":" + questionID
+		attemptsByQuestion[attemptKey]++
+		difficulty := "medium"
+		if match := difficultyMarker.FindStringSubmatch(lg.Detail); len(match) == 2 {
+			difficulty = strings.ToLower(strings.TrimSpace(match[1]))
+		}
 		rawQuiz = append(rawQuiz, RawQuizEvidence{
-			EvidenceID:    lg.ID.String(),
-			StudentID:     lg.StudentID.String(),
-			SessionID:     "live-session",
-			QuestionID:    "live-question",
-			TopicID:       lg.NodeID.String(),
-			Score:         score,
-			AttemptNumber: 1,
-			HintsUsed:     0,
-			GradingMethod: "auto",
-			OccurredAt:    lg.CreatedAt.Format(time.RFC3339),
+			EvidenceID:      lg.ID.String(),
+			StudentID:       lg.StudentID.String(),
+			SessionID:       "activity-log",
+			QuestionID:      questionID,
+			TopicID:         lg.NodeID.String(),
+			Score:           score,
+			AttemptNumber:   attemptsByQuestion[attemptKey],
+			HintsUsed:       0,
+			GradingMethod:   "auto",
+			OccurredAt:      lg.CreatedAt.Format(time.RFC3339),
+			InferenceWeight: inferenceWeightFromDetail(lg.Detail),
+			Difficulty:      difficulty,
 		})
 	}
 	return rawQuiz
+}
+
+func inferenceWeightFromDetail(detail string) float64 {
+	match := regexp.MustCompile(`\[inference_weight=(0(?:\.\d+)?|1(?:\.0+)?)\]`).FindStringSubmatch(detail)
+	if len(match) != 2 {
+		return 1
+	}
+	weight, err := strconv.ParseFloat(match[1], 64)
+	if err != nil || weight <= 0 || weight > 1 {
+		return 1
+	}
+	return weight
 }
 
 func (h *TutorHandler) ApproveLearningPath(c fiber.Ctx) error {

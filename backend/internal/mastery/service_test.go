@@ -15,6 +15,12 @@ type fakeCalculator struct {
 	received CalculateRequest
 }
 
+func TestInferenceWeightFromActivityDetail(t *testing.T) {
+	require.Equal(t, 0.35, inferenceWeightFromActivityDetail("[inference_weight=0.35] distractor"))
+	require.Equal(t, float64(1), inferenceWeightFromActivityDetail("direct evidence"))
+	require.Equal(t, float64(1), inferenceWeightFromActivityDetail("[inference_weight=invalid]"))
+}
+
 func (f *fakeCalculator) Calculate(_ context.Context, request CalculateRequest) (CalculateResponse, error) {
 	f.received = request
 	return f.response, nil

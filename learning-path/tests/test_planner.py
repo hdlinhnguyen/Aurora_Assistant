@@ -108,6 +108,19 @@ def test_path_starts_as_draft_version_1():
     assert p.student_id == "minh"
 
 
+def test_new_student_gets_diagnostic_steps_instead_of_empty_path():
+    states = {
+        tid: st(tid, 0.3, "unknown").model_copy(
+            update={"confidence_score": 0.0, "evidence_count": 0, "effective_evidence": 0.0}
+        )
+        for tid in ("a", "b", "c", "t")
+    }
+    p = plan(CHAIN, states, request())
+    assert [s.topic_id for s in p.ordered_steps] == ["a", "b", "c", "t"]
+    assert all("confidence_score" in s.completion_condition for s in p.ordered_steps)
+    assert "Chưa có bằng chứng" in p.ordered_steps[0].inclusion_reason
+
+
 # ---- ràng buộc giáo viên (mục 8.2, 12) ----
 
 

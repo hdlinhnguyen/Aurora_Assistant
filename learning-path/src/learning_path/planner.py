@@ -26,7 +26,8 @@ from learning_path.schemas import (
     StudentTopicKnowledgeState,
 )
 
-_UNMASTERED = ("confirmed_gap", "learning")
+_REMEDIATION = ("confirmed_gap", "learning")
+_DIAGNOSTIC = ("unknown", "uncertain")
 
 
 def _candidate_steps(
@@ -45,7 +46,16 @@ def _candidate_steps(
             back = nx.ancestors(g, t) | {t}
             on_path |= reach & back
 
-    candidates = {tid for tid in on_path if diagnosis.statuses.get(tid) in _UNMASTERED}
+    candidates = {tid for tid in on_path if diagnosis.statuses.get(tid) in _REMEDIATION}
+    # Unknown/uncertain topics cannot be diagnosed as gaps yet, but they still
+    # need an assessment step. Without this branch a new student gets an empty
+    # path because root-cause ranking intentionally contains confirmed gaps only.
+    if not candidates:
+        candidates |= {
+            tid
+            for tid in diagnosis.subgraph_topic_ids
+            if diagnosis.statuses.get(tid) in _DIAGNOSTIC
+        }
     candidates |= {
         tid
         for tid in request.required_topic_ids
@@ -163,7 +173,12 @@ def plan_path(
     def _step(tid: str, order: int) -> PathStep:
         state = states.get(tid)
         topic = curriculum.topics[tid]
-        if tid in roots:
+        topic_status = diagnosis.statuses.get(tid, "unknown")
+        if topic_status == "unknown":
+            reason = "Chưa có bằng chứng — làm bước chẩn đoán trước khi kết luận hổng kiến thức"
+        elif topic_status == "uncertain":
+            reason = "Bằng chứng chưa đủ tin cậy — cần câu hỏi chẩn đoán bổ sung"
+        elif tid in roots:
             reason = "Gốc rễ lỗ hổng: tiên quyết đều vững, cần lấp trước tiên"
         elif tid in targets:
             reason = "Topic mục tiêu của giáo viên"
@@ -182,8 +197,12 @@ def plan_path(
             estimated_minutes=topic.estimated_learning_time,
             inclusion_reason=reason,
             completion_condition=(
-                f"mastery_probability >= {request.target_mastery_threshold}"
-                f" AND confidence_score >= {request.minimum_confidence_threshold}"
+                f"confidence_score >= {request.minimum_confidence_threshold}"
+                if topic_status in _DIAGNOSTIC
+                else (
+                    f"mastery_probability >= {request.target_mastery_threshold}"
+                    f" AND confidence_score >= {request.minimum_confidence_threshold}"
+                )
             ),
             status="pending" if topic.content_available else "content_unavailable",
         )

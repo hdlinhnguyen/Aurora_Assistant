@@ -31,6 +31,7 @@ class PrerequisiteEdge(BaseModel):
 
     prerequisite_topic_id: str
     dependent_topic_id: str
+    strength: float = Field(default=0.7, gt=0, le=1)
 
 
 class RawQuizEvidence(BaseModel):
@@ -45,6 +46,8 @@ class RawQuizEvidence(BaseModel):
     attempt_number: int = Field(default=1, ge=1)
     hints_used: int = Field(default=0, ge=0)
     grading_method: str = "auto"
+    inference_weight: float = Field(default=1.0, gt=0, le=1)
+    difficulty: str = "medium"
     occurred_at: datetime
 
 
@@ -75,6 +78,7 @@ class CalibratedMasteryEvidence(BaseModel):
     occurred_at: datetime
     assessment_attempt_id: str | None = None
     question_id: str | None = None
+    difficulty: str | None = None
     rubric_item_id: str | None = None
     teacher_confirmed: bool = False
     lineage: str = ""

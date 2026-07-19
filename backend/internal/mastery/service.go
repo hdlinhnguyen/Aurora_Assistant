@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"backend/internal/model"
@@ -248,14 +250,62 @@ func (s *Service) loadEvidence(ctx context.Context, studentID uuid.UUID, subject
 		return nil, err
 	}
 	result := make([]QuizEvidence, 0, len(logs))
+	attemptsByQuestion := map[string]int{}
 	for _, log := range logs {
 		score := 0.0
 		if log.Action == "answer_correct" {
 			score = 1
 		}
-		result = append(result, QuizEvidence{EvidenceID: log.ID.String(), StudentID: studentID, SessionID: "activity-log", QuestionID: log.ID.String(), TopicID: log.NodeID, Score: score, AttemptNumber: 1, GradingMethod: "auto", OccurredAt: log.CreatedAt})
+		questionID := markerValue(log.Detail, "question_id")
+		if questionID == "" {
+			questionID = log.ID.String()
+		}
+		attemptsByQuestion[questionID]++
+		difficulty := markerValue(log.Detail, "difficulty")
+		if difficulty == "" {
+			difficulty = "medium"
+		}
+		result = append(result, QuizEvidence{
+			EvidenceID: log.ID.String(), StudentID: studentID, SessionID: "activity-log",
+			QuestionID: questionID, TopicID: log.NodeID, Score: score, AttemptNumber: attemptsByQuestion[questionID],
+			GradingMethod: "auto", OccurredAt: log.CreatedAt,
+			InferenceWeight: inferenceWeightFromActivityDetail(log.Detail),
+			Difficulty:      difficulty,
+		})
 	}
 	return result, nil
 }
 
+func markerValue(detail, name string) string {
+	marker := "[" + name + "="
+	start := strings.Index(detail, marker)
+	if start < 0 {
+		return ""
+	}
+	start += len(marker)
+	end := strings.IndexByte(detail[start:], ']')
+	if end < 0 {
+		return ""
+	}
+	return strings.TrimSpace(detail[start : start+end])
+}
+
 func decodeJSON[T any](raw string, target *T) error { return json.Unmarshal([]byte(raw), target) }
+
+func inferenceWeightFromActivityDetail(detail string) float64 {
+	const marker = "[inference_weight="
+	start := strings.Index(detail, marker)
+	if start < 0 {
+		return 1
+	}
+	start += len(marker)
+	end := strings.IndexByte(detail[start:], ']')
+	if end < 0 {
+		return 1
+	}
+	weight, err := strconv.ParseFloat(detail[start:start+end], 64)
+	if err != nil || weight <= 0 || weight > 1 {
+		return 1
+	}
+	return weight
+}

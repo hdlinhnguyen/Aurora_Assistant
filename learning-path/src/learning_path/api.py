@@ -106,8 +106,13 @@ def fetch_dynamic_graph(subject: str | None = None) -> CurriculumGraph:
                 learning_outcomes=node.get("yccd") or [],
             )
             for prereq_id in node.get("tienQuyet") or []:
+                strengths = node.get("trongSoTienQuyet") or {}
                 edges.append(
-                    PrerequisiteEdge(prerequisite_topic_id=prereq_id, dependent_topic_id=node["id"])
+                    PrerequisiteEdge(
+                        prerequisite_topic_id=prereq_id,
+                        dependent_topic_id=node["id"],
+                        strength=strengths.get(prereq_id, 0.7),
+                    )
                 )
 
         return CurriculumGraph(topics, edges)

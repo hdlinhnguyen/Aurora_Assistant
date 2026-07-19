@@ -96,6 +96,33 @@ def test_many_correct_evidences_classify_mastered():
     assert s.mastery_status == "mastered"
 
 
+def test_repeating_one_question_cannot_reach_full_mastery():
+    repeated = [
+        ev(i, 1.0).model_copy(update={"question_id": "same-question", "difficulty": "easy"})
+        for i in range(12)
+    ]
+    s = state(repeated)
+    assert s.mastery_probability < CONF.mastered_threshold
+    assert s.mastery_status != "mastered"
+    assert s.evidence_summary["unique_question_count"] == 1
+
+
+def test_quiz_mastery_requires_multiple_questions_and_difficulty_bands():
+    evidence = [
+        ev(i, 1.0).model_copy(
+            update={
+                "question_id": f"q-{i}",
+                "difficulty": "easy" if i < 4 else "medium",
+            }
+        )
+        for i in range(8)
+    ]
+    s = state(evidence)
+    assert s.mastery_status == "mastered"
+    assert s.evidence_summary["unique_question_count"] == 8
+    assert s.evidence_summary["difficulty_band_count"] == 2
+
+
 def test_many_wrong_evidences_classify_confirmed_gap():
     s = state([ev(i, 0.0) for i in range(8)])
     assert s.mastery_status == "confirmed_gap"
@@ -155,8 +182,9 @@ def test_propagate_mastery_dynamic_alpha():
     # Kiểm tra xem A có nhận được lan truyền không
     assert "A" in full_states_5
     assert full_states_5["A"].mastery_probability > PARAMS.p_l0  # được tăng từ 0.3
-    # n=5 -> alpha_n rất lớn -> A đạt trạng thái mastered gián tiếp
-    assert full_states_5["A"].mastery_status == "mastered"
+    # Dù B đã vững, evidence gián tiếp chỉ nâng A một cách bảo thủ và không
+    # được phép tự kết luận mastered thay evidence trực tiếp.
+    assert full_states_5["A"].mastery_status == "uncertain"
 
     # 2. Ca kiểm thử 2: n = 1 (chỉ đúng 1 câu)
     store_1 = EvidenceStore()
@@ -177,8 +205,36 @@ def test_propagate_mastery_dynamic_alpha():
         "student1", direct_states_1, curriculum, store_1, params=PARAMS, config=CONF
     )
 
-    # A nhận lan truyền nhẹ nhưng không đạt mastered vì alpha_1 nhỏ và evidence_count ảo = 0 -> unknown
+    # Một câu đúng với confidence thấp chưa đủ để thay đổi prerequisite.
     assert "A" in full_states_1
-    assert full_states_1["A"].mastery_probability > PARAMS.p_l0
+    assert full_states_1["A"].mastery_probability == pytest.approx(PARAMS.p_l0)
+    assert full_states_1["A"].evidence_count == 0
     assert full_states_1["A"].mastery_status == "unknown"
+
+
+def test_weaker_edge_propagates_less_mastery():
+    from learning_path.adapters import CurriculumGraph
+    from learning_path.bkt import propagate_mastery
+    from learning_path.evidence import EvidenceStore
+    from learning_path.schemas import PrerequisiteEdge, Topic
+
+    topics = {
+        "A": Topic(topic_id="A", subject_id="toan", grade_level=6, name="A", estimated_learning_time=30),
+        "B": Topic(topic_id="B", subject_id="toan", grade_level=7, name="B", estimated_learning_time=30),
+    }
+    evidence = [ev(i, 1.0).model_copy(update={"student_id": "student1", "topic_id": "B"}) for i in range(8)]
+    store = EvidenceStore()
+    store.ingest(evidence)
+    child = knowledge_state("student1", "B", evidence, params=PARAMS, config=CONF)
+
+    def propagated(strength: float) -> float:
+        curriculum = CurriculumGraph(
+            topics,
+            [PrerequisiteEdge(prerequisite_topic_id="A", dependent_topic_id="B", strength=strength)],
+        )
+        return propagate_mastery(
+            "student1", {"B": child}, curriculum, store, params=PARAMS, config=CONF
+        )["A"].mastery_probability
+
+    assert propagated(0.9) > propagated(0.5)
 
