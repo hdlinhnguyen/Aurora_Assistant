@@ -48,6 +48,7 @@ func main() {
 
 	app.Use(recover.New())
 	app.Use(logger.New())
+	app.Use(middleware.HTTPStatusCounter())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: runtime.CORSOrigins(),
 		AllowHeaders: []string{"Origin, Content-Type, Accept, Authorization, Idempotency-Key, idempotency-key"},
@@ -268,6 +269,14 @@ func main() {
 	adminGroup.Put("/classrooms/:id", adminHandler.UpdateClassroom)
 	adminGroup.Delete("/classrooms/:id", adminHandler.DeleteClassroom)
 	adminGroup.Get("/telemetry-dashboard", adminMetricsHandler.GetTelemetryDashboard)
+	// Giám sát hệ thống (/admin/monitoring)
+	adminGroup.Get("/monitoring/overview", adminHandler.GetMonitoringOverview)
+	adminGroup.Get("/monitoring/http-status", adminHandler.GetMonitoringHTTPStatus)
+	adminGroup.Get("/monitoring/ai-cost", adminHandler.GetMonitoringAICost)
+	// Người dùng & Chẩn đoán (/admin/users)
+	adminGroup.Get("/users/diagnostics", adminHandler.GetUsersDiagnostics)
+	adminGroup.Get("/class-tree", adminHandler.GetClassTree)
+	adminGroup.Put("/students/:id/classroom", adminHandler.AssignStudentClass)
 
 	// Teacher Routes (Teacher & Admin only)
 	teacherGroup := api.Group("/teacher", middleware.RequireRole("teacher", "admin"))

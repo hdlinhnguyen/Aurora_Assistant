@@ -814,20 +814,19 @@ export default function TutorHubPage() {
                 transition: "all .15s",
                 width: "100%",
                 border: "none",
-                background: "transparent",
                 textAlign: "left",
                 font: "inherit",
+                cursor: "pointer",
                 ...(active
                   ? {
                       background: "linear-gradient(135deg,#EFE9FD,#f6f1ff)",
                       boxShadow: "inset 0 0 0 2px #7C46E8",
-                      cursor: "pointer",
                     }
                   : done
-                    ? { background: "#F3FBF9", cursor: "pointer" }
+                    ? { background: "#F3FBF9" }
                     : locked
-                      ? { cursor: "pointer", opacity: 0.95 }
-                      : { cursor: "pointer" }),
+                      ? { background: "transparent", opacity: 0.95 }
+                      : { background: "transparent" }),
               };
               const badgeStyle: CSSProperties = {
                 height: 26,

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"backend/internal/aicost"
 	"backend/internal/model"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -438,6 +439,11 @@ func (s *aiService) sendRequestWithFallback(reqBodyMap map[string]interface{}) (
 						Content string `json:"content"`
 					} `json:"message"`
 				} `json:"choices"`
+				Usage struct {
+					PromptTokens     int `json:"prompt_tokens"`
+					CompletionTokens int `json:"completion_tokens"`
+					TotalTokens      int `json:"total_tokens"`
+				} `json:"usage"`
 			}
 
 			if err := json.Unmarshal(bodyBytes, &oaiResp); err != nil {
@@ -449,6 +455,9 @@ func (s *aiService) sendRequestWithFallback(reqBodyMap map[string]interface{}) (
 				lastErr = errors.New("empty choices from AI response")
 				continue
 			}
+
+			// Đếm token/chi phí cho dashboard giám sát admin (Tầng 3).
+			aicost.Record(oaiResp.Usage.PromptTokens, oaiResp.Usage.CompletionTokens)
 
 			fmt.Printf("[AI ROUTER SUCCESS] Gọi thành công model: %s bằng API Key: %s!\n", modelName, key[:Min(len(key), 8)]+"...")
 			return oaiResp.Choices[0].Message.Content, nil

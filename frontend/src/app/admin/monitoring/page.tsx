@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import {
   Users,
   GraduationCap,
@@ -108,9 +109,8 @@ function MetricCard({
   );
 }
 
-// ---- Mock data (static, no API calls) ----
-const HAU_24H = [12, 14, 11, 9, 8, 7, 10, 22, 41, 58, 64, 61, 55, 60, 68, 72, 79, 84, 76, 65, 48, 33, 21, 15];
-
+// LangGraph node latency: CHƯA có nguồn đo per-node trong hệ thống → giữ minh hoạ,
+// gắn nhãn rõ ràng để không nhầm là số thật.
 const LANGGRAPH_NODES = [
   { name: "diagnose_node", ms: 420 },
   { name: "socratic_hint_node", ms: 680 },
@@ -119,36 +119,76 @@ const LANGGRAPH_NODES = [
 ];
 const LANGGRAPH_MAX_MS = Math.max(...LANGGRAPH_NODES.map((n) => n.ms));
 
-const HTTP_STATUS = [
-  { bucket: "2xx", count: 15482, pct: 98.2, color: "text-emerald-600 bg-emerald-500/10 border-emerald-500/20" },
-  { bucket: "4xx", count: 224, pct: 1.4, color: "text-amber-600 bg-amber-500/10 border-amber-500/20" },
-  { bucket: "5xx", count: 64, pct: 0.4, color: "text-rose-600 bg-rose-500/10 border-rose-500/20" },
-];
-
-const COST_BURN = {
-  usd: 12.4,
-  vnd: 310000,
-  quotaRemainingPct: 74.2,
+const HTTP_COLORS: Record<string, string> = {
+  "2xx": "text-emerald-600 bg-emerald-500/10 border-emerald-500/20",
+  "4xx": "text-amber-600 bg-amber-500/10 border-amber-500/20",
+  "5xx": "text-rose-600 bg-rose-500/10 border-rose-500/20",
 };
+
+interface Overview {
+  hau24h: number[];
+  students: { total: number; onlineToday: number; weekGrowthPct: number };
+  teachers: { total: number; classrooms: number };
+  sessions: { totalOnline: number; peakConcurrent: number };
+  adaptive: { remediationGroupCount: number; advancedGroupCount: number };
+}
+interface HttpStatus {
+  total: number;
+  buckets: Array<{ bucket: string; count: number; pct: number }>;
+}
+interface AICost {
+  model: string;
+  totalTokens: number;
+  requestCount: number;
+  usd: number;
+  vnd: number;
+  quotaRemainingPct: number;
+  circuitBreakerOn: boolean;
+}
+
+const nf = (n: number) => (n ?? 0).toLocaleString("vi-VN");
 
 export default function AdminMonitoringPage() {
   const [tier1Range, setTier1Range] = useState<TimeRange>("realtime");
   const [hauRange, setHauRange] = useState<TimeRange>("24h");
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [httpStatus, setHttpStatus] = useState<HttpStatus | null>(null);
+  const [aiCost, setAiCost] = useState<AICost | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const gaugePct = 100 - COST_BURN.quotaRemainingPct; // burn rate arc
-  const maxHau = Math.max(...HAU_24H);
+  const loadAll = () => {
+    apiFetch("/admin/monitoring/overview").then(setOverview).catch((e) => setLoadError(e.message));
+    apiFetch("/admin/monitoring/http-status").then(setHttpStatus).catch(() => {});
+    apiFetch("/admin/monitoring/ai-cost").then(setAiCost).catch(() => {});
+  };
+  useEffect(() => {
+    loadAll();
+    const id = setInterval(loadAll, 15000); // tự làm mới mỗi 15s
+    return () => clearInterval(id);
+  }, []);
+
+  const hau = overview?.hau24h ?? new Array(24).fill(0);
+  const maxHau = Math.max(1, ...hau);
+  const httpBuckets = httpStatus?.buckets ?? [
+    { bucket: "2xx", count: 0, pct: 0 },
+    { bucket: "4xx", count: 0, pct: 0 },
+    { bucket: "5xx", count: 0, pct: 0 },
+  ];
+  const quotaRemaining = aiCost?.quotaRemainingPct ?? 100;
+  const gaugePct = 100 - quotaRemaining; // burn rate arc
 
   return (
     <div className="space-y-8">
-      {/* Prototype banner */}
+      {/* Data source banner: đa số đã nối API thật, chỉ LangGraph node latency còn minh hoạ */}
       <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm">
         <FlaskConical className="h-5 w-5 shrink-0 text-amber-600" />
         <p>
-          <span className="font-bold text-amber-700 dark:text-amber-400">Prototype:</span>{" "}
+          <span className="font-bold text-emerald-700 dark:text-emerald-400">Dữ liệu thật:</span>{" "}
           <span className="text-muted-foreground">
-            Toàn bộ số liệu trên trang này là dữ liệu minh hoạ tĩnh, chưa nối API thật. Xem{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">README.md</code> trong thư mục này để biết việc cần làm tiếp.
+            Tầng 1 (users/telemetry), HTTP status &amp; chi phí AI đã nối API. Riêng{" "}
+            <span className="font-semibold">LangGraph Node Latency</span> chưa có nguồn đo per-node nên vẫn là số minh hoạ.
           </span>
+          {loadError && <span className="ml-2 text-rose-600 font-semibold">Lỗi tải: {loadError}</span>}
         </p>
       </div>
 
@@ -183,33 +223,33 @@ export default function AdminMonitoringPage() {
             icon={Users}
             label="Student Count"
             fields={[
-              { label: "Total", value: "1,240" },
-              { label: "Online hôm nay", value: "187", highlight: true },
-              { label: "Tăng trưởng tuần", value: "+6.4%", highlight: true },
+              { label: "Total", value: nf(overview?.students.total ?? 0) },
+              { label: "Online hôm nay", value: nf(overview?.students.onlineToday ?? 0), highlight: true },
+              { label: "Tăng trưởng tuần", value: `+${(overview?.students.weekGrowthPct ?? 0).toFixed(1)}%`, highlight: true },
             ]}
           />
           <MetricCard
             icon={GraduationCap}
             label="Teacher Count"
             fields={[
-              { label: "Active total", value: "42" },
-              { label: "Lớp quản lý", value: "58" },
+              { label: "Active total", value: nf(overview?.teachers.total ?? 0) },
+              { label: "Lớp quản lý", value: nf(overview?.teachers.classrooms ?? 0) },
             ]}
           />
           <MetricCard
             icon={Activity}
             label="Session Metrics"
             fields={[
-              { label: "Tổng phiên online", value: "312" },
-              { label: "Peak concurrent", value: "89" },
+              { label: "Tổng phiên online", value: nf(overview?.sessions.totalOnline ?? 0) },
+              { label: "Peak concurrent", value: nf(overview?.sessions.peakConcurrent ?? 0) },
             ]}
           />
           <MetricCard
             icon={Layers}
             label="Adaptive Strategy Metrics"
             fields={[
-              { label: "remediation_group_count", value: "14" },
-              { label: "advanced_group_count", value: "5" },
+              { label: "remediation_group_count", value: nf(overview?.adaptive.remediationGroupCount ?? 0) },
+              { label: "advanced_group_count", value: nf(overview?.adaptive.advancedGroupCount ?? 0) },
             ]}
           />
         </div>
@@ -221,7 +261,7 @@ export default function AdminMonitoringPage() {
             <RangePicker value={hauRange} onChange={setHauRange} />
           </div>
           <div className="flex items-end gap-1.5 h-40">
-            {HAU_24H.map((v, i) => (
+            {hau.map((v, i) => (
               <div key={i} className="flex-1 flex flex-col items-center justify-end group relative">
                 <div
                   className="w-full rounded-t-md bg-gradient-to-t from-[var(--mint)] to-[var(--purple)] transition-all group-hover:opacity-80"
@@ -272,9 +312,12 @@ export default function AdminMonitoringPage() {
         />
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-          {/* LangGraph Node Latency */}
+          {/* LangGraph Node Latency — chưa có nguồn đo, giữ minh hoạ */}
           <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-            <p className="text-sm font-bold mb-5">LangGraph Node Latency</p>
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-sm font-bold">LangGraph Node Latency</p>
+              <span className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">minh hoạ</span>
+            </div>
             <div className="space-y-4">
               {LANGGRAPH_NODES.map((n) => (
                 <div key={n.name}>
@@ -295,14 +338,17 @@ export default function AdminMonitoringPage() {
 
           {/* HTTP Status Tracker */}
           <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-            <p className="text-sm font-bold mb-5">HTTP Status Tracker</p>
+            <div className="flex items-center justify-between mb-5">
+              <p className="text-sm font-bold">HTTP Status Tracker</p>
+              <span className="text-[11px] font-semibold text-muted-foreground">từ khi khởi động · {nf(httpStatus?.total ?? 0)} req</span>
+            </div>
             <div className="space-y-3">
-              {HTTP_STATUS.map((s) => (
-                <div key={s.bucket} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${s.color}`}>
+              {httpBuckets.map((s) => (
+                <div key={s.bucket} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${HTTP_COLORS[s.bucket] ?? ""}`}>
                   <span className="font-mono font-extrabold text-sm">{s.bucket}</span>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="font-bold">{s.count.toLocaleString("vi-VN")} req</span>
-                    <span className="font-bold">{s.pct}%</span>
+                    <span className="font-bold">{nf(s.count)} req</span>
+                    <span className="font-bold">{s.pct.toFixed(1)}%</span>
                   </div>
                 </div>
               ))}
@@ -324,7 +370,7 @@ export default function AdminMonitoringPage() {
           {/* Cost burn gauge */}
           <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Model Version</p>
-            <p className="text-sm font-bold font-mono mb-5">gemini-2.5-flash</p>
+            <p className="text-sm font-bold font-mono mb-5">{aiCost?.model ?? "gemini-2.5-flash"}</p>
 
             <div className="flex items-center gap-6">
               <div
@@ -334,7 +380,7 @@ export default function AdminMonitoringPage() {
                 }}
               >
                 <div className="absolute inset-2 rounded-full bg-card flex flex-col items-center justify-center">
-                  <span className="text-lg font-extrabold">{COST_BURN.quotaRemainingPct}%</span>
+                  <span className="text-lg font-extrabold">{quotaRemaining.toFixed(1)}%</span>
                   <span className="text-[9px] text-muted-foreground font-semibold text-center leading-tight">
                     quota
                     <br />
@@ -344,8 +390,9 @@ export default function AdminMonitoringPage() {
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Estimated Cost Burn Rate</p>
-                <p className="text-2xl font-extrabold tracking-tight">${COST_BURN.usd.toFixed(2)}</p>
-                <p className="text-sm font-bold text-muted-foreground">{COST_BURN.vnd.toLocaleString("vi-VN")} ₫</p>
+                <p className="text-2xl font-extrabold tracking-tight">${(aiCost?.usd ?? 0).toFixed(2)}</p>
+                <p className="text-sm font-bold text-muted-foreground">{nf(Math.round(aiCost?.vnd ?? 0))} ₫</p>
+                <p className="text-[11px] font-semibold text-muted-foreground">{nf(aiCost?.totalTokens ?? 0)} token · {nf(aiCost?.requestCount ?? 0)} request</p>
               </div>
             </div>
           </div>
@@ -362,14 +409,24 @@ export default function AdminMonitoringPage() {
               </span>
             </div>
 
-            {/* Billing circuit breaker */}
-            <div className="rounded-3xl border border-emerald-500/25 bg-emerald-500/5 p-5 shadow-[var(--shadow-card)] flex items-center gap-3">
-              <ShieldCheck className="h-8 w-8 text-emerald-500 shrink-0" />
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Billing Circuit Breaker</p>
-                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Đang hoạt động bình thường</p>
+            {/* Billing circuit breaker — trạng thái theo chi phí thật */}
+            {aiCost?.circuitBreakerOn ? (
+              <div className="rounded-3xl border border-rose-500/25 bg-rose-500/5 p-5 shadow-[var(--shadow-card)] flex items-center gap-3">
+                <AlertTriangle className="h-8 w-8 text-rose-500 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Billing Circuit Breaker</p>
+                  <p className="text-sm font-bold text-rose-700 dark:text-rose-400">Đã ngắt — chi phí vượt ngưỡng quota</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-3xl border border-emerald-500/25 bg-emerald-500/5 p-5 shadow-[var(--shadow-card)] flex items-center gap-3">
+                <ShieldCheck className="h-8 w-8 text-emerald-500 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Billing Circuit Breaker</p>
+                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Đang hoạt động bình thường</p>
+                </div>
+              </div>
+            )}
 
             <div className="rounded-3xl border border-border bg-muted/40 p-5 text-xs text-muted-foreground flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />

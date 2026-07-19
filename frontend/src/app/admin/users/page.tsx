@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import {
   Search,
   UserPlus,
@@ -37,34 +38,7 @@ const STATUS_META: Record<Status, { label: string; className: string }> = {
 
 type ClassNode = { id: string; name: string; count: number };
 type KhoiNode = { id: string; name: string; total: number; classes: ClassNode[] };
-
-const TREE: { school: string; khoi: KhoiNode[] } = {
-  school: "Trường THPT A",
-  khoi: [
-    {
-      id: "k11",
-      name: "Khối 11",
-      total: 450,
-      classes: [
-        { id: "11a1", name: "11A1", count: 32 },
-        { id: "11a2", name: "11A2", count: 32 },
-        { id: "11a3", name: "11A3", count: 32 },
-      ],
-    },
-    {
-      id: "k12",
-      name: "Khối 12",
-      total: 450,
-      classes: [
-        { id: "12a1", name: "12A1", count: 30 },
-        { id: "12a2", name: "12A2", count: 30 },
-        { id: "12a3", name: "12A3", count: 30 },
-      ],
-    },
-  ],
-};
-
-const ALL_CLASSES: ClassNode[] = TREE.khoi.flatMap((k) => k.classes);
+type ClassTree = { school: string; khoi: KhoiNode[] };
 
 type UserRow = {
   id: string;
@@ -79,27 +53,6 @@ type UserRow = {
   invalid?: boolean;
   validationError?: string;
 };
-
-const MOCK_USERS: UserRow[] = [
-  { id: "u1", name: "Nguyen Hoang Nam", email: "nguyen.hn@aurora.edu.vn", avgScore: 9.5, clarity: 73, topGap: "Logic", topGapSeverity: 28, classId: "11a1", status: "mastery" },
-  {
-    id: "u2",
-    name: "student.invalid.email",
-    email: "student.invalid.email",
-    avgScore: null,
-    clarity: null,
-    topGap: null,
-    topGapSeverity: null,
-    classId: null,
-    status: "critical_gap",
-    invalid: true,
-    validationError: "Check email and data format (Diagnostic Log for details).",
-  },
-  { id: "u3", name: "Tran Thi Bich", email: "tran.tb@aurora.edu.vn", avgScore: 6.2, clarity: 54, topGap: "Đại số", topGapSeverity: 46, classId: "11a2", status: "at_risk" },
-  { id: "u4", name: "Le Van Cuong", email: "le.vc@aurora.edu.vn", avgScore: 7.8, clarity: 66, topGap: "Hình học", topGapSeverity: 34, classId: "11a1", status: "progressing" },
-  { id: "u5", name: "Pham Minh Duc", email: "pham.md@aurora.edu.vn", avgScore: 8.9, clarity: 81, topGap: "Xác suất", topGapSeverity: 19, classId: "11a3", status: "mastery" },
-  { id: "u6", name: "Hoang Thi Em", email: "hoang.te@aurora.edu.vn", avgScore: 5.4, clarity: 40, topGap: "Logic", topGapSeverity: 62, classId: "11a2", status: "critical_gap" },
-];
 
 function MiniBar({ pct, tone = "purple" }: { pct: number; tone?: "purple" | "mint" | "rose" }) {
   const gradient =
@@ -140,26 +93,54 @@ function DisabledAction({ label, icon: Icon }: { label: string; icon: typeof Sea
 
 export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({ k11: true, k12: false });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [classFilter, setClassFilter] = useState<string | null>(null);
-  const [selectedUserId, setSelectedUserId] = useState<string>("u1");
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [openErrorTooltip, setOpenErrorTooltip] = useState<string | null>(null);
 
-  // Dual-listbox local state for the currently selected user (prototype only — resets on switch, not persisted)
-  const selectedUser = useMemo(() => MOCK_USERS.find((u) => u.id === selectedUserId) ?? MOCK_USERS[0], [selectedUserId]);
-  const [assigned, setAssigned] = useState<string[]>(selectedUser.classId ? [selectedUser.classId] : []);
+  const [tree, setTree] = useState<ClassTree>({ school: "", khoi: [] });
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const allClasses = useMemo(() => tree.khoi.flatMap((k) => k.classes), [tree]);
+
+  const loadUsers = useCallback(async () => {
+    const res = await apiFetch("/admin/users/diagnostics");
+    setUsers(res?.users ?? []);
+  }, []);
+
+  useEffect(() => {
+    apiFetch("/admin/class-tree")
+      .then((t) => {
+        setTree(t ?? { school: "", khoi: [] });
+        // Mở khối đầu tiên mặc định
+        if (t?.khoi?.[0]) setExpanded({ [t.khoi[0].id]: true });
+      })
+      .catch(() => {});
+    loadUsers().catch(() => setUsers([]));
+  }, [loadUsers]);
+
+  // Dual-listbox: mô hình 1 học sinh - 1 lớp, nhưng UI cho chọn nhiều rồi lưu lớp đầu.
+  const selectedUser = useMemo(
+    () => users.find((u) => u.id === selectedUserId) ?? users[0],
+    [selectedUserId, users],
+  );
+  const [assigned, setAssigned] = useState<string[]>([]);
   const [pickedAvailable, setPickedAvailable] = useState<string[]>([]);
   const [pickedAssigned, setPickedAssigned] = useState<string[]>([]);
 
-  function selectUser(id: string) {
-    setSelectedUserId(id);
-    const u = MOCK_USERS.find((x) => x.id === id);
-    setAssigned(u?.classId ? [u.classId] : []);
+  // Đồng bộ lớp đã gán khi đổi học sinh chọn.
+  useEffect(() => {
+    setAssigned(selectedUser?.classId ? [selectedUser.classId] : []);
     setPickedAvailable([]);
     setPickedAssigned([]);
+  }, [selectedUser?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function selectUser(id: string) {
+    setSelectedUserId(id);
   }
 
-  const availableClasses = ALL_CLASSES.filter((c) => !assigned.includes(c.id));
+  const availableClasses = allClasses.filter((c) => !assigned.includes(c.id));
 
   function moveToAssigned() {
     if (!pickedAvailable.length) return;
@@ -172,7 +153,30 @@ export default function AdminUsersPage() {
     setPickedAssigned([]);
   }
 
-  const filteredUsers = MOCK_USERS.filter((u) => {
+  async function saveAssignment() {
+    if (!selectedUser) return;
+    setSaving(true);
+    try {
+      // Model 1:1 → lưu lớp đầu tiên trong danh sách đã gán (null nếu bỏ hết).
+      const classroomId = assigned[0] ?? null;
+      await apiFetch(`/admin/students/${selectedUser.id}/classroom`, {
+        method: "PUT",
+        body: JSON.stringify({ classroomId }),
+      });
+      if (assigned.length > 1) {
+        toast.warning("Mô hình hiện tại là 1 học sinh - 1 lớp; đã lưu lớp đầu tiên trong danh sách.");
+      } else {
+        toast.success("Đã lưu lớp cho học sinh.");
+      }
+      await Promise.all([loadUsers(), apiFetch("/admin/class-tree").then((t) => setTree(t ?? tree))]);
+    } catch (e: any) {
+      toast.error(e?.message || "Không thể lưu gán lớp.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const filteredUsers = users.filter((u) => {
     if (classFilter && u.classId !== classFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -183,14 +187,13 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Prototype banner */}
-      <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm">
-        <FlaskConical className="h-5 w-5 shrink-0 text-amber-600" />
+      {/* Data source banner: đã nối API thật cho danh sách, cây lớp và gán lớp */}
+      <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/8 px-4 py-3 text-sm">
+        <FlaskConical className="h-5 w-5 shrink-0 text-emerald-600" />
         <p>
-          <span className="font-bold text-amber-700 dark:text-amber-400">Prototype:</span>{" "}
+          <span className="font-bold text-emerald-700 dark:text-emerald-400">Dữ liệu thật:</span>{" "}
           <span className="text-muted-foreground">
-            Dữ liệu người dùng, cây lớp học và gán lớp trên trang này là mock tĩnh. Xem{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">README.md</code> trong thư mục này để biết việc cần làm tiếp.
+            Danh sách học sinh, chỉ số chẩn đoán (BKT/Feynman), cây trường/khối/lớp và gán lớp đã nối API. Các nút Bulk Import / RBAC vẫn là tính năng sắp ra mắt.
           </span>
         </p>
       </div>
@@ -244,10 +247,10 @@ export default function AdminUsersPage() {
           <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3 px-1">Cơ cấu tổ chức</p>
           <div className="flex items-center gap-2 px-1 py-1.5 text-sm font-bold">
             <School className="h-4 w-4 text-[var(--purple)]" />
-            {TREE.school}
+            {tree.school || "Toàn trường"}
           </div>
           <div className="mt-1 space-y-0.5">
-            {TREE.khoi.map((k) => (
+            {tree.khoi.map((k) => (
               <div key={k.id}>
                 <button
                   type="button"
@@ -306,7 +309,7 @@ export default function AdminUsersPage() {
               <tbody className="divide-y divide-border">
                 {filteredUsers.map((u) => {
                   const meta = STATUS_META[u.status];
-                  const className = ALL_CLASSES.find((c) => c.id === u.classId)?.name ?? "-";
+                  const className = allClasses.find((c) => c.id === u.classId)?.name ?? "-";
                   return (
                     <tr key={u.id} className={`transition-colors ${u.invalid ? "bg-rose-500/5 hover:bg-rose-500/10" : "hover:bg-muted/30"}`}>
                       <td className="p-4 pl-6">
@@ -384,7 +387,7 @@ export default function AdminUsersPage() {
         {/* Right: detail panel */}
         <div className="rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)] space-y-5">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Lớp: {selectedUser.name}</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Học sinh: {selectedUser?.name ?? "— chọn ở bảng —"}</p>
             <p className="text-sm mt-1">
               <span className="text-muted-foreground">Vai trò: </span>
               <span className="font-bold">Học sinh</span>
@@ -397,7 +400,7 @@ export default function AdminUsersPage() {
               {assigned.length ? (
                 assigned.map((id) => (
                   <span key={id} className="px-2.5 py-1 rounded-lg bg-[var(--purple)]/10 text-[var(--purple)] text-xs font-bold">
-                    {ALL_CLASSES.find((c) => c.id === id)?.name}
+                    {allClasses.find((c) => c.id === id)?.name}
                   </span>
                 ))
               ) : (
@@ -449,22 +452,23 @@ export default function AdminUsersPage() {
               >
                 {assigned.map((id) => (
                   <option key={id} value={id} className="px-1.5 py-1 rounded">
-                    {ALL_CLASSES.find((c) => c.id === id)?.name}
+                    {allClasses.find((c) => c.id === id)?.name}
                   </option>
                 ))}
               </select>
             </div>
             <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
-              Chọn lớp ở 2 khung rồi bấm mũi tên để chuyển. Thay đổi chỉ lưu tạm ở giao diện (prototype), chưa gọi API lưu thật.
+              Chọn lớp ở 2 khung rồi bấm mũi tên để chuyển. Mô hình hiện tại là 1 học sinh - 1 lớp: khi lưu sẽ dùng lớp đầu tiên trong danh sách đã gán.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => toast.info("Sắp ra mắt — lưu gán lớp cần API thật, xem README.")}
-            className="w-full rounded-2xl bg-foreground text-background text-sm font-bold py-2.5 hover:opacity-90 active:scale-95 transition-all"
+            onClick={saveAssignment}
+            disabled={saving || !selectedUser}
+            className="w-full rounded-2xl bg-foreground text-background text-sm font-bold py-2.5 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
           >
-            Lưu thay đổi
+            {saving ? "Đang lưu..." : "Lưu thay đổi"}
           </button>
         </div>
       </div>
