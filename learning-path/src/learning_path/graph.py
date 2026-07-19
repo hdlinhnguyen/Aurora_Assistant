@@ -23,7 +23,7 @@ from langgraph.types import Send, interrupt
 from pydantic import BaseModel
 
 from learning_path.adapters import CurriculumGraph
-from learning_path.bkt import BKTParams, ConfidenceConfig, knowledge_state
+from learning_path.bkt import BKTParams, ConfidenceConfig, knowledge_state, propagate_mastery
 from learning_path.class_insight import compute_class_insight
 from learning_path.diagnosis import Diagnosis, diagnose
 from learning_path.evidence import EvidenceStore, calibrate_paper, calibrate_quiz
@@ -85,10 +85,14 @@ def build_pipeline(
         store.ingest(state["calibrated"])  # dedup theo evidence_id — idempotent
         states_by_student: dict[str, dict[str, StudentTopicKnowledgeState]] = {}
         for sid in state["request"].student_ids:
-            states_by_student[sid] = {
+            direct_states = {
                 tid: knowledge_state(sid, tid, evs, params=params, config=conf)
                 for tid, evs in store.active_by_topic(sid).items()
             }
+            # Cập nhật lan truyền Dynamic Alpha cho các tiên quyết
+            states_by_student[sid] = propagate_mastery(
+                sid, direct_states, curriculum, store, params=params, config=conf
+            )
         return {"states_by_student": states_by_student}
 
     def fan_out(state: PipelineState) -> list[Send]:

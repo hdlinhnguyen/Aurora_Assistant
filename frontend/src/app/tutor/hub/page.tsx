@@ -22,6 +22,7 @@ import {
   mapQuestion,
   requestHint,
   submitAnswer,
+  getReviewPath,
   type DiffTag,
   type GameSummary,
   type HubEdge,
@@ -29,8 +30,11 @@ import {
   type HubQuestion,
   type MasteryProfile,
   type RoadmapStep,
+  type ReviewItem,
 } from "./api";
 import MascotCompanion, { type MascotState } from "@/app/components/MascotCompanion";
+import Character, { type CharKind } from "../components/Character";
+import { characterMeta, useCharacter } from "../components/character-context";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
 const POPPINS: CSSProperties = { fontFamily: "'Poppins', system-ui, sans-serif" };
@@ -86,6 +90,8 @@ export default function TutorHubPage() {
   const router = useRouter();
   const [studentName, setStudentName] = useState("bạn");
   const [currentStepId, setCurrentStepId] = useState("");
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [showReview, setShowReview] = useState(false);
   const [questions, setQuestions] = useState<HubQuestion[]>([]);
   const [qLoading, setQLoading] = useState(false);
 
@@ -169,6 +175,7 @@ export default function TutorHubPage() {
       setMastery(masteryRes);
       setRoadmap(rm);
       setSummary(summaryRes);
+      getReviewPath(subj).then((r) => setReviewItems(r.items ?? [])).catch(() => setReviewItems([]));
       const cur = rm.find((s) => s.status === "current") ?? rm[0];
       const curId = cur?.id ?? "";
       setCurrentStepId(curId);
@@ -263,6 +270,14 @@ export default function TutorHubPage() {
     setActiveTab("theory");
     resetChat(step.name);
     loadQuestions(step.id);
+  }
+
+  function goToReviewNode(nodeId: string, name: string) {
+    setShowReview(false);
+    setCurrentStepId(nodeId);
+    setActiveTab("practice");
+    resetChat(name);
+    loadQuestions(nodeId);
   }
 
   function selectOpt(i: number) {
@@ -523,6 +538,34 @@ export default function TutorHubPage() {
                 />
               </div>
             </div>
+
+            {reviewItems.length > 0 && (
+              <button
+                onClick={() => setShowReview(true)}
+                style={{
+                  ...POPPINS,
+                  width: "calc(100% - 16px)",
+                  margin: "0 8px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "10px 12px",
+                  borderRadius: 13,
+                  border: "1px solid #ffd9b8",
+                  background: "linear-gradient(135deg,#fff5ec,#fff)",
+                  color: "#c2560f",
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  cursor: "pointer",
+                }}
+              >
+                <span style={{ fontSize: 15 }}>🔄</span>
+                <span style={{ flex: 1, textAlign: "left" }}>Ôn tập ({reviewItems.length})</span>
+                <span style={{ background: "#ffe1c4", color: "#c2560f", borderRadius: 8, padding: "2px 7px", fontSize: 10.5, fontWeight: 800 }}>
+                  cần củng cố
+                </span>
+              </button>
+            )}
 
             {roadmap.map((st, i) => {
               const active = st.id === currentStepId;
@@ -1053,7 +1096,6 @@ export default function TutorHubPage() {
                   speechBubble={chatMascotSpeech}
                 />
               </div>
-            </div>
             <RailChat
               char={char}
               buddy={buddy}
@@ -1066,6 +1108,57 @@ export default function TutorHubPage() {
           )}
         </main>
       </div>
+
+      {/* ===== MODAL LỘ TRÌNH ÔN TẬP ===== */}
+      {showReview && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(15,23,42,.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+          onClick={() => setShowReview(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(560px, 96vw)", maxHeight: "88vh", background: "#fff", borderRadius: 22, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 30px 60px -20px rgba(0,0,0,.4)" }}
+          >
+            <div style={{ padding: "18px 22px", borderBottom: "1px solid #f2f4f7", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ ...BALOO, fontWeight: 800, fontSize: 19, color: "#c2560f" }}>🔄 Lộ trình Ôn tập</div>
+                <div style={{ fontSize: 12.5, color: "#5b6072", fontWeight: 600, marginTop: 2 }}>
+                  Các chủ đề cần củng cố nhất, chọn dựa trên hồ sơ năng lực BKT của em
+                </div>
+              </div>
+              <button onClick={() => setShowReview(false)} style={{ background: "#f1f5f9", border: "none", borderRadius: 12, width: 34, height: 34, cursor: "pointer", fontWeight: 800, color: "#64748b", flexShrink: 0 }}>✕</button>
+            </div>
+            <div style={{ padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+              {reviewItems.map((it, idx) => {
+                const barColor = it.masteryPct >= 70 ? "#0FB9A6" : it.masteryPct >= 40 ? "#e0912a" : "#e05a7a";
+                return (
+                  <div
+                    key={it.nodeId}
+                    onClick={() => goToReviewNode(it.nodeId, it.name)}
+                    style={{ border: "1px solid #eef1f4", borderRadius: 15, padding: 14, cursor: "pointer", background: idx === 0 ? "linear-gradient(135deg,#fff7ef,#fff)" : "#fff" }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <span style={{ width: 24, height: 24, borderRadius: 8, background: idx === 0 ? "#c2560f" : "#eef1f4", color: idx === 0 ? "#fff" : "#5b6072", fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{idx + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: "#16161F", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</div>
+                        <div style={{ fontSize: 11, color: "#9aa1b0", fontWeight: 600 }}>{it.topicGroup}</div>
+                      </div>
+                      <span style={{ ...POPPINS, fontWeight: 800, fontSize: 14, color: barColor, flexShrink: 0 }}>{it.masteryPct}%</span>
+                    </div>
+                    <div style={{ height: 6, background: "#eef1f4", borderRadius: 6, marginBottom: 8 }}>
+                      <div style={{ height: 6, background: barColor, borderRadius: 6, width: `${it.masteryPct}%` }} />
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#c2560f", background: "#fff1e5", border: "1px solid #ffdcc0", borderRadius: 8, padding: "3px 8px" }}>{it.reason}</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#7C46E8" }}>Ôn ngay →</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== CHAPTER COMPLETE SCREEN ===== */}
       {screen === "complete" && (
@@ -1086,11 +1179,7 @@ export default function TutorHubPage() {
               Giỏi lắm, {studentName}! 🎉
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, fontSize: 13.5, color: "#5b6072", marginBottom: 22, lineHeight: 1.4 }}>
-<<<<<<< HEAD
               <Character char={char} mood="jump" size={44} face="right" />
-=======
-              <img src={COMPANION.mascot} alt={COMPANION.name} style={{ width: 28, height: 28, objectFit: "contain" }} />
->>>>>>> c50d76c (feat: integrate mascot companion GIF animations into student QA chat & cleanup unused manim module)
               <span>
                 <b>{companion.name}</b>: "Em vừa chinh phục xong bài {currentNode?.name ?? ""}!"
               </span>

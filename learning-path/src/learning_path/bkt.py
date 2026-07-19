@@ -140,3 +140,105 @@ def knowledge_state(
         },
         source_breakdown=source_breakdown,
     )
+
+
+def propagate_mastery(
+    student_id: str,
+    states: dict[str, StudentTopicKnowledgeState],
+    curriculum: CurriculumGraph,
+    store: EvidenceStore,
+    *,
+    params: BKTParams,
+    config: ConfidenceConfig,
+) -> dict[str, StudentTopicKnowledgeState]:
+    """Cơ chế cập nhật lan truyền Dynamic Alpha (mục 3.1 & 3.2 trong tài liệu kiến trúc).
+    
+    Duyệt ngược đồ thị theo thứ tự topological đảo để lan truyền mastery, confidence
+    và virtual evidence từ dependent xuống prerequisite.
+    """
+    import math
+    import networkx as nx
+
+    # 1. Khởi tạo toàn bộ trạng thái cho các topic trong đồ thị nếu chưa tồn tại
+    full_states = {}
+    for tid in curriculum.topics:
+        if tid in states:
+            full_states[tid] = states[tid].model_copy()
+        else:
+            full_states[tid] = StudentTopicKnowledgeState(
+                student_id=student_id,
+                topic_id=tid,
+                mastery_probability=params.p_l0,
+                confidence_score=0.0,
+                consistency=1.0,
+                evidence_count=0,
+                effective_evidence=0.0,
+                mastery_status="unknown",
+                evidence_summary={"evidence_sufficiency": 0.0, "posterior_certainty": 0.0},
+                source_breakdown={},
+            )
+
+    # 2. Xây dựng đồ thị NetworkX
+    g = curriculum.to_networkx()
+
+    # 3. Duyệt ngược topological sort
+    try:
+        topo_order = list(nx.topological_sort(g))
+        reverse_topo = reversed(topo_order)
+    except nx.NetworkXUnfeasible:
+        # Nếu có chu trình (không mong muốn), duyệt theo danh sách các topics
+        reverse_topo = list(curriculum.topics.keys())
+
+    # Các hằng số cho Dynamic Alpha
+    alpha_0 = 0.75
+    lambda_val = 0.4
+
+    for tid_c in reverse_topo:
+        state_c = full_states[tid_c]
+
+        # Lấy danh sách tiên quyết trực tiếp của tid_c
+        prereqs = list(g.predecessors(tid_c))
+        if not prereqs:
+            continue
+
+        # Đếm số lượng câu trả lời đúng liên tiếp gần nhất (observation_value >= 0.8)
+        evs_c = store.active_for(student_id, tid_c)
+        n = 0
+        for ev in reversed(evs_c):
+            if ev.observation_value >= 0.8:
+                n += 1
+            else:
+                break
+
+        # Tính toán Dynamic Alpha: alpha_n = alpha_0 + (1 - alpha_0) * (1 - e^(-lambda_val * n))
+        alpha_n = alpha_0 + (1 - alpha_0) * (1.0 - math.exp(-lambda_val * n))
+
+        # Lan truyền cho từng tiên quyết
+        for tid_p in prereqs:
+            state_p = full_states[tid_p]
+
+            propagated_mastery = alpha_n * state_c.mastery_probability
+            if propagated_mastery > state_p.mastery_probability:
+                state_p.mastery_probability = propagated_mastery
+
+                # Lan truyền thông số tin cậy và số evidence ảo
+                state_p.effective_evidence = max(
+                    state_p.effective_evidence, alpha_n * state_c.effective_evidence
+                )
+                state_p.confidence_score = max(
+                    state_p.confidence_score, alpha_n * state_c.confidence_score
+                )
+                state_p.evidence_count = max(
+                    state_p.evidence_count, int(alpha_n * state_c.evidence_count)
+                )
+
+                # Phân loại lại trạng thái dựa trên các thông số lan truyền mới
+                state_p.mastery_status = classify(
+                    state_p.mastery_probability,
+                    state_p.confidence_score,
+                    state_p.evidence_count,
+                    config,
+                )
+
+    return full_states
+

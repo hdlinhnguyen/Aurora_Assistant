@@ -18,6 +18,7 @@ type curriculumTopic struct {
 	Theory        string
 	GradeLevel    int
 	Strand        string
+	ChuDe         string // Chủ đề (chương) theo knowledge base graph_v2.json — dùng làm TopicGroup của node.
 	Prerequisites []string
 }
 
@@ -54,37 +55,37 @@ func grade7TargetKeys() []string {
 }
 
 func syntheticCurriculumCatalog() []curriculumTopic {
-	topic := func(key, name string, grade int, prerequisites ...string) curriculumTopic {
+	topic := func(key, name, chuDe string, grade int, prerequisites ...string) curriculumTopic {
 		return curriculumTopic{
 			StableKey: key, Name: name, Theory: name, GradeLevel: grade,
-			Strand: "Số và Đại số", Prerequisites: prerequisites,
+			Strand: "Số và Đại số", ChuDe: chuDe, Prerequisites: prerequisites,
 		}
 	}
 	return []curriculumTopic{
-		topic("l4-bieu-thuc-chu", "Biểu thức số và biểu thức chữ", 4, "l4-nhan-chia-so-tu-nhien"),
-		topic("l4-khai-niem-phan-so", "Khái niệm phân số", 4),
-		topic("l4-nhan-chia-so-tu-nhien", "Nhân, chia số tự nhiên", 4),
-		topic("l4-phep-tinh-phan-so", "Cộng, trừ, nhân, chia phân số", 4, "l4-tinh-chat-phan-so", "l4-khai-niem-phan-so"),
-		topic("l4-so-sanh-phan-so", "So sánh phân số", 4, "l4-tinh-chat-phan-so", "l4-khai-niem-phan-so"),
-		topic("l4-tinh-chat-phan-so", "Tính chất phân số - rút gọn, quy đồng", 4, "l4-khai-niem-phan-so", "l4-nhan-chia-so-tu-nhien"),
-		topic("l5-phep-tinh-so-thap-phan", "Phép tính với số thập phân", 5, "l5-so-thap-phan"),
-		topic("l5-quy-dong-phan-so", "Quy đồng mẫu số và phép tính phân số khác mẫu", 5, "l4-phep-tinh-phan-so", "l4-so-sanh-phan-so"),
-		topic("l5-so-thap-phan", "Số thập phân", 5, "l5-quy-dong-phan-so"),
-		topic("l5-ti-so-phan-tram", "Tỉ số và tỉ số phần trăm", 5, "l5-quy-dong-phan-so"),
-		topic("l6-khai-niem-so-nguyen", "Số nguyên âm - khái niệm và thứ tự", 6),
-		topic("l6-luy-thua", "Phép tính số tự nhiên và luỹ thừa", 6, "l4-nhan-chia-so-tu-nhien"),
-		topic("l6-phan-so-tinh-chat", "Phân số tử/mẫu nguyên và so sánh", 6, "l5-quy-dong-phan-so", "l6-phep-tinh-so-nguyen", "l6-uoc-boi"),
-		topic("l6-phep-tinh-phan-so", "Phép tính với phân số mở rộng", 6, "l6-phan-so-tinh-chat", "l6-uoc-boi"),
-		topic("l6-phep-tinh-so-nguyen", "Phép tính với số nguyên", 6, "l4-nhan-chia-so-tu-nhien", "l6-khai-niem-so-nguyen"),
-		topic("l6-uoc-boi", "Chia hết, số nguyên tố, ước chung và bội chung", 6, "l4-nhan-chia-so-tu-nhien"),
-		topic("l7-so-huu-ti-khai-niem", "Số hữu tỉ - khái niệm và thứ tự", 7, "l6-phan-so-tinh-chat", "l6-phep-tinh-so-nguyen"),
-		topic("l7-phep-tinh-so-huu-ti", "Phép tính với số hữu tỉ", 7, "l7-so-huu-ti-khai-niem", "l6-phep-tinh-phan-so", "l6-luy-thua", "l6-phep-tinh-so-nguyen", "l5-phep-tinh-so-thap-phan"),
-		topic("l7-can-bac-hai", "Căn bậc hai số học", 7, "l7-phep-tinh-so-huu-ti"),
-		topic("l7-so-thuc", "Số vô tỉ và số thực", 7, "l7-can-bac-hai"),
-		topic("l7-ti-le-thuc", "Tỉ lệ thức và dãy tỉ số bằng nhau", 7, "l7-phep-tinh-so-huu-ti", "l5-ti-so-phan-tram"),
-		topic("l7-dai-luong-ti-le", "Giải toán về đại lượng tỉ lệ", 7, "l7-ti-le-thuc", "l7-phep-tinh-so-huu-ti"),
-		topic("l7-bieu-thuc-dai-so", "Biểu thức đại số", 7, "l7-phep-tinh-so-huu-ti", "l4-bieu-thuc-chu"),
-		topic("l7-da-thuc-mot-bien", "Đa thức một biến", 7, "l7-bieu-thuc-dai-so"),
+		topic("l4-bieu-thuc-chu", "Biểu thức số và biểu thức chữ", "Các phép tính với số tự nhiên", 4, "l4-nhan-chia-so-tu-nhien"),
+		topic("l4-khai-niem-phan-so", "Khái niệm phân số", "Phân số", 4),
+		topic("l4-nhan-chia-so-tu-nhien", "Nhân, chia số tự nhiên", "Các phép tính với số tự nhiên", 4),
+		topic("l4-phep-tinh-phan-so", "Cộng, trừ, nhân, chia phân số", "Các phép tính với phân số", 4, "l4-tinh-chat-phan-so", "l4-khai-niem-phan-so"),
+		topic("l4-so-sanh-phan-so", "So sánh phân số", "Phân số", 4, "l4-tinh-chat-phan-so", "l4-khai-niem-phan-so"),
+		topic("l4-tinh-chat-phan-so", "Tính chất phân số - rút gọn, quy đồng", "Phân số", 4, "l4-khai-niem-phan-so", "l4-nhan-chia-so-tu-nhien"),
+		topic("l5-phep-tinh-so-thap-phan", "Phép tính với số thập phân", "Các phép tính với số thập phân", 5, "l5-so-thap-phan"),
+		topic("l5-quy-dong-phan-so", "Quy đồng mẫu số và phép tính phân số khác mẫu", "Phân số và các phép tính với phân số", 5, "l4-phep-tinh-phan-so", "l4-so-sanh-phan-so"),
+		topic("l5-so-thap-phan", "Số thập phân", "Số thập phân", 5, "l5-quy-dong-phan-so"),
+		topic("l5-ti-so-phan-tram", "Tỉ số và tỉ số phần trăm", "Tỉ số. Tỉ số phần trăm", 5, "l5-quy-dong-phan-so"),
+		topic("l6-khai-niem-so-nguyen", "Số nguyên âm - khái niệm và thứ tự", "Số nguyên", 6),
+		topic("l6-luy-thua", "Phép tính số tự nhiên và luỹ thừa", "Số tự nhiên", 6, "l4-nhan-chia-so-tu-nhien"),
+		topic("l6-phan-so-tinh-chat", "Phân số tử/mẫu nguyên và so sánh", "Phân số", 6, "l5-quy-dong-phan-so", "l6-phep-tinh-so-nguyen", "l6-uoc-boi"),
+		topic("l6-phep-tinh-phan-so", "Phép tính với phân số mở rộng", "Phân số", 6, "l6-phan-so-tinh-chat", "l6-uoc-boi"),
+		topic("l6-phep-tinh-so-nguyen", "Phép tính với số nguyên", "Số nguyên", 6, "l4-nhan-chia-so-tu-nhien", "l6-khai-niem-so-nguyen"),
+		topic("l6-uoc-boi", "Chia hết, số nguyên tố, ước chung và bội chung", "Số tự nhiên", 6, "l4-nhan-chia-so-tu-nhien"),
+		topic("l7-so-huu-ti-khai-niem", "Số hữu tỉ - khái niệm và thứ tự", "Số hữu tỉ", 7, "l6-phan-so-tinh-chat", "l6-phep-tinh-so-nguyen"),
+		topic("l7-phep-tinh-so-huu-ti", "Phép tính với số hữu tỉ", "Số hữu tỉ", 7, "l7-so-huu-ti-khai-niem", "l6-phep-tinh-phan-so", "l6-luy-thua", "l6-phep-tinh-so-nguyen", "l5-phep-tinh-so-thap-phan"),
+		topic("l7-can-bac-hai", "Căn bậc hai số học", "Số thực", 7, "l7-phep-tinh-so-huu-ti"),
+		topic("l7-so-thuc", "Số vô tỉ và số thực", "Số thực", 7, "l7-can-bac-hai"),
+		topic("l7-ti-le-thuc", "Tỉ lệ thức và dãy tỉ số bằng nhau", "Số thực", 7, "l7-phep-tinh-so-huu-ti", "l5-ti-so-phan-tram"),
+		topic("l7-dai-luong-ti-le", "Giải toán về đại lượng tỉ lệ", "Số thực", 7, "l7-ti-le-thuc", "l7-phep-tinh-so-huu-ti"),
+		topic("l7-bieu-thuc-dai-so", "Biểu thức đại số", "Biểu thức đại số", 7, "l7-phep-tinh-so-huu-ti", "l4-bieu-thuc-chu"),
+		topic("l7-da-thuc-mot-bien", "Đa thức một biến", "Biểu thức đại số", 7, "l7-bieu-thuc-dai-so"),
 	}
 }
 
@@ -201,10 +202,15 @@ func createSyntheticCurriculum(tx *gorm.DB, config Config, teacher model.User) (
 	for _, topic := range closure.Topics {
 		position := gradePosition[topic.GradeLevel]
 		gradePosition[topic.GradeLevel] = position + 1
+		theory := realTheory[topic.StableKey]
+		if theory == "" {
+			theory = fmt.Sprintf("Lớp %d · %s", topic.GradeLevel, topic.Theory)
+		}
 		node := model.Node{
 			ID: stableSyntheticUUID("curriculum", topic.StableKey), Subject: config.Subject,
-			Name: topic.Name, Theory: fmt.Sprintf("Lớp %d · %s", topic.GradeLevel, topic.Theory),
-			PosX: float64(140 + (topic.GradeLevel-4)*240), PosY: float64(140 + position*95),
+			Name: topic.Name, Theory: theory,
+			TopicGroup: topic.ChuDe,
+			PosX:       float64(140 + (topic.GradeLevel-4)*240), PosY: float64(140 + position*95),
 			StableKey: topic.StableKey, Status: "active",
 		}
 		if err := tx.Create(&node).Error; err != nil {

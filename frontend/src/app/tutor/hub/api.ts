@@ -92,6 +92,25 @@ export const getLearningPathLive = (subject: string) =>
 export const getMastery = (subject: string) =>
   apiFetch(`/student/mastery?subject=${encodeURIComponent(subject)}`) as Promise<MasteryProfile>;
 
+export interface ReviewItem {
+  nodeId: string;
+  name: string;
+  topicGroup: string;
+  masteryPct: number;
+  confidencePct: number;
+  status: string;
+  reason: string;
+  priority: number;
+  daysSince: number;
+}
+
+// Lộ trình ôn tập cá nhân hoá: các chủ đề cần củng cố, xếp theo độ ưu tiên (dựa trên BKT).
+export const getReviewPath = (subject: string) =>
+  apiFetch(`/student/review-path?subject=${encodeURIComponent(subject)}`) as Promise<{
+    subject: string;
+    items: ReviewItem[];
+  }>;
+
 export const getQuestions = (nodeId: string) =>
   apiFetch(`/nodes/${nodeId}/questions`) as Promise<RawQuestion[]>;
 
@@ -213,6 +232,22 @@ export const postFeynmanEvent = (payload: FeynmanEventPayload) =>
     method: "POST",
     body: JSON.stringify(payload),
   }) as Promise<{ ok: boolean }>;
+
+export interface FeynmanScoreResult {
+  topic: string;
+  clarityScore: number;
+  subScores: Record<string, number>;
+  vagueSpots: string[];
+  followUps: string[];
+}
+
+// Chấm Tập Vở Feynman bằng LLM; timeout ngắn để rơi về heuristic local khi offline.
+export const scoreFeynman = (nodeId: string, explanation: string) =>
+  apiFetch("/feynman/score", {
+    method: "POST",
+    body: JSON.stringify({ nodeId, explanation }),
+    signal: AbortSignal.timeout(15000),
+  }) as Promise<FeynmanScoreResult>;
 
 export const getStudentState = (subject: string) =>
   apiFetch(`/subjects/${encodeURIComponent(subject)}/state`) as Promise<{
