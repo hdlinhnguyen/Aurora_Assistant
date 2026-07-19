@@ -39,6 +39,8 @@ export interface MasteryTopic {
   masteryProbability: number; // 0..1
   confidenceScore: number;
   masteryStatus: string;
+  evidenceCount?: number;
+  effectiveEvidence?: number;
 }
 export interface MasteryProfile {
   topics: Record<string, MasteryTopic>;
@@ -93,6 +95,11 @@ export const getLearningPathLive = (subject: string) =>
 
 export const getMastery = (subject: string) =>
   apiFetch(`/student/mastery?subject=${encodeURIComponent(subject)}`) as Promise<MasteryProfile>;
+
+export const recalculateMastery = (subject: string) =>
+  apiFetch(`/student/mastery/recalculate?subject=${encodeURIComponent(subject)}`, {
+    method: "POST",
+  }) as Promise<MasteryProfile>;
 
 export interface ReviewItem {
   nodeId: string;

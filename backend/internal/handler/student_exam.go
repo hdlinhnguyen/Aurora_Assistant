@@ -490,24 +490,37 @@ func (h *StudentExamHandler) SubmitAdaptiveAnswer(c fiber.Ctx) error {
 	}
 
 	if nodeID != uuid.Nil {
+		evidenceQuestionID := examQ.ID
+		difficulty := "medium"
+		if examQ.SourceQuestionID != nil {
+			evidenceQuestionID = *examQ.SourceQuestionID
+			var sourceQuestion model.Question
+			if err := h.db.Select("difficulty").First(&sourceQuestion, "id = ?", *examQ.SourceQuestionID).Error; err == nil &&
+				sourceQuestion.Difficulty != "" {
+				difficulty = sourceQuestion.Difficulty
+			}
+		}
 		logEntry := model.ActivityLog{
 			ID:        uuid.New(),
 			StudentID: userID,
 			Subject:   exam.Subject,
 			NodeID:    nodeID,
 			Action:    action,
-			Detail:    fmt.Sprintf("Mã câu hỏi: %s. Phương án chọn: %s (Adaptive)", examQ.SourceQuestionID, req.SelectedChoiceID),
+			Detail: fmt.Sprintf(
+				"[question_id=%s] [difficulty=%s] Phương án chọn: %s (Adaptive diagnostic)",
+				evidenceQuestionID, difficulty, req.SelectedChoiceID,
+			),
 			CreatedAt: time.Now(),
 		}
-		h.db.Create(&logEntry)
+		if err := h.db.Create(&logEntry).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể lưu kết quả khảo sát"})
+		}
 
-		// Trigger BKT mastery recalculation immediately
+		// Recalculate synchronously so the next profile request observes this answer.
 		if h.masteryRecalc != nil {
-			go func() {
-				if _, err := h.masteryRecalc.RecalculateStudent(context.Background(), userID, exam.Subject); err != nil {
-					log.Printf("[StudentExam] mastery recalc error after answer: %v", err)
-				}
-			}()
+			if _, err := h.masteryRecalc.RecalculateStudent(c.Context(), userID, exam.Subject); err != nil {
+				log.Printf("[StudentExam] mastery recalc error after answer: %v", err)
+			}
 		}
 	}
 
@@ -771,4 +784,3 @@ func (h *StudentExamHandler) ResetDiagnostic(c fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"success": true})
 }
-
