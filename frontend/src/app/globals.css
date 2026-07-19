@@ -440,3 +440,11 @@
   transform: translateY(0) !important;
 }
 
+/* ===== Lộ trình ôn tập — Review Roadmap (winding map) ===== */
+@keyframes rr-pulse { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.65); opacity: 0; } }
+@keyframes rr-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes rr-fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rr-flag { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+.rr-card { transition: transform .14s ease; }
+.rr-card:hover { transform: translateY(-52%) scale(1.02) !important; }
+
