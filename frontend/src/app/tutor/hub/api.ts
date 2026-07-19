@@ -12,6 +12,8 @@ export interface HubNode {
   theory: string;
   topicGroup: string;
   isRoot: boolean;
+  posX: number;
+  posY: number;
 }
 export interface HubEdge {
   id: string;
@@ -92,6 +94,25 @@ export const getLearningPathLive = (subject: string) =>
 export const getMastery = (subject: string) =>
   apiFetch(`/student/mastery?subject=${encodeURIComponent(subject)}`) as Promise<MasteryProfile>;
 
+export interface ReviewItem {
+  nodeId: string;
+  name: string;
+  topicGroup: string;
+  masteryPct: number;
+  confidencePct: number;
+  status: string;
+  reason: string;
+  priority: number;
+  daysSince: number;
+}
+
+// Lộ trình ôn tập cá nhân hoá: các chủ đề cần củng cố, xếp theo độ ưu tiên (dựa trên BKT).
+export const getReviewPath = (subject: string) =>
+  apiFetch(`/student/review-path?subject=${encodeURIComponent(subject)}`) as Promise<{
+    subject: string;
+    items: ReviewItem[];
+  }>;
+
 export const getQuestions = (nodeId: string) =>
   apiFetch(`/nodes/${nodeId}/questions`) as Promise<RawQuestion[]>;
 
@@ -109,10 +130,11 @@ export const chatTheory = (
   nodeId: string,
   message: string,
   history: { sender: string; content: string }[],
+  questionText?: string,
 ) =>
   apiFetch(`/nodes/${nodeId}/chat-theory`, {
     method: "POST",
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, questionText }),
   }) as Promise<{ reply: string }>;
 
 export interface HintResult {
@@ -214,6 +236,22 @@ export const postFeynmanEvent = (payload: FeynmanEventPayload) =>
     body: JSON.stringify(payload),
   }) as Promise<{ ok: boolean }>;
 
+export interface FeynmanScoreResult {
+  topic: string;
+  clarityScore: number;
+  subScores: Record<string, number>;
+  vagueSpots: string[];
+  followUps: string[];
+}
+
+// Chấm Tập Vở Feynman bằng LLM; timeout ngắn để rơi về heuristic local khi offline.
+export const scoreFeynman = (nodeId: string, explanation: string) =>
+  apiFetch("/feynman/score", {
+    method: "POST",
+    body: JSON.stringify({ nodeId, explanation }),
+    signal: AbortSignal.timeout(15000),
+  }) as Promise<FeynmanScoreResult>;
+
 export const getStudentState = (subject: string) =>
   apiFetch(`/subjects/${encodeURIComponent(subject)}/state`) as Promise<{
     id: string;
@@ -226,6 +264,11 @@ export const getStudentState = (subject: string) =>
 
 export const getExams = (subject: string) =>
   apiFetch(`/student/exams?subject=${encodeURIComponent(subject)}`) as Promise<any[]>;
+
+export const resetDiagnostic = (subject: string) =>
+  apiFetch(`/student/exams/adaptive/reset?subject=${encodeURIComponent(subject)}`, {
+    method: "POST",
+  }) as Promise<{ success: boolean }>;
 
 export const getExam = (examId: string) =>
   apiFetch(`/student/exams/${examId}`) as Promise<{
@@ -247,6 +290,7 @@ export const submitAdaptiveAnswer = (examId: string, questionId: string, selecte
     isFinished: boolean;
     isCorrect: boolean;
     nextQuestion?: any;
+    summaries?: any[];
   }>;
 
 export const submitCantDo = (nodeId: string) =>
@@ -270,6 +314,7 @@ export const submitAdaptiveDowngrade = (nodeId: string) =>
 export type DiffTag = "Nhận biết" | "Thông hiểu" | "Vận dụng";
 export interface HubQuestion {
   id: string;
+  nodeId: string;
   q: string;
   opts: string[];
   correct: number;
@@ -292,6 +337,7 @@ export function mapQuestion(r: RawQuestion): HubQuestion {
   }
   return {
     id: r.id,
+    nodeId: r.nodeId,
     q: r.content,
     opts,
     correct: r.correctOption,

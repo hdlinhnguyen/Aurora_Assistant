@@ -212,16 +212,20 @@ func createSyntheticData(tx *gorm.DB, config Config) (Result, error) {
 	questionsByNode := make(map[uuid.UUID][]model.Question)
 	questionCount := 0
 	// Tạo câu hỏi cho MỌI nút (không chỉ target) để học sinh luyện tập ở đúng trình độ mình.
+	// Ưu tiên câu hỏi thật đã soạn (buildNodeQuestions); nút chưa soạn dùng phương án mẫu.
 	for nodeIndex, node := range curriculum.Topics {
-		questions := make([]model.Question, 0, 3)
-		for questionIndex := 0; questionIndex < 3; questionIndex++ {
-			question := model.Question{
-				ID: uuid.New(), NodeID: node.ID,
-				Content:     fmt.Sprintf("Câu hỏi %d.%d — bài \"%s\"", nodeIndex+1, questionIndex+1, node.Name),
-				OptionsJSON: `["Đáp án A","Đáp án B","Đáp án C","Đáp án D"]`, CorrectOption: questionIndex % 4,
-				Difficulty: []string{"easy", "medium", "hard"}[questionIndex], QuestionType: "multiple_choice", GradeLevel: "7",
+		questions := buildNodeQuestions(node.ID, node.StableKey, "7")
+		if len(questions) == 0 {
+			questions = make([]model.Question, 0, 3)
+			for questionIndex := 0; questionIndex < 3; questionIndex++ {
+				question := model.Question{
+					ID: uuid.New(), NodeID: node.ID,
+					Content:     fmt.Sprintf("Câu hỏi %d.%d — bài \"%s\"", nodeIndex+1, questionIndex+1, node.Name),
+					OptionsJSON: `["Đáp án A","Đáp án B","Đáp án C","Đáp án D"]`, CorrectOption: questionIndex % 4,
+					Difficulty: []string{"easy", "medium", "hard"}[questionIndex], QuestionType: "multiple_choice", GradeLevel: "7",
+				}
+				questions = append(questions, question)
 			}
-			questions = append(questions, question)
 		}
 		if err := tx.Create(&questions).Error; err != nil {
 			return Result{}, err

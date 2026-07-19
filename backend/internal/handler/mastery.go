@@ -17,6 +17,7 @@ type MasteryService interface {
 	GetHistory(context.Context, uuid.UUID, uuid.UUID, string) ([]mastery.HistoryPoint, error)
 	RecalculateStudent(context.Context, uuid.UUID, string) (mastery.Profile, error)
 	CanTeacherView(context.Context, uuid.UUID, uuid.UUID) error
+	BuildReviewPath(context.Context, uuid.UUID, string, int) ([]mastery.ReviewItem, error)
 }
 
 type MasteryHandler struct{ service MasteryService }
@@ -48,6 +49,53 @@ func (h *MasteryHandler) GetTeacherProfile(c fiber.Ctx) error {
 	}
 	profile, err := h.service.GetProfile(context.Background(), studentID, strings.TrimSpace(c.Query("subject")))
 	return masteryResult(c, profile, err)
+}
+
+// GetStudentReviewPath trả lộ trình ôn tập cá nhân hoá dựa trên hồ sơ BKT.
+func (h *MasteryHandler) GetStudentReviewPath(c fiber.Ctx) error {
+	studentID, err := authenticatedID(c)
+	if err != nil {
+		return err
+	}
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Vui lòng cung cấp môn học"})
+	}
+	items, err := h.service.BuildReviewPath(context.Background(), studentID, subject, 8)
+	if err != nil {
+		return masteryError(c, err)
+	}
+	if items == nil {
+		items = []mastery.ReviewItem{}
+	}
+	return c.JSON(fiber.Map{"subject": subject, "items": items})
+}
+
+// GetTeacherReviewPath cho phép giáo viên xem lộ trình ôn tập đề xuất của một học sinh.
+func (h *MasteryHandler) GetTeacherReviewPath(c fiber.Ctx) error {
+	teacherID, err := authenticatedID(c)
+	if err != nil {
+		return err
+	}
+	studentID, err := uuid.Parse(c.Params("studentId"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid student id"})
+	}
+	if err := h.service.CanTeacherView(context.Background(), teacherID, studentID); err != nil {
+		return masteryError(c, err)
+	}
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Vui lòng cung cấp môn học"})
+	}
+	items, err := h.service.BuildReviewPath(context.Background(), studentID, subject, 8)
+	if err != nil {
+		return masteryError(c, err)
+	}
+	if items == nil {
+		items = []mastery.ReviewItem{}
+	}
+	return c.JSON(fiber.Map{"subject": subject, "items": items})
 }
 
 func (h *MasteryHandler) GetStudentHistory(c fiber.Ctx) error {

@@ -818,6 +818,31 @@ func (h *TutorHandler) GetStudentsProgress(c fiber.Ctx) error {
 	return c.JSON(progress)
 }
 
+func (h *TutorHandler) GetDiagnosticTopicIDs(c fiber.Ctx) error {
+	subject := strings.TrimSpace(c.Query("subject"))
+	if subject == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Thiếu môn học cần lọc dữ liệu chẩn đoán"})
+	}
+
+	var topicUUIDs []uuid.UUID
+	if err := config.DB.Model(&model.ActivityLog{}).
+		Distinct("node_id").
+		Where("subject = ? AND action IN ?", subject, []string{"answer_correct", "answer_incorrect"}).
+		Order("node_id").
+		Pluck("node_id", &topicUUIDs).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Không thể tải dữ liệu chẩn đoán theo bài học"})
+	}
+
+	topicIDs := make([]string, 0, len(topicUUIDs))
+	for _, id := range topicUUIDs {
+		if id != uuid.Nil {
+			topicIDs = append(topicIDs, id.String())
+		}
+	}
+
+	return c.JSON(fiber.Map{"topicIds": topicIDs})
+}
+
 func (h *TutorHandler) GetMonitoringData(c fiber.Ctx) error {
 	token, ok := c.Locals("user").(*jwt.Token)
 	if !ok {
@@ -911,7 +936,7 @@ func (h *TutorHandler) ChatNodeTheory(c fiber.Ctx) error {
 	nodeIdStr := c.Params("nodeId")
 	nodeID, err := uuid.Parse(nodeIdStr)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
+		return c.Status(fiber.StatusLengthRequired).JSON(fiber.Map{"error": "ID nút không hợp lệ"})
 	}
 
 	userIDStr, _ := c.Locals("userID").(string)
@@ -921,14 +946,15 @@ func (h *TutorHandler) ChatNodeTheory(c fiber.Ctx) error {
 	}
 
 	var req struct {
-		Message string              `json:"message"`
-		History []map[string]string `json:"history"`
+		Message      string              `json:"message"`
+		History      []map[string]string `json:"history"`
+		QuestionText string              `json:"questionText"`
 	}
 	if err := c.Bind().JSON(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Dữ liệu không hợp lệ"})
 	}
 
-	reply, err := h.svc.ChatNodeTheory(userID, nodeID, req.Message, req.History)
+	reply, err := h.svc.ChatNodeTheory(userID, nodeID, req.Message, req.History, req.QuestionText)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

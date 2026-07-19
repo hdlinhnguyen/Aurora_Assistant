@@ -287,7 +287,7 @@ func (s *tutorService) AdaptiveDowngrade(studentID uuid.UUID, nodeID uuid.UUID) 
 	return res, nil
 }
 
-func (s *tutorService) ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string) (string, error) {
+func (s *tutorService) ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, message string, history []map[string]string, questionText string) (string, error) {
 	var node model.Node
 	if err := s.db.Where("id = ?", nodeID).First(&node).Error; err != nil {
 		return "", err
@@ -297,6 +297,10 @@ func (s *tutorService) ChatNodeTheory(studentID uuid.UUID, nodeID uuid.UUID, mes
 	if verdict := CheckStudentInput(message); verdict != nil {
 		s.logGuardrailEvent(studentID, nil, "theory_chat", verdict, message)
 		return SafeResponse(verdict.Category, "socratic"), nil
+	}
+
+	if questionText != "" {
+		return s.aiSvc.GenerateSocraticPracticeResponse(node.Theory, questionText, history, message)
 	}
 
 	return s.aiSvc.GenerateRAGResponse(node.Theory, history, message)

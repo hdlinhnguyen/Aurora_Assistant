@@ -3,8 +3,8 @@
 /**
  * Tập Vở Feynman — học sinh giảng lại bài cho nhân vật (bé Nấm/bé Cừu đóng vai học trò ngây thơ),
  * hệ thống chấm Clarity Score 0–100 để phát hiện "học vẹt". Port từ handoff "Aurora Feynman.dc.html".
- * Điểm chấm heuristic tại chỗ theo thiết kế (thật hoá bằng LLM sau); mỗi lần nộp gửi
- * POST /events/feynman → nguồn cho "Chỉ số Feynman Clarity" ở dashboard giáo viên.
+ * Điểm chấm bằng LLM (POST /feynman/score); heuristic local là fallback khi offline/AI chưa cấu hình.
+ * Mỗi lần nộp gửi POST /events/feynman → nguồn cho "Chỉ số Feynman Clarity" ở dashboard giáo viên.
  */
 
 import Link from "next/link";
@@ -17,6 +17,7 @@ import {
   getSubjects,
   getTree,
   postFeynmanEvent,
+  scoreFeynman,
   type MasteryProfile,
 } from "../hub/api";
 import Character, { type Mood } from "../components/Character";
@@ -132,6 +133,7 @@ function FeynmanInner() {
   });
   const [words, setWords] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [scoring, setScoring] = useState(false);
   const [result, setResult] = useState<Analysis | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -178,10 +180,30 @@ function FeynmanInner() {
     setWords(v ? v.split(/\s+/).length : 0);
   }
 
-  function submit() {
+  async function submit() {
     const v = inputRef.current ? inputRef.current.value.trim() : "";
-    if (!v) return;
-    const r = analyze(v);
+    if (!v || scoring) return;
+    setScoring(true);
+    let r: Analysis;
+    try {
+      const llm = await scoreFeynman(topic.id, v);
+      const subBars: SubBar[] = ["Rõ ràng", "Có ví dụ", "Đúng bản chất"].map((label) => {
+        const val = Math.max(0, Math.min(100, Math.round(llm.subScores?.[label] ?? 0)));
+        return { label, val, color: val >= 70 ? "#0FB9A6" : val >= 45 ? "#e0912a" : "#e05a7a" };
+      });
+      const score = Math.max(0, Math.min(100, Math.round(llm.clarityScore)));
+      r = {
+        score,
+        subBars,
+        vagueSpots: (llm.vagueSpots ?? []).slice(0, 3),
+        followUps: (llm.followUps ?? []).slice(0, 3),
+        tier: score >= 75 ? "high" : score >= 45 ? "mid" : "low",
+      };
+    } catch {
+      // Offline hoặc AI chưa cấu hình → heuristic local, Tập Vở vẫn dùng được
+      r = analyze(v);
+    }
+    setScoring(false);
     setResult(r);
     setSubmitted(true);
     if (topic.id) {
@@ -342,11 +364,12 @@ function FeynmanInner() {
                   textAlign: "center",
                   fontWeight: 800,
                   fontSize: 15,
-                  cursor: "pointer",
+                  cursor: scoring ? "wait" : "pointer",
+                  opacity: scoring ? 0.7 : 1,
                   boxShadow: "0 12px 22px -8px rgba(124,70,232,.5)",
                 }}
               >
-                🎤 Giảng cho {buddyName} nghe
+                {scoring ? `⏳ ${buddyName} đang lắng nghe...` : `🎤 Giảng cho ${buddyName} nghe`}
               </div>
               {submitted && (
                 <div

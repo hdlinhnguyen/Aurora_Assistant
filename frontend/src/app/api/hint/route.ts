@@ -73,6 +73,51 @@ Trả về duy nhất nội dung gợi ý, không kèm lời dẫn.`;
   return null;
 }
 
+async function callLLMForSocraticBridge(
+  originalTopicName: string,
+  originalQuestionText: string,
+  remedialTopicName: string
+): Promise<string | null> {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const prompt = `Bạn là trợ lý giảng dạy Socratic AI hỗ trợ học sinh học Toán.
+Học sinh vừa gặp khó khăn ở bài toán gốc thuộc chủ đề "${originalTopicName}".
+Câu hỏi gốc: "${originalQuestionText || "(Chưa có câu hỏi)"}"
+
+Để giúp học sinh, hệ thống đã lùi về hướng dẫn học sinh làm bài toán nền tảng thuộc chủ đề "${remedialTopicName}". Học sinh ĐÃ GIẢI QUYẾT THÀNH CÔNG bài toán nền tảng này!
+
+Nhiệm vụ của bạn: Hãy viết 1 câu giải thích/gợi mở cầu nối (Socratic Bridge) ngắn gọn (dưới 80 từ), truyền cảm hứng theo nguyên lý First Principles (Tư duy từ nguyên bản):
+1. Chúc mừng học sinh đã giải được bài toán nền tảng "${remedialTopicName}".
+2. Giải thích rõ ràng xem kiến thức gốc vừa làm giúp ích gì cho việc giải quyết câu hỏi gốc của chủ đề "${originalTopicName}".
+3. Khuyến khích học sinh quay lại thử sức bài toán gốc ban đầu.
+Không trả về bất kỳ lời dẫn nào, chỉ trả về duy nhất nội dung giải thích cầu nối.`;
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 200,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const aiText = data.choices?.[0]?.message?.content?.trim();
+      if (aiText) return aiText;
+    }
+  } catch {
+    // fallback
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -115,11 +160,18 @@ export async function POST(req: Request) {
         });
         if (pyRes.ok) return NextResponse.json(await pyRes.json());
       } catch {}
+
+      const dynamicBridge = await callLLMForSocraticBridge(
+        body.original_topic_name || topic_name,
+        body.original_question_text || question_text,
+        body.remedial_topic_name || "Kiến thức nền"
+      );
+
       return NextResponse.json({
         original_topic_name: body.original_topic_name || topic_name,
         remedial_topic_name: body.remedial_topic_name || "Kiến thức nền",
-        bridge_text: `Em đã làm chủ '${body.remedial_topic_name || "Kiến thức nền"}'! Bây giờ hãy áp dụng nguyên lý này để quay lại giải bài toán gốc '${body.original_topic_name || topic_name}' nhé!`,
-        source: "Socratic Bridge Engine"
+        bridge_text: dynamicBridge || `Em đã làm chủ '${body.remedial_topic_name || "Kiến thức nền"}'! Bây giờ hãy áp dụng nguyên lý này để quay lại giải bài toán gốc '${body.original_topic_name || topic_name}' nhé!`,
+        source: dynamicBridge ? "LLM (Real-time Socratic Bridge)" : "Socratic Bridge Engine"
       });
     }
 

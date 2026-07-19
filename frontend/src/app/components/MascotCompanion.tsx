@@ -20,6 +20,7 @@ interface MascotCompanionProps {
   speechBubble?: string;
   badgeText?: string;
   compact?: boolean;
+  borderless?: boolean;
 }
 
 const GIF_MAP: Record<MascotState, string> = {
@@ -67,6 +68,7 @@ export default function MascotCompanion({
   speechBubble,
   badgeText,
   compact = false,
+  borderless = false,
 }: MascotCompanionProps) {
   const gifSrc = GIF_MAP[state] || GIF_MAP.idle;
   const bubbleContent = speechBubble || DEFAULT_MESSAGES[state] || DEFAULT_MESSAGES.idle;
@@ -74,8 +76,19 @@ export default function MascotCompanion({
 
   return (
     <div
-      className="mascot-companion-container"
-      style={{
+      className={borderless ? "" : "mascot-companion-container"}
+      style={borderless ? {
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: compact ? "6px 8px" : "12px 14px",
+        background: "transparent",
+        border: "none",
+        position: "relative",
+        width: "100%",
+        flexShrink: 0,
+      } : {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -92,23 +105,25 @@ export default function MascotCompanion({
       }}
     >
       {/* Dynamic Status Badge Header */}
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "4px 12px",
-          borderRadius: 999,
-          background: badgeInfo.bg,
-          color: badgeInfo.color,
-          fontSize: 11.5,
-          fontWeight: 700,
-          marginBottom: 12,
-          boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
-        }}
-      >
-        <span>{badgeText || badgeInfo.label}</span>
-      </div>
+      {!borderless && (
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 12px",
+            borderRadius: 999,
+            background: badgeInfo.bg,
+            color: badgeInfo.color,
+            fontSize: 11.5,
+            fontWeight: 700,
+            marginBottom: 12,
+            boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
+          }}
+        >
+          <span>{badgeText || badgeInfo.label}</span>
+        </div>
+      )}
 
       {/* Speech Bubble */}
       <div
