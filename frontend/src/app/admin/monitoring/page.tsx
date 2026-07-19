@@ -172,17 +172,6 @@ export default function AdminMonitoringPage() {
 
   return (
     <div className="space-y-8">
-      {/* Prototype banner */}
-      <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm">
-        <FlaskConical className="h-5 w-5 shrink-0 text-amber-600" />
-        <p>
-          <span className="font-bold text-amber-700 dark:text-amber-400">Prototype:</span>{" "}
-          <span className="text-muted-foreground">
-            Số liệu tài khoản ở Tầng 1 đã được kết nối với API thực tế. Các số liệu LangGraph (Tầng 2) và AI Cost (Tầng 3) là dữ liệu minh hoạ tĩnh.
-          </span>
-        </p>
-      </div>
-
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -190,7 +179,7 @@ export default function AdminMonitoringPage() {
             Admin Matrix Dashboard
           </h1>
           <p className="text-muted-foreground mt-2">
-            Giám sát người dùng, hạ tầng LangGraph và chi phí AI trên cùng một màn hình.
+            Giám sát người dùng (DB Realtime), hạ tầng LangGraph (Mock) và chi phí AI (Mock) trên cùng một màn hình.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-4 py-2">
@@ -204,7 +193,7 @@ export default function AdminMonitoringPage() {
         <TierHeader
           icon={Users}
           tier="Tầng 1"
-          title="Thống kê Tài khoản & Mức độ Hoạt động"
+          title="Thống kê Tài khoản (Real) & Mức độ Hoạt động (Mock)"
           subtitle="User Metrics Overview"
           action={<RangePicker value={tier1Range} onChange={setTier1Range} />}
         />
@@ -215,8 +204,8 @@ export default function AdminMonitoringPage() {
             label="Student Count"
             fields={[
               { label: "Total (DB)", value: loadingMetrics ? "..." : String(studentsCount), highlight: true },
-              { label: "Online hôm nay", value: "187", highlight: true },
-              { label: "Tăng trưởng tuần", value: "+6.4%", highlight: true },
+              { label: "Online hôm nay (Mock)", value: "187", highlight: true },
+              { label: "Tăng trưởng tuần (Mock)", value: "+6.4%", highlight: true },
             ]}
           />
           <MetricCard
@@ -229,7 +218,7 @@ export default function AdminMonitoringPage() {
           />
           <MetricCard
             icon={Activity}
-            label="Session Metrics"
+            label="Session Metrics (Mock)"
             fields={[
               { label: "Tổng phiên online", value: "312" },
               { label: "Peak concurrent", value: "89" },
@@ -237,7 +226,7 @@ export default function AdminMonitoringPage() {
           />
           <MetricCard
             icon={Layers}
-            label="Adaptive Strategy Metrics"
+            label="Adaptive Strategy Metrics (Mock)"
             fields={[
               { label: "remediation_group_count", value: "14" },
               { label: "advanced_group_count", value: "5" },
@@ -248,7 +237,7 @@ export default function AdminMonitoringPage() {
         {/* HAU chart */}
         <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-            <p className="text-sm font-bold">Hourly Active Users (HAU) — Last 24 hours</p>
+            <p className="text-sm font-bold">Hourly Active Users (HAU) — Last 24 hours (Mock)</p>
             <RangePicker value={hauRange} onChange={setHauRange} />
           </div>
           <div className="flex items-end gap-1.5 h-40">
@@ -257,7 +246,7 @@ export default function AdminMonitoringPage() {
                 <div
                   className="w-full rounded-t-md bg-gradient-to-t from-[var(--mint)] to-[var(--purple)] transition-all group-hover:opacity-80"
                   style={{ height: `${(v / maxHau) * 100}%` }}
-                  title={`${i}:00 — ${v} người dùng`}
+                  title={`${i}:00 — ${v} người dùng (Mock)`}
                 />
               </div>
             ))}
@@ -277,7 +266,7 @@ export default function AdminMonitoringPage() {
         <TierHeader
           icon={Server}
           tier="Tầng 2"
-          title="Giám sát FastAPI & LangGraph"
+          title="Giám sát FastAPI & LangGraph (Mock)"
           subtitle="Infrastructure Performance"
           action={
             <div className="flex items-center gap-2">
@@ -305,7 +294,7 @@ export default function AdminMonitoringPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {/* LangGraph Node Latency */}
           <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-            <p className="text-sm font-bold mb-5">LangGraph Node Latency</p>
+            <p className="text-sm font-bold mb-5">LangGraph Node Latency (Mock)</p>
             <div className="space-y-4">
               {LANGGRAPH_NODES.map((n) => (
                 <div key={n.name}>
@@ -326,7 +315,7 @@ export default function AdminMonitoringPage() {
 
           {/* HTTP Status Tracker */}
           <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-            <p className="text-sm font-bold mb-5">HTTP Status Tracker</p>
+            <p className="text-sm font-bold mb-5">HTTP Status Tracker (Mock)</p>
             <div className="space-y-3">
               {HTTP_STATUS.map((s) => (
                 <div key={s.bucket} className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${s.color}`}>
@@ -347,7 +336,7 @@ export default function AdminMonitoringPage() {
         <TierHeader
           icon={Gauge}
           tier="Tầng 3"
-          title="Kiểm soát Token & Chi phí Google Gemini API"
+          title="Kiểm soát Token & Chi phí Google Gemini API (Mock)"
           subtitle="AI Cost Control"
         />
 
@@ -369,12 +358,12 @@ export default function AdminMonitoringPage() {
                   <span className="text-[9px] text-muted-foreground font-semibold text-center leading-tight">
                     quota
                     <br />
-                    còn lại
+                    còn lại (Mock)
                   </span>
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Estimated Cost Burn Rate</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Estimated Cost Burn Rate (Mock)</p>
                 <p className="text-2xl font-extrabold tracking-tight">${COST_BURN.usd.toFixed(2)}</p>
                 <p className="text-sm font-bold text-muted-foreground">{COST_BURN.vnd.toLocaleString("vi-VN")} ₫</p>
               </div>
@@ -385,8 +374,8 @@ export default function AdminMonitoringPage() {
             {/* Quota */}
             <div className="rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)] flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold">Current Quota</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Bật/tắt giới hạn gọi API tự động</p>
+                <p className="text-sm font-bold">Current Quota (Mock)</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Bật/tắt giới hạn gọi API tự động (Chưa kết nối DB)</p>
               </div>
               <span className="inline-flex h-6 w-11 items-center rounded-full bg-emerald-500 px-0.5">
                 <span className="h-5 w-5 rounded-full bg-white translate-x-5 transition-transform" />
@@ -397,8 +386,8 @@ export default function AdminMonitoringPage() {
             <div className="rounded-3xl border border-emerald-500/25 bg-emerald-500/5 p-5 shadow-[var(--shadow-card)] flex items-center gap-3">
               <ShieldCheck className="h-8 w-8 text-emerald-500 shrink-0" />
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Billing Circuit Breaker</p>
-                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Đang hoạt động bình thường</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Billing Circuit Breaker (Mock)</p>
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Đang hoạt động bình thường (Chưa kết nối DB)</p>
               </div>
             </div>
 
@@ -418,7 +407,7 @@ export default function AdminMonitoringPage() {
         <span className="font-semibold">online</span>
         <span className="mx-1">·</span>
         <TrendingUp className="h-3.5 w-3.5" />
-        <span>Aurora Assistant Admin Matrix Dashboard — Prototype v0.1</span>
+        <span>Aurora Assistant Admin Matrix Dashboard — Ops Matrix</span>
       </div>
     </div>
   );
