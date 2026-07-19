@@ -73,7 +73,8 @@ import {
   ArrowRight,
   Check,
   Star,
-  Flag
+  Flag,
+  Map
 } from "lucide-react";
 
 const BALOO: CSSProperties = { fontFamily: "'Baloo 2', system-ui, sans-serif" };
@@ -1129,7 +1130,7 @@ export default function TutorHubPage() {
             {!needsDiagnostic ? (
               <>
                 <div onClick={() => setActiveTab("roadmap")} style={activeTab === "roadmap" ? tabOn : tabOff}>
-                  <span style={{ fontSize: 15 }}>🗺️</span> Lộ trình ôn tập
+                  <Map size={15} /> Lộ trình ôn tập
                   {reviewItems.length > 0 && (
                     <span
                       style={{
@@ -1191,7 +1192,7 @@ export default function TutorHubPage() {
                   marginLeft: "auto",
                   display: "flex",
                   alignItems: "center",
-                  gap: 6,
+                  gap: 8,
                   padding: "10px 16px",
                   borderRadius: 14,
                   fontSize: 13,
@@ -1203,7 +1204,7 @@ export default function TutorHubPage() {
                   boxShadow: "0 6px 14px -8px rgba(15,185,166,.4)",
                 }}
               >
-                📓 Tập Vở Feynman
+                <BookOpen size={15} /> Tập Vở Feynman
               </div>
             )}
           </div>
@@ -1212,7 +1213,9 @@ export default function TutorHubPage() {
           {activeTab === "roadmap" && (
             <div className="ah-panel" style={{ animation: "rr-fade .3s ease-out", border: "1px solid #eef1f4", borderRadius: 26, background: "linear-gradient(180deg,#fff7ef 0%,#fff 180px)", boxShadow: "0 20px 50px -28px rgba(194,86,15,.35)", padding: "26px 22px 34px", overflow: "hidden" }}>
               <div style={{ textAlign: "center", marginBottom: 6 }}>
-                <div style={{ ...BALOO, fontWeight: 800, fontSize: 23, color: "#c2560f" }}>🗺️ Lộ trình ôn tập của em</div>
+                <div style={{ ...BALOO, fontWeight: 800, fontSize: 23, color: "#c2560f", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <Map size={24} style={{ color: "#c2560f" }} /> Lộ trình ôn tập của em
+                </div>
                 <div style={{ fontSize: 13, color: "#5b6072", fontWeight: 600, marginTop: 4 }}>Ôn từ gốc lên — mỗi chặng là một trạm, chinh phục để mở đường lên đỉnh 🏔️</div>
               </div>
 
