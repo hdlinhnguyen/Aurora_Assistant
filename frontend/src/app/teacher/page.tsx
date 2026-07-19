@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 
 const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
 import { telemetry } from "@/lib/telemetry";
@@ -1789,8 +1790,15 @@ export default function TeacherDashboard() {
         }`}>
         <div className="p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-white shadow-sm shrink-0 font-bold text-sm">
-              📖
+            <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm">
+              <Image
+                src="/icon.png"
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 rounded-lg object-contain"
+                aria-hidden="true"
+              />
             </div>
             <span className="font-[var(--font-display)] font-extrabold text-slate-800 tracking-tight text-base">Teacher Hub</span>
           </div>
