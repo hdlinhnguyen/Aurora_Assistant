@@ -296,6 +296,7 @@ export default function TutorHubPage() {
       });
       return {
         id: `demo-${nodeId}-${idx}`,
+        nodeId,
         q: item.q,
         opts: shuffled.map(o => o.opt),
         correct: shuffled.findIndex(o => o.isCorrect),
@@ -577,6 +578,12 @@ export default function TutorHubPage() {
     : questions;
   const q = filteredQuestions[qIndex];
   const qTotal = filteredQuestions.length;
+  const questionTheoryNode = q?.nodeId ? nodes.find((n) => n.id === q.nodeId) : undefined;
+  const reviewTheoryNode = questionTheoryNode ?? currentNode;
+  const reviewTheoryText =
+    reviewTheoryNode?.theory?.trim() ||
+    "Nội dung lý thuyết cho câu này đang được cập nhật. Em có thể trò chuyện với Nova hoặc luyện tập trắc nghiệm nhé!";
+  const reviewQuestionPreview = q?.q ? firstSentence(q.q.replace(/<[^>]*>/g, "").trim(), 150) : "";
   const doneCount = roadmap.filter((s) => s.status === "done").length;
   const totalSteps = roadmap.length || 1;
   const chapterPct = Math.round((doneCount / totalSteps) * 100);
@@ -843,209 +850,169 @@ export default function TutorHubPage() {
         color: "#16161F",
       }}
     >
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-        {/* ============ ROADMAP RAIL ============ */}
-        <aside
-          style={{
-            width: 290,
-            background: "#fff",
-            borderRight: "1px solid #eef1f4",
-            display: "flex",
-            flexDirection: "column",
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #f2f4f7" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
-              <img
-                src="/icon.png"
-                alt="Aurora"
-                style={{
-                  height: 38,
-                  width: 38,
-                  borderRadius: 12,
-                  objectFit: "cover",
-                }}
-              />
-              <div>
-                <div style={{ ...POPPINS, fontWeight: 800, fontSize: 16, lineHeight: 1 }}>Aurora</div>
-                <div style={{ fontSize: 11, color: "#9aa1b0", marginTop: 2 }}>Học thật, hiểu thật</div>
-              </div>
-            </div>
-            <div
+      {/* ============ TOP NAVBAR ============ */}
+      <header
+        style={{
+          height: 64,
+          background: "rgba(255, 255, 255, 0.85)",
+          backdropFilter: "blur(12px)",
+          borderBottom: "1px solid #eef1f4",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+          zIndex: 10,
+          flexShrink: 0,
+        }}
+      >
+        {/* Left: Brand logo & Name + Subject info */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src="/icon.png"
+              alt="Aurora"
               style={{
-                background: "#f4f6f9",
-                border: "1px solid #eef1f4",
-                borderRadius: 13,
-                padding: "10px 13px",
-                fontSize: 13.5,
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                height: 34,
+                width: 34,
+                borderRadius: 10,
+                objectFit: "cover",
               }}
-            >
-              <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                <span>📐</span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subject}</span>
-              </span>
+            />
+            <div>
+              <div style={{ ...POPPINS, fontWeight: 800, fontSize: 15, lineHeight: 1 }}>Aurora</div>
+              <div style={{ fontSize: 10, color: "#9aa1b0", marginTop: 2 }}>Học thật, hiểu thật</div>
             </div>
           </div>
+          <div style={{ width: 1, height: 24, background: "#eef1f4" }} />
+          <div
+            style={{
+              background: "#f4f6f9",
+              border: "1px solid #eef1f4",
+              borderRadius: 10,
+              padding: "6px 12px",
+              fontSize: 12.5,
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span>📐</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+              {subject}
+            </span>
+          </div>
+        </div>
 
-          <div style={{ padding: "16px 12px", overflowY: "auto", flex: 1 }}>
+        {/* Center: Chapter Progress Bar */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              ...POPPINS,
+              fontSize: 11,
+              fontWeight: 800,
+              color: "#9aa1b0",
+              textTransform: "uppercase",
+              letterSpacing: ".05em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180, display: "inline-block", verticalAlign: "middle" }}>
+              {chapterName}
+            </span>
+            <span style={{ color: "#0FB9A6", marginLeft: 6 }}>
+              {doneCount}/{totalSteps} bài
+            </span>
+          </div>
+          <div style={{ width: 120, height: 6, background: "#eef1f4", borderRadius: 6, overflow: "hidden" }}>
+            <div
+              style={{
+                height: "100%",
+                background: "linear-gradient(90deg,#14D9C0,#0FB9A6)",
+                borderRadius: 6,
+                width: `${chapterPct}%`,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Right: Gamification Info & User profile & Logout */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {/* Stats: Streak & Stars */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "#fafbfc",
+              border: "1px solid #eef1f4",
+              borderRadius: 12,
+              padding: "6px 12px",
+              fontSize: 12.5,
+              fontWeight: 700,
+            }}
+          >
+            <span title="Chuỗi học tập" style={{ cursor: "default" }}>🔥 {streak}</span>
+            <div style={{ width: 1, height: 14, background: "#eef1f4" }} />
+            <span title="Sao tích lũy" style={{ cursor: "default" }}>⭐ {stars}</span>
+          </div>
+
+          {/* User profile */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div
               style={{
                 ...POPPINS,
-                fontSize: 10.5,
-                fontWeight: 800,
-                color: "#9aa1b0",
-                textTransform: "uppercase",
-                letterSpacing: ".07em",
-                padding: "0 8px 4px",
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chapterName}</span>
-              <span style={{ color: "#0FB9A6", flexShrink: 0 }}>
-                {doneCount}/{totalSteps}
-              </span>
-            </div>
-            <div style={{ padding: "0 8px 12px" }}>
-              <div style={{ height: 6, background: "#eef1f4", borderRadius: 6 }}>
-                <div
-                  style={{
-                    height: 6,
-                    background: "linear-gradient(90deg,#14D9C0,#0FB9A6)",
-                    borderRadius: 6,
-                    width: `${chapterPct}%`,
-                  }}
-                />
-              </div>
-            </div>
-
-            {roadmap.map((st, i) => {
-              const gated = needsDiagnostic;
-              const active = st.id === currentStepId && !gated;
-              const done = st.status === "done" && !gated;
-              const locked = (st.status === "locked" && !active) || gated;
-              const rowStyle: CSSProperties = {
-                display: "flex",
-                alignItems: "center",
-                gap: 11,
-                padding: "11px 12px",
-                borderRadius: 14,
-                marginBottom: 5,
-                transition: "all .15s",
-                ...(active
-                  ? {
-                      background: "linear-gradient(135deg,#EFE9FD,#f6f1ff)",
-                      boxShadow: "inset 0 0 0 2px #7C46E8",
-                      cursor: "pointer",
-                    }
-                  : done
-                    ? { background: "#F3FBF9", cursor: "pointer" }
-                    : locked
-                      ? { cursor: "pointer", opacity: 0.95 }
-                      : { cursor: "pointer" }),
-              };
-              const badgeStyle: CSSProperties = {
-                height: 26,
-                width: 26,
+                height: 30,
+                width: 30,
                 borderRadius: "50%",
+                background: "linear-gradient(135deg,#ffd76f,#ff9f43)",
                 display: "grid",
                 placeItems: "center",
+                fontWeight: 800,
+                color: "#7a4b00",
                 fontSize: 12,
-                fontWeight: 800,
-                flexShrink: 0,
-                ...(active
-                  ? { background: "#7C46E8", color: "#fff" }
-                  : done
-                    ? { background: "#14D9C0", color: "#fff" }
-                    : { background: "#eef1f4", color: "#b3b9c4" }),
-              };
-              const nameStyle: CSSProperties = {
-                fontSize: 12.5,
-                fontWeight: active ? 800 : 600,
-                flex: 1,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                color: active ? "#5b2fc0" : done ? "#16161F" : "#a2a8b4",
-              };
-              const tag = active ? "đang học" : locked ? <Lock size={12} style={{ color: "#a2a8b4" }} /> : null;
-              const tagStyle: CSSProperties = {
-                fontSize: 10,
-                fontWeight: 700,
-                padding: active ? "2px 8px" : "0",
-                borderRadius: 999,
-                flexShrink: 0,
-                ...(active ? { background: "#fff", color: "#7C46E8" } : { color: "#c2c8d2" }),
-              };
-              return (
-                <div key={st.id} onClick={() => selectStep(st)} style={rowStyle} title={st.name}>
-                  <span style={badgeStyle}>{done ? "✓" : String(i + 1)}</span>
-                  <span style={nameStyle}>{st.name}</span>
-                  <span style={tagStyle}>{tag}</span>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ padding: 14, borderTop: "1px solid #f2f4f7" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 10 }}>
-              <div
-                style={{
-                  ...POPPINS,
-                  height: 38,
-                  width: 38,
-                  borderRadius: "50%",
-                  background: "linear-gradient(135deg,#ffd76f,#ff9f43)",
-                  display: "grid",
-                  placeItems: "center",
-                  fontWeight: 800,
-                  color: "#7a4b00",
-                }}
-              >
-                {studentName.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {studentName}
-                </div>
-                <div style={{ fontSize: 11, color: "#9aa1b0" }}>
-                  🔥 {streak} ngày · ⭐ {stars}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                localStorage.clear();
-                router.push("/");
-              }}
-              style={{
-                ...POPPINS,
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                padding: "9px 14px",
-                border: "1px solid #f8d3da",
-                borderRadius: 12,
-                background: "#fef3f5",
-                color: "#c23a54",
-                fontSize: 12.5,
-                fontWeight: 800,
-                cursor: "pointer",
-                transition: "all .15s",
               }}
             >
-              <LogOut size={14} /> Đăng xuất
-            </button>
+              {studentName.charAt(0).toUpperCase()}
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 700, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {studentName}
+            </span>
           </div>
-        </aside>
+
+          <div style={{ width: 1, height: 20, background: "#eef1f4" }} />
+
+          {/* Logout */}
+          <button
+            onClick={() => {
+              localStorage.clear();
+              router.push("/");
+            }}
+            title="Đăng xuất"
+            style={{
+              ...POPPINS,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "8px 12px",
+              border: "1px solid #f8d3da",
+              borderRadius: 10,
+              background: "#fef3f5",
+              color: "#c23a54",
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: "pointer",
+              transition: "all .15s",
+            }}
+          >
+            <LogOut size={13} />
+            <span>Thoát</span>
+          </button>
+        </div>
+      </header>
+
+      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
         {/* ============ WORKSPACE ============ */}
         <main
@@ -1673,9 +1640,30 @@ export default function TutorHubPage() {
                       <Key size={18} style={{ color: "#eab308" }} />
                       <span>Ý tưởng chính</span>
                     </div>
-                    <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: "#4b5060", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
-                      {currentNode?.theory?.trim() || "Nội dung lý thuyết cho bài này đang được cập nhật. Em có thể trò chuyện với Nova hoặc luyện tập trắc nghiệm nhé!"}
-                    </p>
+                    {q && (
+                      <div style={{ marginBottom: 18, padding: "12px 14px", borderRadius: 16, background: "linear-gradient(180deg,#fbf8ff,#ffffff)", border: "1px solid #ece5fb", color: "#5b2fc0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                          <span style={{ ...POPPINS, fontSize: 10.5, fontWeight: 850, textTransform: "uppercase", letterSpacing: ".04em", padding: "4px 8px", borderRadius: 999, background: "#f2ebff", color: "#6d37d8" }}>
+                            Theo câu đang làm
+                          </span>
+                          <span style={{ ...POPPINS, fontSize: 12.5, fontWeight: 800, color: "#252033" }}>
+                            {reviewTheoryNode?.name || currentNode?.name || "Bài học"}
+                          </span>
+                        </div>
+                        {reviewQuestionPreview && (
+                          <SafeHtml
+                            text={reviewQuestionPreview}
+                            variant="tutor"
+                            style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: "#4b5060" }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    <SafeHtml
+                      text={reviewTheoryText}
+                      variant="tutor"
+                      style={{ margin: 0, fontSize: 14.5, lineHeight: 1.75, color: "#4b5060", textWrap: "pretty", whiteSpace: "pre-wrap" }}
+                    />
                     <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
                       <button
                         onClick={() => setReviewLeftSubTab("practice")}

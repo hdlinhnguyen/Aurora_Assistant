@@ -279,6 +279,7 @@ export const submitAdaptiveDowngrade = (nodeId: string) =>
 export type DiffTag = "Nhận biết" | "Thông hiểu" | "Vận dụng";
 export interface HubQuestion {
   id: string;
+  nodeId: string;
   q: string;
   opts: string[];
   correct: number;
@@ -301,6 +302,7 @@ export function mapQuestion(r: RawQuestion): HubQuestion {
   }
   return {
     id: r.id,
+    nodeId: r.nodeId,
     q: r.content,
     opts,
     correct: r.correctOption,
